@@ -1,0 +1,186 @@
+// SPDX-License-Identifier: CC-BY-NC-SA-4.0
+// Copyright (c) 2026 Noschvie
+// KNX Runtime Engine – https://github.com/Noschvie/semantic-knx-gateway.git
+
+import { Router } from 'express';
+import { bearer } from '../middleware/oauth-bearer.js';
+import { toDeviceResource } from './helpers/knx-iot-transform.js';
+import { paginate, stableUuid } from './helpers/knx-iot-uuid.js';
+
+// ── KNX IoT Spec §Errors ──────────────────────────────────────────────────────
+const KNX_SCHEMA_LINK = 'https://schema.knx.org/2020/api';
+
+function knxError(status, title, detail) {
+    return { errors: [{ title, links: KNX_SCHEMA_LINK, status: String(status), detail }] };
+}
+
+// ── Filter Helpers ────────────────────────────────────────────────────────────
+
+/**
+ * Parst alle filter[...]-Query-Parameter aus req.query.
+ *
+ * Spec-Beispiele:
+ *   filter[meta.@type]=Device
+ *   filter[meta.@type][or]=Room,Floor
+ *   filter[title]=Actuator
+ *   filter[state][eq]=Tested
+ *   filter[hasTag]=switch
+ *
+ * @returns {Array<{ key: string, operator: string, values: string[] }>}
+ */
+function parseFilters(query) {
+    const filters = [];
+    const re = /^filter\[([^\]]+)\](?:\[([^\]]+)\])?$/;
+
+    for (const [param, raw] of Object.entries(query)) {
+        const m = param.match(re);
+        if (!m) continue;
+
+        const key      = m[1];                          // z.B. "meta.@type", "title", "hasTag"
+        const operator = (m[2] ?? 'eq').toLowerCase();  // eq | or | and | le | ge | lt | gt
+        const values   = String(raw).split(',').map(v => v.trim()).filter(Boolean);
+
+        filters.push({ key, operator, values });
+    }
+
+    return filters;
+}
+
+/**
+ * Liest einen verschachtelten Wert aus einem Objekt anhand eines Pfades.
+ * Unterstützt: "meta.@type", "attributes.title", "title" (shorthand für attributes.title)
+ */
+function getField(resource, key) {
+    // Direkte JSON:API-Pfade: meta.@type, attributes.title, relationships.*
+    const parts = key.split('.');
+
+    // Versuche zuerst den exakten Pfad im resource-Objekt
+    let val = resource;
+    for (const p of parts) {
+        if (val == null) return undefined;
+        val = val[p];
+    }
+    if (val !== undefined) return val;
+
+    // Shorthand: "title" → resource.attributes.title
+    if (parts.length === 1) {
+        return resource?.attributes?.[key];
+    }
+
+    return undefined;
+}
+
+/**
+ * Vergleicht zwei Werte anhand des Spec-Operators.
+ * String → lexikalisch, Number → numerisch, Array → enthält-Prüfung.
+ */
+function matchValue(fieldVal, filterVal, operator) {
+    // Array-Felder (z.B. meta.@type): mind. ein Element muss matchen
+    if (Array.isArray(fieldVal)) {
+        return fieldVal.some(v => matchValue(v, filterVal, operator));
+    }
+
+    const a = String(fieldVal ?? '').toLowerCase();
+    const b = filterVal.toLowerCase();
+
+    // Namespace-Präfix optional: "Device" matched "knx:device" oder "core:Device"
+    const aStripped = a.includes(':') ? a.split(':').pop() : a;
+    const bStripped = b.includes(':') ? b.split(':').pop() : b;
+
+    switch (operator) {
+        case 'eq':  return aStripped === bStripped;
+        case 'le':  return isNaN(fieldVal) ? a <= b : Number(fieldVal) <= Number(filterVal);
+        case 'ge':  return isNaN(fieldVal) ? a >= b : Number(fieldVal) >= Number(filterVal);
+        case 'lt':  return isNaN(fieldVal) ? a <  b : Number(fieldVal) <  Number(filterVal);
+        case 'gt':  return isNaN(fieldVal) ? a >  b : Number(fieldVal) >  Number(filterVal);
+        default:    return aStripped === bStripped;
+    }
+}
+
+/**
+ * Wendet einen einzelnen Filter auf ein Array von JSON:API Resources an.
+ *
+ * operator=or  → Feld muss einem der Werte entsprechen
+ * operator=and → Feld muss allen Werten entsprechen
+ * alle anderen → erster Wert wird mit matchValue verglichen
+ */
+function applyFilter(resources, { key, operator, values }) {
+    return resources.filter(resource => {
+        const fieldVal = getField(resource, key);
+
+        if (fieldVal === undefined || fieldVal === null) return false;
+
+        if (operator === 'or') {
+            return values.some(v => matchValue(fieldVal, v, 'eq'));
+        }
+        if (operator === 'and') {
+            return values.every(v => matchValue(fieldVal, v, 'eq'));
+        }
+
+        // eq / le / ge / lt / gt → erster Wert
+        return matchValue(fieldVal, values[0] ?? '', operator);
+    });
+}
+
+/**
+ * Wendet alle geparsten Filter sequenziell an (AND-Verknüpfung zwischen Filtern).
+ */
+function applyAllFilters(resources, filters) {
+    let result = resources;
+    for (const filter of filters) {
+        result = applyFilter(result, filter);
+    }
+    return result;
+}
+
+// ── Router ────────────────────────────────────────────────────────────────────
+
+export function devicesRouter(semanticEngine) {
+    const router = Router();
+
+    // GET /api/v1/devices
+    router.get('/', bearer('read'), async (req, res) => {
+        try {
+            const rawNumber = req.query['page[number]'] ?? req.query.page?.number;
+            const rawSize   = req.query['page[size]']   ?? req.query.page?.size;
+
+            const allDevices  = await semanticEngine.getAllDevices();
+            const resources   = allDevices.map(toDeviceResource);
+
+            // ── Filter anwenden (typeFilter / tagFilter / attributeFilter) ──
+            const filters         = parseFilters(req.query);
+            const filteredResources = applyAllFilters(resources, filters);
+
+            const { items, total, number, size } = paginate(filteredResources, rawNumber, rawSize);
+
+            res.json({
+                meta: { collection: { number, size, total } },
+                data: items,
+            });
+        } catch (error) {
+            res.status(500).json(knxError(500, 'Internal Server Error', error.message));
+        }
+    });
+
+    // GET /api/v1/devices/:id
+    router.get('/:id', bearer('read'), async (req, res) => {
+        try {
+            const { id } = req.params;
+
+            const allDevices = await semanticEngine.getAllDevices();
+            const device = allDevices.find(
+                d => stableUuid(d.id ?? d.uri ?? '') === id || d.id === id
+            );
+
+            if (!device) {
+                return res.status(404).json(knxError(404, 'Not Found', `Device ${id} not found`));
+            }
+
+            res.json({ data: toDeviceResource(device) });
+        } catch (error) {
+            res.status(500).json(knxError(500, 'Internal Server Error', error.message));
+        }
+    });
+
+    return router;
+}

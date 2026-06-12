@@ -1,0 +1,117 @@
+// SPDX-License-Identifier: CC-BY-NC-SA-4.0
+// Copyright (c) 2026 Noschvie
+// KNX Runtime Engine – https://github.com/Noschvie/semantic-knx-gateway.git
+
+// helpers/knx-iot-dpt.js – DPT Encoding, GA-Konvertierung, Spec-Wert-Mapping
+
+import { DPT_NAME_MAP, DPT_TO_DATAPOINT_TYPE } from '../../../utils/dpt-map.js';
+
+/**
+ * Löst einen DPT-String in KNX IoT Spec-konforme datapointType IRIs auf.
+ * Beispiel: "9.001" → ["knx:dpa.9.1"]
+ */
+export function resolveDatapointTypes(dpt) {
+    if (!dpt) return [];
+    let resolved = dpt;
+    if (!/^\d/.test(dpt)) {
+        resolved = DPT_NAME_MAP[dpt]
+            ?? DPT_NAME_MAP[Object.keys(DPT_NAME_MAP).find(
+                (k) => k.toLowerCase() === dpt.toLowerCase()
+            )]
+            ?? dpt;
+    }
+    const iri = DPT_TO_DATAPOINT_TYPE[resolved];
+    if (iri) return [iri];
+    const main = parseInt(resolved.split('.')[0]);
+    const sub  = parseInt(resolved.split('.')[1] ?? '0');
+    if (!isNaN(main)) return [`knx:dpa.${main}.${sub}`];
+    return [];
+}
+
+/**
+ * Konvertiert GA-String "1/5/1" in KNX-Integer-Kodierung.
+ * Formel: main*2048 + middle*256 + sub
+ */
+export function gaToInteger(gaString) {
+    if (!gaString) return null;
+    const parts = gaString.split('/').map(Number);
+    if (parts.length !== 3 || parts.some(isNaN)) return null;
+    const [main, middle, sub] = parts;
+    return main * 2048 + middle * 256 + sub;
+}
+
+/**
+ * Konvertiert beliebige DB-Werte in Spec-konforme Strings oder Arrays.
+ * Spec: value ist IMMER string oder array (niemals boolean/number direkt).
+ * @returns {{ value: string|string[]|null, valueType: 'string'|'object' }}
+ */
+export function toSpecValue(rawValue) {
+    if (rawValue === null || rawValue === undefined) {
+        return { value: null, valueType: 'string' };
+    }
+
+    // JSON-geparste Strings aus der DB entpacken
+    let val = rawValue;
+    if (typeof val === 'string') {
+        try {
+            val = JSON.parse(val);
+        } catch {
+            return { value: rawValue, valueType: 'string' };
+        }
+    }
+
+    // Buffer-Objekte → Hex-String
+    if (val && typeof val === 'object' && val.type === 'Buffer' && Array.isArray(val.data)) {
+        return { value: Buffer.from(val.data).toString('hex'), valueType: 'string' };
+    }
+
+    // Arrays → valueType "object"
+    if (Array.isArray(val)) {
+        return { value: val.map(String), valueType: 'object' };
+    }
+
+    // Objekte → valueType "object", als JSON-String
+    if (typeof val === 'object') {
+        return { value: JSON.stringify(val), valueType: 'object' };
+    }
+
+    // Boolean, Number → String
+    return { value: String(val), valueType: 'string' };
+}
+
+/**
+ * Konvertiert einen Spec-String-Wert in den nativen Typ den knxultimate erwartet.
+ * Spec: value ist IMMER ein String ("1", "0", "21.5").
+ * knxultimate erwartet: boolean für DPT 1.x, number für DPT 5.x/9.x, etc.
+ */
+export function decodeValueForKnx(valueStr, dpt) {
+    const str = String(valueStr).trim();
+
+    if (!dpt) {
+        if (str === '1' || str === 'true')  return true;
+        if (str === '0' || str === 'false') return false;
+        const num = Number(str);
+        return isNaN(num) ? str : num;
+    }
+
+    const [main] = dpt.split('.').map(Number);
+    switch (main) {
+        case 1:  // Boolean (Schalten, Schritt, ...)
+            if (str === '1' || str === 'true')  return true;
+            if (str === '0' || str === 'false') return false;
+            throw new Error(`Invalid boolean value for DPT ${dpt}: "${str}"`);
+        case 2: case 3: case 5: case 6: case 7: case 8: case 17: case 18: case 20:
+            return parseInt(str, 10);
+        case 9: case 14:
+            return parseFloat(str);
+        case 4: case 16:
+            return str;
+        case 10: case 11: case 19: case 232:
+            try { return JSON.parse(str); }
+            catch { throw new Error(`Invalid object value for DPT ${dpt}: "${str}"`); }
+        default: {
+            const num = Number(str);
+            return isNaN(num) ? str : num;
+        }
+    }
+}
