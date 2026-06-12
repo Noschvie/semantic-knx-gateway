@@ -1,0 +1,59 @@
+# docker-compose.yml
+
+services:
+  semantic-knx-runtime:
+    build:
+      context: .
+      args:
+        USER_ID: ${USER_ID:-1000}
+        GROUP_ID: ${GROUP_ID:-1000}
+    container_name: semantic-knx-runtime
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      - POSTGRES_HOST=${POSTGRES_HOST}
+      - POSTGRES_PORT=${POSTGRES_PORT}
+      - POSTGRES_USERNAME=${POSTGRES_USERNAME}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_DB=${POSTGRES_DB}
+      - TIMESCALEDB_ENABLED=${TIMESCALEDB_ENABLED:-false}
+      - KNX_GATEWAY_IP=${KNX_GATEWAY_IP}
+      - KNX_GATEWAY_PORT=${KNX_GATEWAY_PORT}
+      - KNX_GATEWAY_PHYS_ADDR=${KNX_GATEWAY_PHYS_ADDR}
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./logs:/app/logs
+      - ./config/project-prod.ttl:/app/config/project.ttl:ro
+    depends_on:
+      timescaledb:
+        condition: service_healthy
+
+  timescaledb:
+    image: timescale/timescaledb:latest-pg18
+    container_name: timescaledb
+    restart: unless-stopped
+    environment:
+      - TIMESCALEDB_TELEMETRY="off"
+      - POSTGRES_USER=${POSTGRES_USERNAME}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_DB=${POSTGRES_DB}
+      - PGDATA=/var/lib/postgresql/data/pgdata
+    ports:
+      - "5432:5432"
+    volumes:
+      - ./volumes/timescaledb/data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USERNAME} -d ${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    logging:
+      options:
+        max-size: "10m"
+        max-file: "3"
+    deploy:
+      resources:
+        limits:
+          memory: 1g
