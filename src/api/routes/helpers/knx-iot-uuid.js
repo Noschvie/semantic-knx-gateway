@@ -5,9 +5,9 @@
 // helpers/knx-iot-uuid.js – Stabile UUID-Generierung und Paginierung
 
 /**
- * Generiert eine deterministische UUID v5-ähnliche ID aus einem String.
- * Nutzt einen einfachen Hash (kein Crypto-Import nötig).
- * Die UUID ist pro Input-String stabil und unveränderlich.
+ * Generates a deterministic UUID v5-like ID from a string.
+ * Uses a simple hash (no crypto import required).
+ * The UUID is stable and immutable for a given input string.
  */
 export function stableUuid(input) {
     let h1 = 0xdeadbeef, h2 = 0x41c6ce57;
@@ -24,12 +24,12 @@ export function stableUuid(input) {
     const u32a = (h1 >>> 0).toString(16).padStart(8, '0');
     const u32b = (h2 >>> 0).toString(16).padStart(8, '0');
 
-    // UUID-Format: xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx
+    // UUID format: xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx
     return `${u32a}-${u32b.slice(0, 4)}-4${u32b.slice(4, 7)}-a${u32a.slice(1, 4)}-${u32b}${u32a.slice(0, 4)}`;
 }
 
 /**
- * Paginiert ein Array anhand von page[number] und page[size] Query-Parametern.
+ * Paginates an array using page[number] and page[size] query parameters.
  * @returns {{ items, total, number, size }}
  */
 export function paginate(items, pageNumber, pageSize) {
