@@ -10,20 +10,20 @@ export class TelegramDecoder {
     constructor() {
         this.logger = createLogger('TelegramDecoder');
         this.dptDecoder = new DPTDecoder();
-        // einmalig loggen pro unbekanntem DPT-String, um Spam zu vermeiden
+        // Log only once per unknown DPT string to avoid spam
         this._unknownDpts = new Set();
     }
 
     /**
-     * Normalisiert einen DPT-String auf das Format "X.YYY"
-     * Akzeptiert: "1.001", "9", "timeOfDay", "date", ...
+     * Normalizes a DPT string to the format "X.YYY"
+     * Accepts: "1.001", "9", "timeOfDay", "date", ...
      */
     normalizeDpt(dpt) {
         if (!dpt) return null;
         if (/^\d+\.\d+$/.test(dpt)) return dpt;
         if (/^\d+$/.test(dpt)) return `${dpt}.001`;
 
-        // ETS/KNX-IoT Format: "DPST-9-4" → "9.004" oder "DPT-9" → "9.001"
+        // ETS/KNX-IoT format: "DPST-9-4" -> "9.004" or "DPT-9" -> "9.001"
         const dpstMatch = dpt.match(/^DPST-(\d+)-(\d+)$/i);
         if (dpstMatch) {
             return `${dpstMatch[1]}.${String(dpstMatch[2]).padStart(3, '0')}`;
@@ -33,11 +33,11 @@ export class TelegramDecoder {
             return `${dptMatch[1]}.001`;
         }
 
-        // Exakter Map-Lookup
+        // Exact map lookup
         const mapped = DPT_NAME_MAP[dpt];
         if (mapped) return mapped;
 
-        // Fallback: case-insensitive Suche in der Map
+        // Fallback: case-insensitive search in the map
         const lowerDpt = dpt.toLowerCase();
         const caseInsensitiveMatch = Object.entries(DPT_NAME_MAP)
             .find(([key]) => key.toLowerCase() === lowerDpt);

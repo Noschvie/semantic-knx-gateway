@@ -17,7 +17,7 @@ function knxError(status, title, detail) {
     return { errors: [{ title, links: KNX_SCHEMA_LINK, status: String(status), detail }] };
 }
 
-// ── Filter Helpers (identisch zu devices.js / datapoints.js / locations.js) ──
+// ── Filter Helpers (same as devices.js / datapoints.js / locations.js)
 
 function parseFilters(query) {
     const filters = [];
@@ -139,13 +139,13 @@ export function knxIotRouter(semanticEngine, stateEngine) {
     });
 
     // ── GET /api/v1/node ──────────────────────────────────────────────────
-    // Spec: type = "service", attributes inkl. title + version.server als Objekt
+    // Spec: type = "service", attributes including title + version.server as object
     router.get('/node', bearer('read'), async (req, res) => {
         try {
             const nowIso = new Date().toISOString();
             const nodeId = stableUuid('knx-node-default');
 
-            // Aktuelle Subscription-Anzahl aus SubscriptionStore ermitteln (optional)
+            // Determine current subscription count from SubscriptionStore (optional)
             let currentSubscriptions = 0;
             try {
                 const subs = await stateEngine?.subscriptionStore?.getAll?.() ?? [];
@@ -155,7 +155,7 @@ export function knxIotRouter(semanticEngine, stateEngine) {
             res.json({
                 data: {
                     id:   nodeId,
-                    type: 'service',   // Spec-Beispiel: "service", nicht "node"
+                    type: 'service',   // Spec example: "service", not "node"
                     attributes: {
                         title:               process.env.INSTALLATION_NAME ?? 'KNX Runtime Node',
                         deviceOrServiceName: process.env.INSTALLATION_NAME ?? 'KNX Runtime Node',
@@ -223,7 +223,7 @@ export function knxIotRouter(semanticEngine, stateEngine) {
     });
 
     // ── GET /api/v1/sites ─────────────────────────────────────────────────
-    // Spec: nur root-level Locations (ohne parentId)
+    // Spec: only root-level locations (without parentId)
     // Spec-Parameter: page[number], page[size], typeFilter, tagFilter, attributeFilter
     router.get('/sites', bearer('read'), async (req, res) => {
         try {
@@ -251,14 +251,14 @@ export function knxIotRouter(semanticEngine, stateEngine) {
 // ── GET /.well-known/knx Handler ──────────────────────────────────────────────
 //
 // Spec §/.well-known/knx:
-//  - KEIN JSON:API-Format – eigenes Schema: api / supportedversions / links / context
-//  - Content-Type: application/json (nicht application/vnd.api+json)
-//  - security: [] – kein Bearer-Token erforderlich
-//  - URL darf KEINEN API-Base-Pfad enthalten (also /.well-known/knx, nicht /api/v1/...)
+//  - NO JSON:API format - own schema: api / supportedversions / links / context
+//  - Content-Type: application/json (not application/vnd.api+json)
+//  - security: [] - no bearer token required
+//  - URL must NOT include an API base path (so /.well-known/knx, not /api/v1/...)
 //
 export function wellKnownKnxHandler() {
     return async (req, res) => {
-        // Spec schreibt application/json vor (nicht vnd.api+json)
+        // Spec requires application/json (not vnd.api+json)
         res.setHeader('Content-Type', 'application/json');
 
         res.json({

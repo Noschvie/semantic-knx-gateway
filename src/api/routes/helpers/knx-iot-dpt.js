@@ -2,13 +2,13 @@
 // Copyright (c) 2026 Noschvie
 // KNX Runtime Engine – https://github.com/Noschvie/semantic-knx-gateway.git
 
-// helpers/knx-iot-dpt.js – DPT Encoding, GA-Konvertierung, Spec-Wert-Mapping
+// helpers/knx-iot-dpt.js - DPT encoding, GA conversion, spec value mapping
 
 import { DPT_NAME_MAP, DPT_TO_DATAPOINT_TYPE } from '../../../utils/dpt-map.js';
 
 /**
- * Löst einen DPT-String in KNX IoT Spec-konforme datapointType IRIs auf.
- * Beispiel: "9.001" → ["knx:dpa.9.1"]
+ * Resolves a DPT string to KNX IoT spec-compliant datapointType IRIs.
+ * Example: "9.001" -> ["knx:dpa.9.1"]
  */
 export function resolveDatapointTypes(dpt) {
     if (!dpt) return [];
@@ -29,8 +29,8 @@ export function resolveDatapointTypes(dpt) {
 }
 
 /**
- * Konvertiert GA-String "1/5/1" in KNX-Integer-Kodierung.
- * Formel: main*2048 + middle*256 + sub
+ * Converts GA string "1/5/1" into KNX integer encoding.
+ * Formula: main*2048 + middle*256 + sub
  */
 export function gaToInteger(gaString) {
     if (!gaString) return null;
@@ -41,8 +41,8 @@ export function gaToInteger(gaString) {
 }
 
 /**
- * Konvertiert beliebige DB-Werte in Spec-konforme Strings oder Arrays.
- * Spec: value ist IMMER string oder array (niemals boolean/number direkt).
+ * Converts arbitrary DB values to spec-compliant strings or arrays.
+ * Spec: value is ALWAYS string or array (never boolean/number directly).
  * @returns {{ value: string|string[]|null, valueType: 'string'|'object' }}
  */
 export function toSpecValue(rawValue) {
@@ -50,7 +50,7 @@ export function toSpecValue(rawValue) {
         return { value: null, valueType: 'string' };
     }
 
-    // JSON-geparste Strings aus der DB entpacken
+    // Unpack JSON-parsed strings from the DB
     let val = rawValue;
     if (typeof val === 'string') {
         try {
@@ -60,29 +60,29 @@ export function toSpecValue(rawValue) {
         }
     }
 
-    // Buffer-Objekte → Hex-String
+    // Buffer objects -> hex string
     if (val && typeof val === 'object' && val.type === 'Buffer' && Array.isArray(val.data)) {
         return { value: Buffer.from(val.data).toString('hex'), valueType: 'string' };
     }
 
-    // Arrays → valueType "object"
+    // Arrays -> valueType "object"
     if (Array.isArray(val)) {
         return { value: val.map(String), valueType: 'object' };
     }
 
-    // Objekte → valueType "object", als JSON-String
+    // Objects -> valueType "object", as JSON string
     if (typeof val === 'object') {
         return { value: JSON.stringify(val), valueType: 'object' };
     }
 
-    // Boolean, Number → String
+    // Boolean, Number -> String
     return { value: String(val), valueType: 'string' };
 }
 
 /**
- * Konvertiert einen Spec-String-Wert in den nativen Typ den knxultimate erwartet.
- * Spec: value ist IMMER ein String ("1", "0", "21.5").
- * knxultimate erwartet: boolean für DPT 1.x, number für DPT 5.x/9.x, etc.
+ * Converts a spec string value into the native type expected by knxultimate.
+ * Spec: value is ALWAYS a string ("1", "0", "21.5").
+ * knxultimate expects: boolean for DPT 1.x, number for DPT 5.x/9.x, etc.
  */
 export function decodeValueForKnx(valueStr, dpt) {
     const str = String(valueStr).trim();
@@ -96,7 +96,7 @@ export function decodeValueForKnx(valueStr, dpt) {
 
     const [main] = dpt.split('.').map(Number);
     switch (main) {
-        case 1:  // Boolean (Schalten, Schritt, ...)
+        case 1:  // Boolean (switching, step, ...)
             if (str === '1' || str === 'true')  return true;
             if (str === '0' || str === 'false') return false;
             throw new Error(`Invalid boolean value for DPT ${dpt}: "${str}"`);

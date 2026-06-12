@@ -373,7 +373,7 @@ export class MessagingWebSocketServer {
             }
         });
 
-        // ── Heartbeat: alle 30s ein ping senden ──────────────────────────────
+        // Heartbeat: send a ping every 30s
         const heartbeatInterval = setInterval(() => {
             this.sendWsMessage(ws, {
                 type: 'ping',

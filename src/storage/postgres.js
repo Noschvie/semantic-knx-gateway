@@ -189,7 +189,7 @@ export class PostgresClient {
             );
           `);
 
-            // updated_at Trigger für subscriptions
+            // updated_at trigger for subscriptions
             await client.query(`
             CREATE OR REPLACE FUNCTION update_updated_at_column()
             RETURNS TRIGGER AS $$

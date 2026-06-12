@@ -125,8 +125,8 @@ export class StateStore {
         let params = [];
 
         if (locationId) {
-            // GAs ermitteln die zu Devices gehören die sich in der Location befinden
-            // Pfad: location -containsDevice-> device <- linkedToDevice- groupAddress
+            // Determine GAs that belong to devices located in the location
+            // Path: location -containsDevice-> device <- linkedToDevice- groupAddress
             query = `
                 SELECT cs.*, dm.name, dm.location_id
                 FROM current_state cs
