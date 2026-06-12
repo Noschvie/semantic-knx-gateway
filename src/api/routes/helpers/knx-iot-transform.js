@@ -8,8 +8,8 @@ import { stableUuid } from './knx-iot-uuid.js';
 import { gaToInteger, resolveDatapointTypes, toSpecValue } from './knx-iot-dpt.js';
 
 /**
- * Transformiert einen internen Datapoint-State in eine JSON:API Resource.
- * @param {Object} state - Zeile aus current_state + optionale semantic-Daten
+ * Transforms an internal datapoint state into a JSON:API resource.
+ * @param {Object} state - Row from current_state + optional semantic data
  */
 export function toDatapointResource(state) {
     const uuid     = stableUuid(state.datapointId ?? state.datapoint_id ?? '');
@@ -44,7 +44,7 @@ export function toDatapointResource(state) {
 }
 
 /**
- * Transformiert eine Location in eine JSON:API Resource.
+ * Transforms a location into a JSON:API resource.
  */
 export function toLocationResource(loc) {
     const uuid = stableUuid(loc.id ?? loc.uri ?? '');
@@ -61,7 +61,7 @@ export function toLocationResource(loc) {
 }
 
 /**
- * Transformiert ein Device in eine JSON:API Resource.
+ * Transforms a device into a JSON:API resource.
  */
 export function toDeviceResource(dev) {
     const uuid = stableUuid(dev.id ?? dev.uri ?? '');
@@ -85,7 +85,7 @@ export function toDeviceResource(dev) {
 }
 
 /**
- * Transformiert eine Function in eine JSON:API Resource.
+ * Transforms a function into a JSON:API resource.
  */
 export function toFunctionResource(fn) {
     const uuid = stableUuid(fn.id ?? fn.uri ?? '');
@@ -99,8 +99,8 @@ export function toFunctionResource(fn) {
 }
 
 /**
- * Lädt alle Locations aus der SemanticEngine.
- * Unterstützt beide bekannten Zugriffspfade (direkt oder via semanticMapper).
+ * * Loads all locations from the SemanticEngine.
+ *  * Supports both known access paths (direct or via semanticMapper).
  */
 export async function getAllLocations(semanticEngine) {
     return await semanticEngine.resourceStore?.getResourcesByType('location')
