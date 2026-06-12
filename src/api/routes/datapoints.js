@@ -15,14 +15,14 @@ function knxError(status, title, detail) {
     return { errors: [{ title, links: KNX_SCHEMA_LINK, status: String(status), detail }] };
 }
 
-// ── Filter Helpers (identisch zu devices.js) ─────────────────────────────────
+// ── Filter Helpers (identical to devices.js) ──────────────────────────────────
 
 /**
- * Parst alle filter[...][operator]-Query-Parameter aus req.query.
+ * Parses all filter[...][operator] query parameters from req.query.
  *
- * Spec-Beispiele:
+ * Spec examples:
  *   filter[meta.@type]=DPT_Switch
- *   filter[title][eq]=Licht
+ *   filter[title][eq]=Light
  *   filter[timestamp][ge]=2021-02-17T17:17:13Z
  *   filter[timestamp][le]=2021-02-17T17:17:17Z
  *   filter[hasTag]=actuator
@@ -48,8 +48,8 @@ function parseFilters(query) {
 }
 
 /**
- * Liest einen Feldwert aus einem JSON:API Resource-Objekt.
- * Unterstützt: "meta.@type", "attributes.title", "title" (Shorthand).
+ * Reads a field value from a JSON:API resource object.
+ * Supports: "meta.@type", "attributes.title", "title" (shorthand).
  */
 function getField(resource, key) {
     const parts = key.split('.');
@@ -69,8 +69,8 @@ function getField(resource, key) {
 }
 
 /**
- * Wertet einen Vergleich aus – string lexikalisch, number numerisch.
- * Namespace-Präfix (z.B. "knx:") wird beim Vergleich ignoriert.
+ * Evaluates a comparison – string lexicographically, number numerically.
+ * Namespace prefix (e.g. "knx:") is ignored during comparison.
  */
 function matchValue(fieldVal, filterVal, operator) {
     if (Array.isArray(fieldVal)) {
@@ -93,9 +93,9 @@ function matchValue(fieldVal, filterVal, operator) {
 }
 
 /**
- * Wendet einen einzelnen Filter auf ein Array von JSON:API Resources an.
- * operator=or  → mind. ein Wert muss matchen
- * operator=and → alle Werte müssen matchen
+ * Applies a single filter to an array of JSON:API resources.
+ * operator=or  → at least one value must match
+ * operator=and → all values must match
  */
 function applyFilter(resources, { key, operator, values }) {
     return resources.filter(resource => {
@@ -110,7 +110,7 @@ function applyFilter(resources, { key, operator, values }) {
 }
 
 /**
- * Wendet alle Filter sequenziell an (AND-Verknüpfung zwischen Filtern).
+ * Applies all filters sequentially (AND-conjunction between filters).
  */
 function applyAllFilters(resources, filters) {
     let result = resources;
@@ -121,11 +121,11 @@ function applyAllFilters(resources, filters) {
 }
 
 /**
- * Sonderbehandlung für filter[timestamp][ge/le/gt/lt]:
- * Filtert ein Array von Timeseries-Einträgen anhand von RFC-3339-Zeitstempeln.
+ * Special handling for filter[timestamp][ge/le/gt/lt]:
+ * Filters an array of timeseries entries based on RFC-3339 timestamps.
  *
- * @param {Array}  entries   - Rohe History-Einträge mit .timestamp
- * @param {Array}  filters   - Geparste Filter aus parseFilters()
+ * @param {Array}  entries   - Raw history entries with .timestamp
+ * @param {Array}  filters   - Parsed filters from parseFilters()
  * @returns {Array}
  */
 function applyTimeFilters(entries, filters) {
@@ -138,7 +138,7 @@ function applyTimeFilters(entries, filters) {
 
         return timeFilters.every(({ operator, values }) => {
             const ref = new Date(values[0]).getTime();
-            if (isNaN(ref)) return true; // ungültiger Filter → ignorieren
+            if (isNaN(ref)) return true; // invalid filter → ignore
 
             switch (operator) {
                 case 'ge': return t >= ref;
@@ -225,22 +225,22 @@ export function datapointsRouter(stateEngine, tunnelManager) {
     const router = Router();
 
     // ── GET /api/v1/datapoints ────────────────────────────────────────────
-    // Spec-Parameter: page[number], page[size], typeFilter, tagFilter,
-    //                 attributeFilter, timeFilter
-    // Vendor-extensions: filter[deviceId], filter[locationId], filter[ga],
-    //                    filter[datapointId]  (nicht in Spec, aber harmlos)
+    // Spec parameters: page[number], page[size], typeFilter, tagFilter,
+    //                  attributeFilter, timeFilter
+    // Vendor extensions: filter[deviceId], filter[locationId], filter[ga],
+    //                    filter[datapointId]  (not in Spec, but harmless)
     router.get('/', bearer('read'), async (req, res) => {
         try {
             const rawNumber = req.query['page[number]'] ?? req.query.page?.number;
             const rawSize   = req.query['page[size]']   ?? req.query.page?.size;
 
-            // Vendor-Filter: werden vor dem Resource-Mapping auf Rohstaten angewendet
+            // Vendor filters: applied before resource mapping on raw states
             const filterDeviceId    = req.query['filter[deviceId]']    ?? req.query.filter?.deviceId;
             const filterLocationId  = req.query['filter[locationId]']  ?? req.query.filter?.locationId;
             const filterGa          = req.query['filter[ga]']          ?? req.query.filter?.ga;
             const filterDatapointId = req.query['filter[datapointId]'] ?? req.query.filter?.datapointId;
 
-            // filter[locationId] → interne Location-ID auflösen
+            // filter[locationId] → resolve internal location ID
             let resolvedLocationId = null;
             if (filterLocationId) {
                 const allLocations = await getAllLocations(stateEngine);
@@ -257,7 +257,7 @@ export function datapointsRouter(stateEngine, tunnelManager) {
                 resolvedLocationId ? { locationId: resolvedLocationId } : {}
             );
 
-            // Vendor-Filter auf Rohstaten anwenden
+            // Apply vendor filters on raw states
             if (filterGa)          allStates = allStates.filter(s => s.ga === filterGa);
             if (filterDatapointId) allStates = allStates.filter(s => s.datapointId === filterDatapointId);
 
@@ -273,11 +273,11 @@ export function datapointsRouter(stateEngine, tunnelManager) {
                 allStates = allStates.filter(s => deviceGas.has(s.ga));
             }
 
-            // JSON:API Resources erzeugen
+            // Build JSON:API resources
             const resources = allStates.map(toDatapointResource);
 
-            // Spec-konforme Filter (typeFilter / tagFilter / attributeFilter / timeFilter)
-            // filter[timestamp] wird auf Resources angewendet (attributes.timestamp)
+            // Spec-compliant filters (typeFilter / tagFilter / attributeFilter / timeFilter)
+            // filter[timestamp] is applied on resources (attributes.timestamp)
             const filters          = parseFilters(req.query);
             const specFilters      = filters.filter(f => f.key !== 'deviceId' &&
                                                          f.key !== 'locationId' &&
@@ -296,8 +296,8 @@ export function datapointsRouter(stateEngine, tunnelManager) {
         }
     });
 
-    // ── GET /api/v1/datapoints/values (muss VOR /:id stehen!) ────────────
-    // Nicht in Spec als GET – vendor extension für Bulk-Read
+    // ── GET /api/v1/datapoints/values (must come BEFORE /:id!) ───────────
+    // Not in Spec as GET – vendor extension for bulk-read
     router.get('/values', bearer('read'), async (req, res) => {
         try {
             const allStates = await stateEngine.getAllStates();
@@ -311,11 +311,11 @@ export function datapointsRouter(stateEngine, tunnelManager) {
     });
 
     // ── PUT /api/v1/datapoints/by-ga ──────────────────────────────────────
-    // Vendor-Extension: Wert per Gruppenadresse schreiben.
-    // GA wird über data.meta.ga übergeben (JSON:API-konform: meta für
-    // nicht-standardisierte Felder, kein id erforderlich da GA-Lookup).
+    // Vendor extension: write value by group address.
+    // GA is passed via data.meta.ga (JSON:API-compliant: meta for
+    // non-standard fields, no id required since GA-lookup).
     //
-    // Request-Body:
+    // Request body:
     //   {
     //     "data": {
     //       "type": "datapoint",
@@ -324,7 +324,7 @@ export function datapointsRouter(stateEngine, tunnelManager) {
     //     }
     //   }
     //
-    // Response: 200 + geschriebener Wert (analog PUT /datapoints)
+    // Response: 200 + written value (analogous to PUT /datapoints)
     router.put('/by-ga', bearer('write'), async (req, res) => {
         const body = req.body;
         const ga    = body?.data?.meta?.ga;
@@ -342,7 +342,7 @@ export function datapointsRouter(stateEngine, tunnelManager) {
             );
         }
 
-        // GA → State auflösen
+        // Resolve GA → state
         const allStates = await stateEngine.getAllStates().catch(() => []);
         const state = allStates.find(s => s.ga === ga);
 
@@ -352,7 +352,7 @@ export function datapointsRouter(stateEngine, tunnelManager) {
             );
         }
 
-        // Über writeDatapointValue via UUID schreiben (einheitliche Logik)
+        // Write via writeDatapointValue using UUID (unified logic)
         const uuid   = stableUuid(state.datapointId);
         const result = await writeDatapointValue(uuid, value, stateEngine, tunnelManager);
         if (result.error) return res.status(result.error.status).json(result.error.payload);
@@ -361,7 +361,7 @@ export function datapointsRouter(stateEngine, tunnelManager) {
     });
 
     // ── GET /api/v1/datapoints/:id/timeseries ─────────────────────────────
-    // Spec-Parameter: page[number], page[size], filter[timestamp][ge/le/gt/lt]
+    // Spec parameters: page[number], page[size], filter[timestamp][ge/le/gt/lt]
     router.get('/:id/timeseries', bearer('read'), async (req, res) => {
         try {
             const { id } = req.params;
@@ -377,10 +377,10 @@ export function datapointsRouter(stateEngine, tunnelManager) {
                 return res.status(404).json(knxError(404, 'Not Found', `Datapoint ${id} not found`));
             }
 
-            // Alle History-Einträge laden (ohne Vorab-Filter – wir filtern selbst)
+            // Load all history entries (without pre-filter – we filter ourselves)
             const history = await stateEngine.getHistory(state.datapointId, { limit: 100_000 });
 
-            // filter[timestamp][ge/le/gt/lt] anwenden (RFC 3339)
+            // Apply filter[timestamp][ge/le/gt/lt] (RFC 3339)
             const filters        = parseFilters(req.query);
             const filteredHistory = applyTimeFilters(history, filters);
 
@@ -424,8 +424,8 @@ export function datapointsRouter(stateEngine, tunnelManager) {
     });
 
     // ── GET /api/v1/datapoints/:id/history ───────────────────────────────
-    // Vendor-Extension (nicht in Spec) – proprietäres Format für interne Nutzung.
-    // Unterstützt startTime/endTime als Convenience-Aliases für filter[timestamp].
+    // Vendor extension (not in Spec) – proprietary format for internal use.
+    // Supports startTime/endTime as convenience aliases for filter[timestamp].
     router.get('/:id/history', bearer('read'), async (req, res) => {
         try {
             const { id }                        = req.params;
@@ -446,7 +446,7 @@ export function datapointsRouter(stateEngine, tunnelManager) {
     });
 
     // ── PUT /api/v1/datapoints/values ─────────────────────────────────────
-    // Spec §/datapoints/values – Bulk-Write, antwortet mit 204 No Content
+    // Spec §/datapoints/values – bulk write, responds with 204 No Content
     router.put('/values', bearer('write'), async (req, res) => {
         const body = req.body;
 
@@ -467,12 +467,12 @@ export function datapointsRouter(stateEngine, tunnelManager) {
             if (result.error) return res.status(result.error.status).json(result.error.payload);
         }
 
-        // Spec §/datapoints/values: 204 No Content für synchrone Verarbeitung
+        // Spec §/datapoints/values: 204 No Content for synchronous processing
         return res.status(204).end();
     });
 
     // ── PUT /api/v1/datapoints ────────────────────────────────────────────
-    // Vendor-Extension: einzelner Datapoint-Write über JSON:API body
+    // Vendor extension: single datapoint write via JSON:API body
     router.put('/', bearer('write'), async (req, res) => {
         const body = req.body;
 
