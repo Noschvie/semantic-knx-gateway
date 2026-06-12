@@ -5,18 +5,18 @@
 import { createLogger } from '../utils/logger.js';
 
 /**
- * SubscriptionStore
- *
- * Persistiert HTTP-Callback- und WebSocket-Subscriptions in PostgreSQL.
- * Modelliert nach dem KNX IoT 3rd Party API Spec 2.1.0:
- *   - POST   /subscriptions       → create()
- *   - GET    /subscriptions       → findAll()
- *   - GET    /subscriptions/:id   → findById()
- *   - PATCH  /subscriptions/:id   → update()   (nur url/secret/caCert/lifetime)
- *   - DELETE /subscriptions/:id   → delete()
- *   - GET    /subscriptions/:id/datapoints     → findDatapointsBySubId()
- *   - GET    /subscriptions/:id/installations  → findInstallationsBySubId()
- *   - GET    /subscriptions/:id/node           → findNodeBySubId()
+ *     * SubscriptionStore
+ *      *
+ *      * Persists HTTP callback and WebSocket subscriptions in PostgreSQL.
+ *      * Modelled after the KNX IoT 3rd Party API Spec 2.1.0:
+ *      *   - POST   /subscriptions       → create()
+ *      *   - GET    /subscriptions       → findAll()
+ *      *   - GET    /subscriptions/:id   → findById()
+ *      *   - PATCH  /subscriptions/:id   → update()   (url/secret/caCert/lifetime only)
+ *      *   - DELETE /subscriptions/:id   → delete()
+ *      *   - GET    /subscriptions/:id/datapoints     → findDatapointsBySubId()
+ *      *   - GET    /subscriptions/:id/installations  → findInstallationsBySubId()
+ *      *   - GET    /subscriptions/:id/node           → findNodeBySubId()
  */
 export class SubscriptionStore {
     constructor(db) {
@@ -29,19 +29,19 @@ export class SubscriptionStore {
     // ------------------------------------------------------------------
 
     /**
-     * Legt eine neue Subscription an (HTTP Callback oder WebSocket).
+     * Creates a new subscription (HTTP callback or WebSocket).
      *
      * @param {object} sub
      * @param {string}   sub.type          'callback' | 'websocket'
-     * @param {string}   [sub.url]         Callback-URL (Pflicht bei type='callback')
-     * @param {string}   [sub.secret]      HMAC-Secret
-     * @param {string}   [sub.caCert]      PEM-Zertifikat
-     * @param {string}   [sub.lifetime]    PostgreSQL-Interval z.B. '24 hours'
+     * @param {string}   [sub.url]         Callback URL (required for type='callback')
+     * @param {string}   [sub.secret]      HMAC secret
+     * @param {string}   [sub.caCert]      PEM certificate
+     * @param {string}   [sub.lifetime]    PostgreSQL interval e.g. '24 hours'
      * @param {Array}    [sub.datapoints]  [{ datapointId, expand }]
      * @param {Array}    [sub.installations] [{ installationId, expand }]
      * @param {object}   [sub.node]        { nodeId, expand }
      *
-     * @returns {Promise<string>} Generierte UUID der neuen Subscription
+     * @returns {Promise<string>} Generated UUID of the new subscription
      */
     async create(sub) {
         const {
@@ -62,7 +62,7 @@ export class SubscriptionStore {
         try {
             await client.query('BEGIN');
 
-            // 1. Subscription-Stammsatz anlegen
+            // 1. Insert subscription master record
             const lifetimeInterval =
                 lifetime != null
                     ? `${lifetime} seconds`
@@ -99,7 +99,7 @@ export class SubscriptionStore {
             ]);
             const id = subResult.rows[0].id;
 
-            // 2. Datapunkte verknüpfen
+            // 2. Link datapoints
             if (datapoints.length > 0) {
                 const dpValues = datapoints
                     .map((_, i) => `($1, $${i * 2 + 2}, $${i * 2 + 3})`)
@@ -112,7 +112,7 @@ export class SubscriptionStore {
                 );
             }
 
-            // 3. Installationen verknüpfen
+            // 3. Link installations
             if (installations.length > 0) {
                 const instValues = installations
                     .map((_, i) => `($1, $${i * 2 + 2}, $${i * 2 + 3})`)
@@ -125,7 +125,7 @@ export class SubscriptionStore {
                 );
             }
 
-            // 4. Node verknüpfen (maximal einer lt. Spec)
+            // 4. Link node (at most one per spec)
             if (node) {
                 await client.query(
                     `INSERT INTO subscription_node (subscription_id, node_id, expand)
@@ -156,8 +156,8 @@ export class SubscriptionStore {
     // ------------------------------------------------------------------
 
     /**
-     * Alle aktiven Subscriptions (ohne verknüpfte Ressourcen).
-     * Pagination: page (1-basiert), size
+     * All active subscriptions (without linked resources).
+     * Pagination: page (1-based), size
      */
     async findAll({ page = 1, size = 50 } = {}) {
         const offset = (page - 1) * size;
@@ -182,8 +182,8 @@ export class SubscriptionStore {
     }
 
     /**
-     * Einzelne Subscription anhand ID.
-     * Gibt null zurück wenn nicht gefunden oder inaktiv.
+     * Single subscription by ID.
+     * Returns null if not found or inactive.
      */
     async findById(id) {
         const query = `
@@ -197,8 +197,8 @@ export class SubscriptionStore {
     }
 
     /**
-     * Alle Subscriptions die einen bestimmten Datapunkt abonniert haben.
-     * Wird von GET /datapoints/:id/subscriptions benötigt.
+     * All subscriptions that have subscribed to a specific datapoint.
+     * Required by GET /datapoints/:id/subscriptions.
      */
     async findByDatapointId(datapointId) {
         const query = `
@@ -213,7 +213,7 @@ export class SubscriptionStore {
     }
 
     // ------------------------------------------------------------------
-    // Sub-Ressourcen (für /subscriptions/:id/datapoints etc.)
+    // Sub-resources (for /subscriptions/:id/datapoints etc.)
     // ------------------------------------------------------------------
 
     async findDatapointsBySubId(subscriptionId, { page = 1, size = 50 } = {}) {
@@ -271,17 +271,17 @@ export class SubscriptionStore {
     }
 
     // ------------------------------------------------------------------
-    // UPDATE (PATCH – nur Callback-Metadaten, lt. Spec)
+    // UPDATE (PATCH – callback metadata only, per spec)
     // ------------------------------------------------------------------
 
     /**
-     * Aktualisiert patchbare Felder einer Subscription.
-     * Gemäß Spec sind NUR url, secret, caCert und lifetime änderbar.
-     * Die subscribed Items (datapoints/installations/node) sind NICHT änderbar.
+     * Updates patchable fields of a subscription.
+     * Per spec, ONLY url, secret, caCert and lifetime are modifiable.
+     * Subscribed items (datapoints/installations/node) are NOT modifiable.
      *
      * @param {string} id
      * @param {object} patch  { url?, secret?, caCert?, lifetime? }
-     * @returns {Promise<boolean>} true wenn Zeile gefunden & aktualisiert
+     * @returns {Promise<boolean>} true if row was found & updated
      */
     async update(id, patch) {
         const allowed = ['url', 'secret', 'caCert', 'lifetime'];
@@ -303,7 +303,7 @@ export class SubscriptionStore {
         const setClauses = fields.map((field, i) => {
             const col = columnMap[field];
             if (field === 'lifetime') {
-                // expires_at mitaktualisieren wenn lifetime geändert wird
+                // Also, update expires_at when lifetime is changed
                 return `${col} = $${i + 2}::INTERVAL, expires_at = CASE WHEN $${i + 2} IS NOT NULL THEN NOW() + $${i + 2}::INTERVAL ELSE NULL END`;
             }
             return `${col} = $${i + 2}`;
@@ -336,11 +336,11 @@ export class SubscriptionStore {
     // ------------------------------------------------------------------
 
     /**
-     * Löscht eine Subscription (Soft-Delete via active = FALSE).
-     * Cascade auf subscription_datapoints / _installations / _node
-     * erfolgt beim Hard-Delete; beim Soft-Delete bleibt die History erhalten.
+     * Deletes a subscription (soft-delete via active = FALSE).
+     * Cascade on subscription_datapoints / _installations / _node
+     * applies on hard-delete; soft-delete preserves history.
      *
-     * @returns {Promise<boolean>} true wenn gefunden & gelöscht
+     * @returns {Promise<boolean>} true if found & deleted
      */
     async delete(id) {
         const query = `
@@ -368,8 +368,8 @@ export class SubscriptionStore {
     // ------------------------------------------------------------------
 
     /**
-     * Protokolliert einen Callback-Versuch (Erfolg oder Fehler).
-     * Analog zu EventStore.storeEvent().
+     * Logs a callback delivery attempt (success or error).
+     * Analogous to EventStore.storeEvent().
      */
     async logDelivery({ subscriptionId, datapointId, triggerType, payload, httpStatus, deliveryError }) {
         const query = `
@@ -387,14 +387,14 @@ export class SubscriptionStore {
                 deliveryError ?? null,
             ]);
         } catch (error) {
-            // Delivery-Log-Fehler werden nur geloggt, nicht propagiert
+            // Delivery log errors are only logged, not propagated
             this.logger.error({ msg: 'Failed to log delivery', subscriptionId, error: error.message });
         }
     }
 
     /**
-     * Liefert alle aktiven Subscriptions, die einen bestimmten Datapunkt
-     * abonniert haben – wird vom Callback-Dispatcher aufgerufen.
+     * Returns all active subscriptions that have subscribed to a specific
+     * datapoint – called by the callback dispatcher.
      */
     async findActiveCallbacksByDatapointId(datapointId) {
         const query = `
