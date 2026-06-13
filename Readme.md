@@ -104,7 +104,7 @@ cp .env.example .env
 Copy your ETS KNX IoT export to the config directory:
 
 ```bash
-cp your-installation.ttl config/installation.ttl
+cp your-installation.ttl config/project-prod.ttl
 ```
 
 **4. Start the stack**
