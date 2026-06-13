@@ -222,6 +222,14 @@ src/
 
 ---
 
+## Acknowledgements
+
+- **KNX bus communication** — [KNXUltimate](https://github.com/Supergiovane/KNXUltimate) by [@Supergiovane](https://github.com/Supergiovane), a full-featured KNX/IP tunneling library for Node.js with KNX Secure support
+- **Runtime** — [Node.js](https://nodejs.org/)
+- **Time-series storage** — [TimescaleDB](https://www.timescale.com/), built on PostgreSQL
+
+---
+
 ## License
 
 This project is licensed under [CC BY-NC-SA 4.0](https://creativecommons.org/licenses/by-nc-sa/4.0/) — free to use and adapt for non-commercial purposes, with attribution and under the same license.
