@@ -1,45 +1,45 @@
 # Semantic KNX Runtime Engine
 
-## Architecture and Implementation Document
+## Architektur- und Umsetzungsdokument
 
 Version: 0.1
-Target Platform: Docker + Node.js + TimescaleDB
+Zielplattform: Docker + Node.js + TimescaleDB
 Basis: KNX Classic + KNX IoT 3rd Party API 2.1.0
 
 ---
 
-# Project Goal
+# Projektziel
 
-Development of a semantic KNX Runtime Engine as a container platform.
+Entwicklung einer semantischen KNX Runtime Engine als Containerplattform.
 
-The Runtime Engine shall:
+Die Runtime Engine soll:
 
-* connect classic KNX TP installations
-* process ETS KNX IoT TTL exports
-* generate a semantic Digital Twin
-* manage live states
-* store historical values
-* implement the KNX IoT 3rd Party REST API
-* provide MQTT/WebSocket
-* later enable KNX IoT Point API / Matter
+* klassische KNX TP Installationen anbinden
+* ETS KNX IoT TTL Exporte verarbeiten
+* einen semantischen Digital Twin erzeugen
+* Live-Zustände verwalten
+* historische Werte speichern
+* die KNX IoT 3rd Party REST API implementieren
+* MQTT/WebSocket bereitstellen
+* später KNX IoT Point API / Matter ermöglichen
 
-The platform is:
+Die Plattform ist:
 
-```text
-not a simple KNX logger
+```text id="4fcyii"
+kein einfacher KNX Logger
 ```
 
-but rather:
+sondern:
 
-```text
-a semantic KNX Runtime Engine
+```text id="n8n1eg"
+eine semantische KNX Runtime Engine
 ```
 
 ---
 
-# Target Architecture
+# Zielarchitektur
 
-```text
+```text id="rw7wdg"
                     ┌────────────────────┐
                     │ KNX TP Installation│
                     └─────────┬──────────┘
@@ -99,15 +99,15 @@ a semantic KNX Runtime Engine
 
 ---
 
-# Core Principles
+# Grundprinzipien
 
 ## 1. Resource-Oriented Design
 
-The Runtime does NOT work group-address-centric.
+Die Runtime arbeitet NICHT gruppenadresszentriert.
 
-Internal model:
+Internes Modell:
 
-```text
+```text id="4l6q5m"
 Location
  └── Device
       └── Function
@@ -115,48 +115,48 @@ Location
                 └── KNX Binding
 ```
 
-Group addresses are transport bindings only.
+Gruppenadressen sind nur Transportbindungen.
 
 ---
 
 # Semantic Digital Twin
 
-The ETS TTL file generates a complete semantic model:
+Die ETS TTL Datei erzeugt ein vollständiges semantisches Modell:
 
-* Buildings
-* Floors
-* Rooms
-* Devices
-* Functions
+* Gebäude
+* Stockwerke
+* Räume
+* Geräte
+* Funktionen
 * Datapoints
-* Relationships
-* DPT Types
+* Beziehungen
+* DPT Typen
 * KNX Bindings
 
 ---
 
 # KNX Runtime Layer
 
-## Responsibilities
+## Aufgaben
 
 ### KNX/IP Tunneling
 
-* Connection to KNX/IP interface
-* Tunnel reconnect
-* Tunnel monitoring
+* Verbindung zum KNX/IP Interface
+* Tunnel-Reconnect
+* Tunnel-Monitoring
 
 ### Telegram Processing
 
-* Reading all telegrams
-* Decoding
-* DPT processing
-* Event generation
+* Lesen aller Telegramme
+* Decode
+* DPT Verarbeitung
+* Event-Erzeugung
 
 ### Telegram Write API
 
-* Writing group values
-* Read requests
-* Response handling
+* Schreiben von Gruppenwerten
+* Read Requests
+* Response Handling
 
 ---
 
@@ -166,27 +166,27 @@ The ETS TTL file generates a complete semantic model:
 
 Input:
 
-```text
+```text id="y1j6cx"
 ETS KNX IoT Export (.ttl)
 ```
 
 Output:
 
-```text
+```text id="0bjj7s"
 Internal Resource Graph
 ```
 
 ---
 
-# Internal Resources
+# Interne Ressourcen
 
 ## Location
 
-```json
+```json id="sv9f8l"
 {
-  "id": "room-bathroom-upper",
+  "id": "room-bad-og",
   "type": "location",
-  "name": "Bathroom Upper Floor"
+  "name": "Bad OG"
 }
 ```
 
@@ -194,11 +194,11 @@ Internal Resource Graph
 
 ## Device
 
-```json
+```json id="7vjlwm"
 {
   "id": "device-1.1.54",
   "type": "device",
-  "name": "Switching Actuator Bathroom"
+  "name": "Schaltaktor Bad"
 }
 ```
 
@@ -206,9 +206,9 @@ Internal Resource Graph
 
 ## Datapoint
 
-```json
+```json id="s4n4mf"
 {
-  "id": "dp-light-bathroom-mirror",
+  "id": "dp-light-bad-mirror",
   "ga": "1/1/83",
   "dpt": "1.001",
   "valueType": "boolean"
@@ -219,21 +219,21 @@ Internal Resource Graph
 
 # State Engine
 
-## Responsibilities
+## Aufgaben
 
-* Current state of all datapoints
+* aktueller Zustand aller Datapoints
 * Timestamping
-* Event queue
-* Subscription dispatching
-* State persistence
+* Event Queue
+* Subscription Dispatching
+* State Persistence
 
 ---
 
 # State Model
 
-```json
+```json id="zsmkq0"
 {
-  "datapointId": "dp-light-bathroom-mirror",
+  "datapointId": "dp-light-bad-mirror",
   "value": true,
   "timestamp": "2026-05-22T18:00:00Z",
   "source": "1.1.54"
@@ -242,27 +242,27 @@ Internal Resource Graph
 
 ---
 
-# Persistence
+# Persistenz
 
-## Database
+## Datenbank
 
-Using:
+Verwendung von:
 
-```text
+```text id="vjlwmc"
 TimescaleDB
 ```
 
-based on PostgreSQL.
+auf Basis von PostgreSQL.
 
 ---
 
-# Data Model
+# Datenmodell
 
 ## events
 
-Append-only telegram history.
+Append-only Telegramhistorie.
 
-```sql
+```sql id="c8p7az"
 CREATE TABLE knx_events (
     ts TIMESTAMPTZ NOT NULL,
     datapoint_id TEXT,
@@ -280,9 +280,9 @@ CREATE TABLE knx_events (
 
 ## current_state
 
-Current state of all datapoints.
+Aktueller Zustand aller Datapoints.
 
-```sql
+```sql id="e8f10r"
 CREATE TABLE current_state (
     datapoint_id TEXT PRIMARY KEY,
     value_json JSONB,
@@ -294,9 +294,9 @@ CREATE TABLE current_state (
 
 ## semantic_resources
 
-Persistent Digital Twin.
+Persistenter Digital Twin.
 
-```sql
+```sql id="j3d5jd"
 CREATE TABLE semantic_resources (
     id TEXT PRIMARY KEY,
     type TEXT,
@@ -308,11 +308,11 @@ CREATE TABLE semantic_resources (
 
 # API Layer
 
-## Goal
+## Ziel
 
-Implementation of the official:
+Implementierung der offiziellen:
 
-```text
+```text id="6t2jlwm"
 KNX IoT 3rd Party API 2.1.0
 ```
 
@@ -320,9 +320,9 @@ KNX IoT 3rd Party API 2.1.0
 
 # REST API
 
-## Examples
+## Beispiele
 
-```http
+```http id="dbkjlwm"
 GET /api/v1/devices
 GET /api/v1/datapoints
 GET /api/v1/locations
@@ -336,33 +336,33 @@ GET /api/v1/timeseries
 
 ## WebSocket
 
-Live events.
+Live Events.
 
 ## MQTT
 
-Semantic MQTT topics.
+Semantische MQTT Topics.
 
 ---
 
-# MQTT Structure
+# MQTT Struktur
 
-```text
-knx/location/bathroom-upper/light/mirror/state
+```text id="ffjlwm"
+knx/location/bad-og/light/mirror/state
 ```
 
-or:
+oder:
 
-```text
-knx/datapoint/dp-light-bathroom-mirror/state
+```text id="gxjlwm"
+knx/datapoint/dp-light-bad-mirror/state
 ```
 
 ---
 
-# Docker Architecture
+# Docker Architektur
 
-## Containers
+## Container
 
-```text
+```text id="0ljlwm"
 semantic-knx-runtime
 timescaledb
 ```
@@ -371,7 +371,7 @@ timescaledb
 
 # Docker Compose
 
-```yaml
+```yaml id="e7jlwm"
 services:
 
   semantic-knx-runtime:
@@ -415,11 +415,11 @@ volumes:
 
 ---
 
-# Environment Variables
+# Environment Variablen
 
 ## .env
 
-```env
+```env id="4kjlwm"
 KNX_IP=192.168.7.15
 KNX_PORT=3671
 KNX_PHYS_ADDR=15.15.200
@@ -437,9 +437,9 @@ LOG_LEVEL=info
 
 ---
 
-# Project Structure
+# Projektstruktur
 
-```text
+```text id="ozjlwm"
 src/
 ├── index.js
 │
@@ -477,19 +477,19 @@ src/
 
 ---
 
-# Implementation Phases
+# Umsetzungsphasen
 
 # Phase 1 — Core Runtime
 
-## Goals
+## Ziele
 
-* Docker base
-* KNX tunnel
-* Telegram reception
-* DPT decoding
+* Docker Basis
+* KNX Tunnel
+* Telegram Empfang
+* DPT Decode
 * Reconnect
 
-## Result
+## Ergebnis
 
 Live KNX Runtime.
 
@@ -497,14 +497,14 @@ Live KNX Runtime.
 
 # Phase 2 — Semantic Engine
 
-## Goals
+## Ziele
 
-* TTL parsing
-* Resource graph
-* Semantic store
-* Datapoint mapping
+* TTL Parsing
+* Resource Graph
+* Semantic Store
+* Datapoint Mapping
 
-## Result
+## Ergebnis
 
 Digital Twin Runtime.
 
@@ -512,41 +512,41 @@ Digital Twin Runtime.
 
 # Phase 3 — State Engine
 
-## Goals
+## Ziele
 
-* Current state cache
-* Event processing
-* State updates
+* Current State Cache
+* Event Processing
+* State Updates
 
-## Result
+## Ergebnis
 
-Live state model.
+Live Zustandsmodell.
 
 ---
 
 # Phase 4 — TimescaleDB
 
-## Goals
+## Ziele
 
-* Event persistence
-* Current state persistence
-* Resource persistence
+* Event Persistenz
+* Current State Persistenz
+* Resource Persistenz
 
-## Result
+## Ergebnis
 
-Historization + Analytics.
+Historisierung + Analytics.
 
 ---
 
 # Phase 5 — KNX IoT REST API
 
-## Goals
+## Ziele
 
-* OpenAPI-compliant REST API
-* Resource endpoints
-* Timeseries endpoints
+* OpenAPI-konforme REST API
+* Resource Endpoints
+* Timeseries Endpoints
 
-## Result
+## Ergebnis
 
 KNX IoT 3rd Party API Server.
 
@@ -554,7 +554,7 @@ KNX IoT 3rd Party API Server.
 
 # Phase 6 — Realtime & Integration
 
-## Goals
+## Ziele
 
 * WebSocket
 * Subscription API
@@ -562,9 +562,9 @@ KNX IoT 3rd Party API Server.
 
 ---
 
-# Phase 7 — Extensions
+# Phase 7 — Erweiterungen
 
-## Goals
+## Ziele
 
 * Matter Bridge
 * CoAP
@@ -574,21 +574,26 @@ KNX IoT 3rd Party API Server.
 
 ---
 
-# Immediate Next Step
+# Sofortiger nächster Schritt
 
-## Start of Implementation
+## Start der Implementierung
 
-First we implement:
+Als erstes implementieren wir:
 
-1. Docker base
-2. Node.js runtime
+1. Docker Basis
+2. Node.js Runtime
 3. KNX Tunnel Manager
-4. Telegram event stream
-5. Base project structure
+4. Telegram Event Stream
+5. Basisprojektstruktur
 
-Afterwards:
+Danach:
 
 * Semantic Layer
 * State Engine
 * TimescaleDB
 * REST API
+---
+
+## License
+
+This project is licensed under [CC BY-NC-SA 4.0](https://creativecommons.org/licenses/by-nc-sa/4.0/) — free to use and adapt for non-commercial purposes, with attribution and under the same license.
