@@ -7,14 +7,14 @@ import { bearer } from '../middleware/oauth-bearer.js';
 import { paginate, stableUuid } from './helpers/knx-iot-uuid.js';
 import { getAllLocations, toLocationResource, toDeviceResource } from './helpers/knx-iot-transform.js';
 
-// ── KNX IoT Spec §Errors ──────────────────────────────────────────────────────
+// KNX IoT Spec §Errors
 const KNX_SCHEMA_LINK = 'https://schema.knx.org/2020/api';
 
 function knxError(status, title, detail) {
     return { errors: [{ title, links: KNX_SCHEMA_LINK, status: String(status), detail }] };
 }
 
-// ── Filter Helpers (identisch zu devices.js / datapoints.js) ─────────────────
+// Filter Helpers (same as devices.js / datapoints.js)
 
 function parseFilters(query) {
     const filters = [];
@@ -126,7 +126,7 @@ export function locationsRouter(semanticEngine) {
     });
 
     // ── GET /api/v1/locations/:id/parentlocation ──────────────────────────
-    // Spec: data MAY be null wenn keine Parent-Location vorhanden
+    // Spec: data MAY be null when no parent location exists
     router.get('/:id/parentlocation', bearer('read'), async (req, res) => {
         try {
             const { allLocations, loc } = await findLocation(semanticEngine, req.params.id);
@@ -148,7 +148,7 @@ export function locationsRouter(semanticEngine) {
     });
 
     // ── GET /api/v1/locations/:id/childlocations ──────────────────────────
-    // Spec: nur direkt untergeordnete Locations (keine rekursive Traversierung)
+    // Spec: only directly subordinate locations (no recursive traversal)
     // Spec-Parameter: page[number], page[size], typeFilter, tagFilter, attributeFilter
     router.get('/:id/childlocations', bearer('read'), async (req, res) => {
         try {

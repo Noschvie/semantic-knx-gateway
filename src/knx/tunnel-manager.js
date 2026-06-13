@@ -43,7 +43,7 @@ export class TunnelManager {
             ipPort: parseInt(process.env.KNX_GATEWAY_PORT, 10),
             physAddr: process.env.KNX_GATEWAY_PHYS_ADDR,
             hostProtocol: 'TunnelUDP',
-            // ACKs für LDataReq unterdrücken (reduziert Telegrammverkehr bei vielen Leseanfragen)
+            // Suppress ACKs for LDataReq (reduces telegram traffic during many read requests)
             suppress_ack_ldatareq: true,
             loglevel: 'error',
         };
@@ -115,8 +115,8 @@ export class TunnelManager {
 
                         // ===== APCI + VALUE =====
                         const apciRaw = cemi?.npdu?._apci ?? 0;
-                        const apciCmd = apciRaw & 0xC0; // Bits 7:6 → Befehlstyp
-                        const apciData = apciRaw & 0x3F; // Bits 5:0 → Kurzdaten (≤6 Bit)
+                        const apciCmd = apciRaw & 0xC0; // Bits 7:6 -> command type
+                        const apciData = apciRaw & 0x3F; // Bits 5:0 -> short data (<= 6 bit)
 
                         let evt = 'Unknown';
                         switch (apciCmd) {
@@ -125,7 +125,7 @@ export class TunnelManager {
                             case 0x80: evt = 'GroupValue_Write';    break;
                         }
 
-                        // Read-Requests haben keine Nutzlast – nicht in State speichern
+                        // Read requests have no payload - do not store in state
                         if (evt === 'GroupValue_Read') {
                             this.logger.debug({ msg: '📖 GroupValue_Read – skipping state update', dest });
                             return;
@@ -134,17 +134,17 @@ export class TunnelManager {
                         // ===== VALUE =====
                         const npduData = cemi?.npdu?._data;
 
-                        // Alle möglichen Datenpfade von knxultimate abdecken
+                        // Cover all possible knxultimate data paths
                         const dataBytes =
                             npduData?._data?.data ??   // { _data: { type: 'Buffer', data: [...] } }
-                            npduData?._data ??         // direkt Buffer
+                            npduData?._data ??         // direct Buffer
                             npduData?.data ??          // { data: [...] }
                             null;
 
                         let rawValue;
 
                         if (!dataBytes || (Array.isArray(dataBytes) && dataBytes.length === 0)) {
-                            // Kurzes Telegramm (1-Bit / 4-Bit): Wert in APCI-Low-Bits
+                            // Short telegram (1-bit / 4-bit): value in APCI low bits
                             rawValue = apciData;
                         } else if (Array.isArray(dataBytes) || Buffer.isBuffer(dataBytes)) {
                             const arr = Array.isArray(dataBytes) ? dataBytes : Array.from(dataBytes);
@@ -233,7 +233,7 @@ export class TunnelManager {
         });
 
         try {
-            // DPT aus StateEngine-Mapping holen (falls vorhanden)
+            // Get DPT from StateEngine mapping (if present)
             const mapping = this.stateEngine.datapointMappings?.get(dest);
             const dpt = mapping?.dpt ?? null;
 

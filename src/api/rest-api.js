@@ -70,11 +70,11 @@ export class RestAPI {
         this.server = null;
         this.websocketApi = new MessagingWebSocketServer(this.stateEngine, this.tunnelManager);
 
-        // Store vor setupRoutes() – wird im Router und Dispatcher verwendet
+        // Store before setupRoutes() - used in router and dispatcher
         this.subscriptionStore = new SubscriptionStore(this.db);
         this.dispatcher = new CallbackDispatcher(this.stateEngine, this.subscriptionStore);
 
-        // ── 503 Guard wenn Semantic Engine fehlt ─────────────────────────────
+        // 503 Guard when semantic engine is missing
         if (!this.semanticEngine) {
             this.app.use((req, res) => {
                 res.status(503)
@@ -103,10 +103,10 @@ export class RestAPI {
         }));
 
         this.app.use((req, res, next) => {
-            // OAuth-Endpunkte verwenden application/json (RFC 6749) – kein JSON:API
+            // OAuth endpoints use application/json (RFC 6749) - not JSON:API
             if (req.path.startsWith('/oauth')) return next();
 
-            // .well-known-Endpunkte liefern spezifische MIME-Types (z.B. PKCS#7 für IDevID)
+            // .well-known endpoints return specific MIME types (e.g. PKCS#7 for iDevID)
             if (req.path.includes('/.well-known')) return next();
 
             // JSON:API Response Content-Type
@@ -161,7 +161,7 @@ export class RestAPI {
                     );
                 }
 
-                // JSON:API erlaubt keine zusätzlichen Parameter außer profile/ext
+                // JSON:API allows no extra parameters except profile/ext
                 const hasInvalidParameter =
                     isJsonApi &&
                     contentType.includes(';') &&
@@ -235,7 +235,7 @@ export class RestAPI {
         // OAuth2 token endpoint (KNX IoT spec §/oauth/access)
         this.app.use('/oauth', oauthRouter());
 
-        // /.well-known/knx – KNX IoT Discovery Endpunkt (Pflicht lt. Spec)
+        // /.well-known/knx - KNX IoT discovery endpoint (required by spec)
         this.app.get('/.well-known/knx', wellKnownKnxHandler());
 
         this.app.get('/api/v1/.well-known/knx/idevid', async (req, res) => {

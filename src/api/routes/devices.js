@@ -17,9 +17,9 @@ function knxError(status, title, detail) {
 // ── Filter Helpers ────────────────────────────────────────────────────────────
 
 /**
- * Parst alle filter[...]-Query-Parameter aus req.query.
+ * Parses all filter[...]-query parameters from req.query.
  *
- * Spec-Beispiele:
+ * Spec examples:
  *   filter[meta.@type]=Device
  *   filter[meta.@type][or]=Room,Floor
  *   filter[title]=Actuator
@@ -36,7 +36,7 @@ function parseFilters(query) {
         const m = param.match(re);
         if (!m) continue;
 
-        const key      = m[1];                          // z.B. "meta.@type", "title", "hasTag"
+        const key      = m[1];                          // e.g. "meta.@type", "title", "hasTag"
         const operator = (m[2] ?? 'eq').toLowerCase();  // eq | or | and | le | ge | lt | gt
         const values   = String(raw).split(',').map(v => v.trim()).filter(Boolean);
 
@@ -47,14 +47,14 @@ function parseFilters(query) {
 }
 
 /**
- * Liest einen verschachtelten Wert aus einem Objekt anhand eines Pfades.
- * Unterstützt: "meta.@type", "attributes.title", "title" (shorthand für attributes.title)
+ * Reads a nested value from an object using a path.
+ * Supports: "meta.@type", "attributes.title", "title" (shorthand for attributes.title)
  */
 function getField(resource, key) {
-    // Direkte JSON:API-Pfade: meta.@type, attributes.title, relationships.*
+    // Direct JSON:API paths: meta.@type, attributes.title, relationships.*
     const parts = key.split('.');
 
-    // Versuche zuerst den exakten Pfad im resource-Objekt
+    // Try exact path in the resource object first
     let val = resource;
     for (const p of parts) {
         if (val == null) return undefined;
@@ -71,11 +71,11 @@ function getField(resource, key) {
 }
 
 /**
- * Vergleicht zwei Werte anhand des Spec-Operators.
- * String → lexikalisch, Number → numerisch, Array → enthält-Prüfung.
+ * Compares two values using the spec operator.
+ * String -> lexical, Number -> numeric, Array -> contains check.
  */
 function matchValue(fieldVal, filterVal, operator) {
-    // Array-Felder (z.B. meta.@type): mind. ein Element muss matchen
+    // Array fields (e.g. meta.@type): at least one element must match
     if (Array.isArray(fieldVal)) {
         return fieldVal.some(v => matchValue(v, filterVal, operator));
     }
@@ -83,7 +83,7 @@ function matchValue(fieldVal, filterVal, operator) {
     const a = String(fieldVal ?? '').toLowerCase();
     const b = filterVal.toLowerCase();
 
-    // Namespace-Präfix optional: "Device" matched "knx:device" oder "core:Device"
+    // Namespace prefix optional: "Device" matches "knx:device" or "core:Device"
     const aStripped = a.includes(':') ? a.split(':').pop() : a;
     const bStripped = b.includes(':') ? b.split(':').pop() : b;
 
@@ -98,11 +98,11 @@ function matchValue(fieldVal, filterVal, operator) {
 }
 
 /**
- * Wendet einen einzelnen Filter auf ein Array von JSON:API Resources an.
+ * Applies one filter to an array of JSON:API resources.
  *
- * operator=or  → Feld muss einem der Werte entsprechen
- * operator=and → Feld muss allen Werten entsprechen
- * alle anderen → erster Wert wird mit matchValue verglichen
+ * operator=or  -> field must match one of the values
+ * operator=and -> field must match all values
+ * all others   -> first value is compared with matchValue
  */
 function applyFilter(resources, { key, operator, values }) {
     return resources.filter(resource => {
@@ -117,13 +117,13 @@ function applyFilter(resources, { key, operator, values }) {
             return values.every(v => matchValue(fieldVal, v, 'eq'));
         }
 
-        // eq / le / ge / lt / gt → erster Wert
+        // eq / le / ge / lt / gt -> first value
         return matchValue(fieldVal, values[0] ?? '', operator);
     });
 }
 
 /**
- * Wendet alle geparsten Filter sequenziell an (AND-Verknüpfung zwischen Filtern).
+ * Applies all parsed filters sequentially (AND conjunction between filters).
  */
 function applyAllFilters(resources, filters) {
     let result = resources;
@@ -147,7 +147,7 @@ export function devicesRouter(semanticEngine) {
             const allDevices  = await semanticEngine.getAllDevices();
             const resources   = allDevices.map(toDeviceResource);
 
-            // ── Filter anwenden (typeFilter / tagFilter / attributeFilter) ──
+            // ── Apply filters (typeFilter / tagFilter / attributeFilter) ─────
             const filters         = parseFilters(req.query);
             const filteredResources = applyAllFilters(resources, filters);
 

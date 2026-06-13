@@ -36,7 +36,7 @@ export class SemanticEngine {
             // Build graph from TTL
             this.graph = await this.graphBuilder.buildFromTTL(ttlFilePath);
 
-            // Lookup-Map einmalig aufbauen
+            // Build lookup map once
             this.deviceToGaMap = this._buildDeviceToGaMap(this.graph.groupAddresses);
             this.logger.info(`Built device→GA map for ${this.deviceToGaMap.size} devices`);
 
@@ -137,17 +137,17 @@ export class SemanticEngine {
     }
 
     /**
-     * Gibt alle GA-Adressen zurück, die mit einem bestimmten Device verbunden sind.
-     * @param {string} internalDeviceId - Die interne Device-ID (uri)
-     * @returns {Set<string>} Set mit GA-Adressen (z.B. "1/1/83")
+     * Returns all GA addresses linked to a specific device.
+     * @param {string} internalDeviceId - The internal device ID (uri)
+     * @returns {Set<string>} Set of GA addresses (e.g. "1/1/83")
      */
     getGasByDevice(internalDeviceId) {
         return this.deviceToGaMap.get(internalDeviceId) ?? new Set();
     }
 
     /**
-     * Baut eine invertierte Map: internalDeviceId → Set<gaAddress>
-     * aus der GroupAddress-Liste des Graphen auf.
+     * Builds an inverted map: internalDeviceId -> Set<gaAddress>
+     * from the graph's group address list.
      * @param {Array} groupAddresses
      * @returns {Map<string, Set<string>>}
      */

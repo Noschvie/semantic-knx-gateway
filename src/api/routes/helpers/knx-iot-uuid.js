@@ -2,7 +2,7 @@
 // Copyright (c) 2026 Noschvie
 // KNX Runtime Engine – https://github.com/Noschvie/semantic-knx-gateway.git
 
-// helpers/knx-iot-uuid.js – Stabile UUID-Generierung und Paginierung
+// helpers/knx-iot-uuid.js - Stable UUID generation and pagination
 
 /**
  * Generates a deterministic UUID v5-like ID from a string.

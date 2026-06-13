@@ -13,8 +13,8 @@ const CONTENT_TYPE = 'application/vnd.api+json';
 // ------------------------------------------------------------
 
 /**
- * Einzelne Subscription als JSON:API Resource Object.
- * Secret und caCert werden NICHT zurückgegeben (Security).
+ * Single subscription as JSON:API resource object.
+ * Secret and caCert are NOT returned (security).
  */
 function serializeSubscription(row, baseUrl) {
     return {
@@ -92,7 +92,7 @@ function errorResponse(status, detail) {
     };
 }
 
-/** Pagination-Parameter aus Query lesen */
+/** Read pagination parameters from the query */
 function parsePagination(query) {
     const page = Math.max(1, parseInt(query['page[number]'] ?? query.page ?? '1', 10));
     const size = Math.min(100, Math.max(1, parseInt(query['page[size]'] ?? query.size ?? '50', 10)));
@@ -100,13 +100,13 @@ function parsePagination(query) {
 }
 
 /**
- * Normalisiert lifetime auf Sekunden (Zahl) für den Store.
- * Akzeptiert:
- *   - Zahl           → direkt (bereits Sekunden)
- *   - { seconds }    → Sekunden
- *   - { minutes }    → minutes * 60
- *   - { hours }      → hours * 3600
- *   - null/undefined → undefined (Store-Default)
+ * Normalizes lifetime to seconds (number) for the store.
+ * Accepts:
+ *   - number         -> directly (already seconds)
+ *   - { seconds }    -> seconds
+ *   - { minutes }    -> minutes * 60
+ *   - { hours }      -> hours * 3600
+ *   - null/undefined -> undefined (store default)
  */
 function normalizeLifetime(lifetime) {
     if (lifetime == null) return undefined;
@@ -126,21 +126,21 @@ function normalizeLifetime(lifetime) {
 export function subscriptionsRouter(subscriptionStore, stateEngine) {
     const router = Router();
 
-    // Effektive Scope-Anforderungen (lt. KNX IoT Spec):
+    // Effective scope requirements (according to KNX IoT spec):
     // - GET /subscriptions*
     // - POST /subscriptions
     // - PATCH /subscriptions/:id
     // - DELETE /subscriptions/:id
-    // => alle benötigen 'manage'
+    // => all require 'manage'
     router.use(bearer('manage'));
 
-    // Alle Responses als application/vnd.api+json
+    // All responses as application/vnd.api+json
     router.use((req, res, next) => {
         res.setHeader('Content-Type', CONTENT_TYPE);
         next();
     });
 
-    // Basis-URL für Self/Related-Links (ohne trailing slash)
+    // Base URL for self/related links (without trailing slash)
     function baseUrl(req) {
         return `${req.protocol}://${req.get('host')}/api/v1/subscriptions`;
     }
@@ -168,7 +168,7 @@ export function subscriptionsRouter(subscriptionStore, stateEngine) {
         try {
             const body = req.body;
 
-            // Minimale JSON:API-Validierung
+            // Minimal JSON:API validation
             if (!body?.data?.type || body.data.type !== 'subscription') {
                 return res.status(400).json(
                     errorResponse(400, 'Request body must contain a JSON:API resource object of type "subscription".')
@@ -181,7 +181,7 @@ export function subscriptionsRouter(subscriptionStore, stateEngine) {
             // subscriptionType default = callback
             const subType = attr.subscriptionType ?? 'callback';
 
-            // Callback benötigt URL
+            // Callback requires URL
             if (subType === 'callback' && !attr.url) {
                 return res.status(422).json(
                     errorResponse(422, 'Attribute "url" is required for callback subscriptions.')
@@ -189,11 +189,11 @@ export function subscriptionsRouter(subscriptionStore, stateEngine) {
             }
 
             // ----------------------------------------------------
-            // SPEC-KONFORME RELATIONSHIPS
+            // SPEC-COMPLIANT RELATIONSHIPS
             // ----------------------------------------------------
 
-            // UUID → internen datapointId auflösen (z.B. 'a0744285-...' → 'GA-98')
-            // damit subscription_datapoints konsistent den internen Key speichert
+            // Resolve UUID -> internal datapointId (e.g. 'a0744285-...' -> 'GA-98')
+            // so subscription_datapoints consistently stores the internal key
             const allStates = await stateEngine.getAllStates();
 
             const datapoints = (rels.subscriptionDatapoints?.data ?? []).map(item => {
@@ -203,7 +203,7 @@ export function subscriptionsRouter(subscriptionStore, stateEngine) {
 
                 const state = allStates.find(s => stableUuid(s.datapointId) === item.id);
                 return {
-                    datapointId: state?.datapointId ?? item.id, // fallback: original behalten
+                    datapointId: state?.datapointId ?? item.id, // fallback: keep original
                     expand: item.meta?.expand ?? false,
                 };
             });
@@ -234,7 +234,7 @@ export function subscriptionsRouter(subscriptionStore, stateEngine) {
                 }
                 : undefined;
 
-            // Mindestens eine Ressource erforderlich
+            // At least one resource is required
             if (datapoints.length === 0 && installations.length === 0 && !node) {
                 return res.status(422).json(
                     errorResponse(
@@ -264,7 +264,7 @@ export function subscriptionsRouter(subscriptionStore, stateEngine) {
                 );
             }
 
-            // 201 + Location-Header + minimales Response-Objekt (lt. Spec)
+            // 201 + Location header + minimal response object (according to spec)
             res.setHeader('Location', `${baseUrl(req)}/${id}`);
 
             return res.status(201).json({
@@ -322,13 +322,13 @@ export function subscriptionsRouter(subscriptionStore, stateEngine) {
 
     // --------------------------------------------------------
     // PATCH /subscriptions/:id
-    // Nur url, secret, caCert, lifetime sind änderbar (lt. Spec).
+    // Only url, secret, caCert, lifetime are mutable (according to spec).
     // --------------------------------------------------------
     router.patch('/:id', async (req, res) => {
         try {
             const body = req.body;
 
-            // JSON:API Grundvalidierung
+            // Basic JSON:API validation
             if (!body?.data?.type || body.data.type !== 'subscription') {
                 return res.status(400).json(
                     errorResponse(
@@ -338,7 +338,7 @@ export function subscriptionsRouter(subscriptionStore, stateEngine) {
                 );
             }
 
-            // Body-ID muss zur URL passen
+            // Body ID must match the URL
             if (body.data.id && body.data.id !== req.params.id) {
                 return res.status(409).json(
                     errorResponse(
@@ -367,7 +367,7 @@ export function subscriptionsRouter(subscriptionStore, stateEngine) {
                 patch.lifetime = normalizeLifetime(attr.lifetime);
             }
 
-            // Nicht patchbare Felder erkennen
+            // Detect non-patchable fields
             const allowedFields = [
                 'url',
                 'secret',
@@ -387,7 +387,7 @@ export function subscriptionsRouter(subscriptionStore, stateEngine) {
                 );
             }
 
-            // Leerer PATCH
+            // Empty PATCH
             if (Object.keys(patch).length === 0) {
                 return res.status(422).json(
                     errorResponse(
@@ -397,7 +397,7 @@ export function subscriptionsRouter(subscriptionStore, stateEngine) {
                 );
             }
 
-            // Relationships dürfen laut Spec nicht geändert werden
+            // Relationships cannot be changed according to the spec
             if (body.data.relationships) {
                 return res.status(422).json(
                     errorResponse(
@@ -418,7 +418,7 @@ export function subscriptionsRouter(subscriptionStore, stateEngine) {
                 );
             }
 
-            // Spec-konform: erfolgreicher PATCH liefert 200.
+            // Spec-compliant: successful PATCH returns 200.
             return res.status(200).json({ data: null });
 
         } catch (err) {
@@ -476,7 +476,7 @@ export function subscriptionsRouter(subscriptionStore, stateEngine) {
                 },
 
                 data: rows.map(row => ({
-                    id: stableUuid(row.id), // 'GA-98' → 'a0744285-...' für den Client
+                    id: stableUuid(row.id), // 'GA-98' -> 'a0744285-...' for the client
 
                     type: 'datapoint',
 
@@ -561,7 +561,7 @@ export function subscriptionsRouter(subscriptionStore, stateEngine) {
 
             const node = await subscriptionStore.findNodeBySubId(req.params.id);
 
-            // Kein Node subscribed → leeres data-Objekt (lt. JSON:API)
+            // No node subscribed -> empty data object (according to JSON:API)
             if (!node) {
                 return res.status(200).json({ data: null });
             }

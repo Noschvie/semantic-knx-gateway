@@ -170,7 +170,7 @@ export class DPTDecoder {
     decodeDPT9(value) {
         // 2-byte float (KNX DPT 9.x)
         // Format: SEEEEMMM MMMMMMMM
-        // S = Sign, E = Exponent (4 bit), M = Mantissa (11 bit, Zweierkomplement)
+        // S = Sign, E = Exponent (4 bit), M = Mantissa (11 bit, two's complement)
         const buf = this.toBuffer(value);
         if (buf.length < 2) return 0;
 
@@ -181,7 +181,7 @@ export class DPTDecoder {
         const exponent = (byte1 & 0x78) >> 3;
         const mantissa = ((byte1 & 0x07) << 8) | byte2;
 
-        // Mantissa als 11-Bit Zweierkomplement
+        // Mantissa as 11-bit two's complement
         const mantissaSigned = sign ? mantissa - 2048 : mantissa;
 
         const result = 0.01 * mantissaSigned * Math.pow(2, exponent);
@@ -191,13 +191,13 @@ export class DPTDecoder {
 
     decodeDPT10(value) {
         // Time of Day: 3 Bytes
-        // Byte 0: Bits 7-5 = Wochentag (0=kein, 1=Mo ... 7=So), Bits 4-0 = Stunden
-        // Byte 1: Minuten (0-59)
-        // Byte 2: Sekunden (0-59)
+        // Byte 0: Bits 7-5 = day of week (0=none, 1=Mon ... 7=Sun), Bits 4-0 = hours
+        // Byte 1: minutes (0-59)
+        // Byte 2: seconds (0-59)
         const buf = this.toBuffer(value);
         if (buf.length < 2) return null;
 
-        const dayOfWeek = (buf[0] & 0xE0) >> 5; // 0=kein Tag, 1=Mo...7=So
+        const dayOfWeek = (buf[0] & 0xE0) >> 5; // 0=no day, 1=Mon...7=Sun
         const hour    = buf[0] & 0x1F;
         const minute  = buf.length > 1 ? buf[1] & 0x3F : 0;
         const second  = buf.length > 2 ? buf[2] & 0x3F : 0;
@@ -215,9 +215,9 @@ export class DPTDecoder {
 
     decodeDPT11(value) {
         // Date: 3 Bytes
-        // Byte 0: Tag (1-31)
-        // Byte 1: Monat (1-12)
-        // Byte 2: Jahr (0-99, wobei 90-99 = 1990-1999, 0-89 = 2000-2089)
+        // Byte 0: day (1-31)
+        // Byte 1: month (1-12)
+        // Byte 2: year (0-99, where 90-99 = 1990-1999, 0-89 = 2000-2089)
         const buf = this.toBuffer(value);
         if (buf.length < 3) return null;
 

@@ -26,24 +26,24 @@ export class GraphBuilder {
         };
     }
 
-    // ── Öffentliche API ──────────────────────────────────────────────────────
+    // ── Public API ───────────────────────────────────────────────────────────
 
     /**
-     * Erstellt semantischen Graphen aus TTL-Export.
-     * @param {string} ttlFilePath - Pfad zur TTL-Datei
-     * @returns {Promise<Object>} Semantischer Graph
+     * Builds semantic graph from TTL export.
+     * @param {string} ttlFilePath - Path to TTL file
+     * @returns {Promise<Object>} Semantic graph
      */
     async buildFromTTL(ttlFilePath) {
         this.logger.info('Building semantic graph from TTL...');
 
-        // TTLLoader macht den gesamten Parse — wir verwenden das Ergebnis direkt
+        // TTLLoader performs the full parse - we use the result directly
         const { topology, groupAddresses, deviceMap } = await this.ttlLoader.loadTTLFull(ttlFilePath);
 
         const graph = {
             locations: this.buildLocations(topology),
             devices: this.buildDevices(deviceMap),
-            functions: [], // KNX IoT TTL hat keine brick:Function-Typen
-            datapoints: [], // werden über groupAddresses abgedeckt
+            functions: [], // KNX IoT TTL has no brick:Function types
+            datapoints: [], // covered via groupAddresses
             groupAddresses: this.buildGroupAddresses(groupAddresses),
             relationships: this.buildRelationships(topology, groupAddresses)
         };
@@ -58,12 +58,12 @@ export class GraphBuilder {
         return graph;
     }
 
-    // ── Locations aus Topologie-Baum ──────────────────────────────────────────
+    // ── Locations from Topology Tree ─────────────────────────────────────────
 
     /**
-     * Erstellt flache Locations-Liste aus Topologie-Baum.
-     * @param {Object} topology - Topologie-Objekt
-     * @returns {Array} Locations-Array
+     * Builds a flat locations list from topology tree.
+     * @param {Object} topology - Topology object
+     * @returns {Array} Locations array
      */
     buildLocations(topology) {
         const locations = [];
@@ -110,12 +110,12 @@ export class GraphBuilder {
         return locations;
     }
 
-    // ── Devices aus deviceMap ─────────────────────────────────────────────────
+    // ── Devices from deviceMap ───────────────────────────────────────────────
 
     /**
-     * Erstellt sortierte Devices-Liste aus deviceMap.
-     * @param {Map} deviceMap - Map mit Device-Informationen
-     * @returns {Array} Devices-Array sortiert nach physikalischer Adresse
+     * Builds sorted devices list from deviceMap.
+     * @param {Map} deviceMap - Map with device information
+     * @returns {Array} Devices array sorted by physical address
      */
     buildDevices(deviceMap) {
         return [...deviceMap.values()]
@@ -146,9 +146,9 @@ export class GraphBuilder {
     // ── GroupAddresses ────────────────────────────────────────────────────────
 
     /**
-     * Erstellt normalisierte GroupAddresses-Liste.
-     * @param {Array} groupAddresses - Rohe Gruppenadressen
-     * @returns {Array} Normalisierte GroupAddresses
+     * Builds normalized group addresses list.
+     * @param {Array} groupAddresses - Raw group addresses
+     * @returns {Array} Normalized group addresses
      */
     buildGroupAddresses(groupAddresses) {
         return groupAddresses.map((ga) => ({
@@ -171,10 +171,10 @@ export class GraphBuilder {
     // ── Relationships ─────────────────────────────────────────────────────────
 
     /**
-     * Erstellt Relationships-Liste aus Topologie und Gruppenadressen.
-     * @param {Object} topology - Topologie-Objekt
-     * @param {Array} groupAddresses - Gruppenadressen
-     * @returns {Array} Relationships-Array
+     * Builds a relationship list from topology and group addresses.
+     * @param {Object} topology - Topology object
+     * @param {Array} groupAddresses - Group addresses
+     * @returns {Array} Relationships array
      */
     buildRelationships(topology, groupAddresses) {
         const relationships = [];
@@ -212,9 +212,9 @@ export class GraphBuilder {
     // ── Helpers ───────────────────────────────────────────────────────────────
 
     /**
-     * Extrahiert normalisierten ID-String aus URI oder Name.
-     * @param {string} uri - URI oder Name
-     * @returns {string} Normalisierter ID-String
+     * Extracts normalized ID string from URI or name.
+     * @param {string} uri - URI or name
+     * @returns {string} Normalized ID string
      */
     extractId(uri) {
         if (!uri) return 'unknown';
@@ -237,14 +237,14 @@ export class GraphBuilder {
     }
 
     /**
-     * Bestimmt den JavaScript-Werttyp anhand des DPT-Codes.
-     * @param {string} dpt - DPT-Code (z.B. "9.001")
-     * @returns {string} Werttyp
+     * Determines JavaScript value type based on DPT code.
+     * @param {string} dpt - DPT code (e.g. "9.001")
+     * @returns {string} Value type
      */
     getValueTypeFromDPT(dpt) {
         if (!dpt) return 'unknown';
 
-        // Symbolischen Namen auflösen (z.B. "windowDoor" → "1.019")
+        // Resolve symbolic name (e.g. "windowDoor" -> "1.019")
         let resolved = dpt;
         if (!/^\d/.test(dpt)) {
             resolved = DPT_NAME_MAP[dpt]

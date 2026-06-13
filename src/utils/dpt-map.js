@@ -3,8 +3,8 @@
 // KNX Runtime Engine – https://github.com/Noschvie/semantic-knx-gateway.git
 
 /**
- * Mapping von symbolischen DPT-Namen (aus TTL/ETS) auf numerische DPT-Strings.
- * Wird von TelegramDecoder und GraphBuilder gemeinsam genutzt.
+ * Mapping from symbolic DPT names (from TTL/ETS) to numeric DPT strings.
+ * Shared by TelegramDecoder and GraphBuilder.
  */
 export const DPT_NAME_MAP = {
     // DPT 1.x – Boolean
@@ -32,7 +32,7 @@ export const DPT_NAME_MAP = {
     'sceneAB':          '1.022',
     'shutter':          '1.023',
 
-    // DPT 3.x – 4-Bit dimmen/jalousie
+    // DPT 3.x - 4-bit dimming/blinds
     'dimming':          '3.007',
     'blinds':           '3.008',
 
@@ -86,10 +86,10 @@ export const DPT_NAME_MAP = {
     'valueWind':        '9.005',
     'valueAngl':        '9.006',
 
-    // DPT 10.x – Zeit
+    // DPT 10.x - time
     'timeOfDay':        '10.001',
 
-    // DPT 11.x – Datum
+    // DPT 11.x - date
     'date':             '11.001',
 
     // DPT 12.x – 32-Bit unsigned
@@ -109,13 +109,13 @@ export const DPT_NAME_MAP = {
     'string':           '16.001',
     'stringLatin':      '16.000',
 
-    // DPT 17.x – Szenennummer
+    // DPT 17.x - scene number
     'scene':            '17.001',
 
-    // DPT 18.x – Szenensteuerung
+    // DPT 18.x - scene control
     'sceneControl':     '18.001',
 
-    // DPT 19.x – Datum+Zeit
+    // DPT 19.x - date+time
     'datetime':         '19.001',
 
     // DPT 20.x – 8-Bit enum

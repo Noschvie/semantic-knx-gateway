@@ -7,8 +7,8 @@ import { formatTimestamp } from '../../utils/timezone.js';
 import { bearer } from '../middleware/oauth-bearer.js';
 
 // ── Vendor-Extension: Stats Endpoints ────────────────────────────────────────
-// Diese Endpunkte sind NICHT in der KNX IoT Spec definiert.
-// Registriert unter /api/v1/stats/...
+// These endpoints are NOT defined in the KNX IoT spec.
+// Registered under /api/v1/stats/...
 
 function parseHours(raw, defaultVal = 24, max = 8760) {
     const n = parseInt(raw);

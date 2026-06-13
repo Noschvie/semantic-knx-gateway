@@ -34,7 +34,7 @@ export class EventStore {
             actualValue = buffer.toString('hex');
             valueType = 'string';
         } else if (value !== null && typeof value === 'object') {
-            // Objekte (z.B. DPT 11.001 Datum, 10.001 Uhrzeit) als JSON-String speichern
+            // Store objects (e.g. DPT 11.001 date, 10.001 time) as JSON string
             actualValue = JSON.stringify(value);
             valueType = 'string';
         }

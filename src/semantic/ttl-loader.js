@@ -19,12 +19,12 @@ export class TTLLoader {
         this.logger = createLogger('TTLLoader');
     }
 
-    // ── Adress-Konvertierung ─────────────────────────────────────────────────
+    // Address Conversion
 
     /**
-     * Konvertiert hex-Adresse zu physikalischer Adresse im Format X.X.XXX
-     * @param {string} hex - Hexadezimale Adresse
-     * @returns {string} Physikalische Adresse
+     * Converts a hex address to a physical address in format X.X.XXX
+     * @param {string} hex - Hexadecimal address
+     * @returns {string} Physical address
      */
     toPhysAddress(hex) {
         const n = parseInt(hex, 16);
@@ -32,9 +32,9 @@ export class TTLLoader {
     }
 
     /**
-     * Konvertiert dezimale Adresse zu Gruppenadresse im Format XX/X/XXX
-     * @param {string|number} dec - Dezimale Adresse
-     * @returns {string} Gruppenadresse
+     * Converts a decimal address to a group address in format XX/X/XXX
+     * @param {string|number} dec - Decimal address
+     * @returns {string} Group address
      */
     toGroupAddress(dec) {
         const n = parseInt(dec);
@@ -42,10 +42,10 @@ export class TTLLoader {
     }
 
     /**
-     * Sortiert physikalische Adressen aufsteigend
-     * @param {string} a - Erste Adresse
-     * @param {string} b - Zweite Adresse
-     * @returns {number} Sortierungswert
+     * Sorts physical addresses in ascending order
+     * @param {string} a - First address
+     * @param {string} b - Second address
+     * @returns {number} Sort value
      */
     sortPhys(a, b) {
         const pa = (a ?? '9.9.999').split('.').map(Number);
@@ -53,10 +53,10 @@ export class TTLLoader {
         return pa[0] - pb[0] || pa[1] - pb[1] || pa[2] - pb[2];
     }
 
-    // ── Hilfsfunktionen ──────────────────────────────────────────────────────
+    // Helper Functions
 
     /**
-     * Extrahiert Label aus Dataset für einen Node
+     * Extracts a label from the dataset for a node
      * @param {Object} dataset - RDF Dataset
      * @param {Object} node - RDF Node
      * @returns {string} Label
@@ -71,7 +71,7 @@ export class TTLLoader {
     }
 
     /**
-     * Extrahiert Geräte-Informationen aus Dataset
+     * Extracts device information from the dataset
      * @param {Object} dataset - RDF Dataset
      * @param {Object} device - Device Node
      * @returns {Object} Device Info Object
@@ -106,21 +106,21 @@ export class TTLLoader {
     }
 
     /**
-     * Extrahiert Device-ID aus URI
+     * Extracts device ID from URI
      * @param {string} uri - URI String
-     * @returns {string|null} Device ID oder null
+     * @returns {string|null} Device ID or null
      */
     extractDeviceId(uri) {
         const m = uri.match(/DI-\d+/);
         return m ? m[0] : null;
     }
 
-    // ── Dataset laden ────────────────────────────────────────────────────────
+    // Load Dataset
 
     /**
-     * Lädt TTL-Datei als rdf-ext Dataset.
-     * Stabiler als for-await Streaming — resolved sauber via Promise.
-     * @param {string} filePath - Pfad zur TTL-Datei
+     * Loads a TTL file as a rdf-ext dataset.
+     * More stable than for-await streaming - resolves cleanly via Promise.
+     * @param {string} filePath - Path to TTL file
      * @returns {Promise<Object>} RDF Dataset
      */
     async loadDataset(filePath) {
@@ -136,12 +136,12 @@ export class TTLLoader {
         return dataset;
     }
 
-    // ── Öffentliche API ──────────────────────────────────────────────────────
+    // Public API
 
     /**
-     * Gibt strukturierte Gruppenadressen-Liste zurück (Rückwärtskompatibilität).
-     * @param {string} filePath - Pfad zur TTL-Datei
-     * @returns {Promise<Array>} Array von Gruppenadressen
+     * Returns a structured group-address list (backward compatibility).
+     * @param {string} filePath - Path to TTL file
+     * @returns {Promise<Array>} Array of group addresses
      */
     async loadTTL(filePath) {
         const dataset = await this.loadDataset(filePath);
@@ -151,9 +151,9 @@ export class TTLLoader {
     }
 
     /**
-     * Gibt vollständige Topologie + Gruppenadressen zurück.
-     * @param {string} filePath - Pfad zur TTL-Datei
-     * @returns {Promise<Object>} Objekt mit topology, groupAddresses, deviceMap
+     * Returns complete topology and group addresses.
+     * @param {string} filePath - Path to TTL file
+     * @returns {Promise<Object>} Object with topology, groupAddresses, deviceMap
      */
     async loadTTLFull(filePath) {
         const dataset = await this.loadDataset(filePath);
@@ -161,8 +161,8 @@ export class TTLLoader {
     }
 
     /**
-     * Gibt das rohe RDF-Dataset zurück (für externe SPARQL-ähnliche Queries).
-     * @param {string} filePath - Pfad zur TTL-Datei
+     * Returns the raw RDF dataset (for external SPARQL-like queries).
+     * @param {string} filePath - Path to TTL file
      * @returns {Promise<Object>} RDF Dataset
      */
     async loadTTLAsDataset(filePath) {
@@ -172,14 +172,14 @@ export class TTLLoader {
     // ── Parsing ──────────────────────────────────────────────────────────────
 
     /**
-     * Parst das RDF Dataset und extrahiert Topologie und Gruppenadressen
+     * Parses the RDF dataset and extracts topology and group addresses
      * @param {Object} dataset - RDF Dataset
-     * @returns {Promise<Object>} Objekt mit topology, groupAddresses, deviceMap
+     * @returns {Promise<Object>} Object with topology, groupAddresses, deviceMap
      */
     async parse(dataset) {
         const deviceMap = new Map(); // uri-Fragment → deviceInfo + room/floor context
 
-        // ── Topologie ────────────────────────────────────────────────────────────
+        // Topology
         const siteNode = [...dataset.match(null, LOC.hasBuilding)][0]?.subject;
         const siteLabel = siteNode ? this.getLabel(dataset, siteNode) : 'Site';
         const topology = { site: siteLabel, buildings: [] };
@@ -227,7 +227,7 @@ export class TTLLoader {
             topology.buildings.push(buildingEntry);
         }
 
-        // ── Gruppenadressen ───────────────────────────────────────────────────────
+        // Group Addresses
         const groupAddresses = [];
 
         for (const gaQuad of dataset.match(null, KNX.groupAddress)) {
@@ -267,7 +267,7 @@ export class TTLLoader {
 
         groupAddresses.sort((a, b) => parseInt(a.decimal) - parseInt(b.decimal));
 
-        // GAs den Räumen zuordnen
+        // Assign GAs to rooms
         const roomGAMap = new Map();
         for (const ga of groupAddresses) {
             for (const d of ga.connectedDevices) {
