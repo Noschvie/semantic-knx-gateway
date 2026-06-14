@@ -1,4 +1,4 @@
-# Semantic KNX Runtime Engine
+﻿# Semantic KNX Runtime Engine
 
 ## Architektur- und Umsetzungsdokument
 
@@ -597,3 +597,4 @@ Danach:
 ## License
 
 This project is licensed under [CC BY-NC-SA 4.0](https://creativecommons.org/licenses/by-nc-sa/4.0/) — free to use and adapt for non-commercial purposes, with attribution and under the same license.
+

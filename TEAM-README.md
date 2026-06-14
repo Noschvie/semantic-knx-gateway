@@ -1,4 +1,4 @@
-# Team README
+﻿# Team README
 
 This short team README contains repository-level conventions and commands
 that every contributor should follow to avoid unnecessary diffs and ensure a
@@ -74,3 +74,4 @@ git commit -m "Add .gitattributes and normalize line endings"
 
 Thank you — small, consistent steps keep the repository healthy for every
 contributor.
+

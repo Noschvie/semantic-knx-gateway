@@ -1,4 +1,4 @@
-# docker-compose.yml
+﻿# docker-compose.yml
 
 services:
   semantic-knx-runtime:
@@ -57,3 +57,4 @@ services:
       resources:
         limits:
           memory: 1g
+

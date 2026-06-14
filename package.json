@@ -1,4 +1,4 @@
-{
+﻿{
   "name": "semantic-knx-gateway",
   "version": "0.4.0",
   "type": "module",
@@ -29,3 +29,4 @@
     "@types/node": "^24.0.0"
   }
 }
+

@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: CC-BY-NC-SA-4.0
+﻿// SPDX-License-Identifier: CC-BY-NC-SA-4.0
 // Copyright (c) 2026 Noschvie
 // KNX Runtime Engine – https://github.com/Noschvie/semantic-knx-gateway.git
 
@@ -110,3 +110,4 @@ export function semanticRouter(semanticEngine) {
 
     return router;
 }
+

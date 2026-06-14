@@ -1,4 +1,4 @@
-# Subscription-Beispiele (aktueller Stand)
+﻿# Subscription-Beispiele (aktueller Stand)
 
 Dieses Dokument beschreibt den **aktuell implementierten** Stand in der Runtime.
 
@@ -187,3 +187,4 @@ Ein WebSocket-Subscription-Endpoint ist in der aktuellen Implementierung nicht v
 - Kein `GET /api/v1/.../ws`
 - Kein WebSocket-Dispatch im `CallbackDispatcher`
 - Event-Dispatch erfolgt aktuell nur ueber HTTP Callback
+

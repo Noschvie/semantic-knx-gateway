@@ -1,4 +1,4 @@
-# Python Setup – KNX Bus Logger
+﻿# Python Setup – KNX Bus Logger
 
 ## Virtual Environment and Connectivity Tests
 
@@ -153,3 +153,4 @@ After completing these steps you will have:
 - Successfully transmitted a KNX switching telegram
 
 The environment is now ready for KNX Bus Logger development and testing.
+
