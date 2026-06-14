@@ -58,3 +58,4 @@ export function toLocalISO(timestamp) {
 export function nowLocal() {
     return formatTimestamp(new Date());
 }
+

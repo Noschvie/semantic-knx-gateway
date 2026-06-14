@@ -276,3 +276,4 @@ export class SemanticMapper {
             .replace(/^-+|-+$/g, '');
     }
 }
+

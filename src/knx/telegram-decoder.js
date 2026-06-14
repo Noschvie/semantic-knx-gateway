@@ -86,3 +86,4 @@ export class TelegramDecoder {
         return this.decode(telegram, dpt);
     }
 }
+

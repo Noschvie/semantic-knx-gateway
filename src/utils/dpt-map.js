@@ -156,3 +156,4 @@ export const DPT_TO_DATAPOINT_TYPE = {
     '17.001': 'knx:scene',
     '20.102': 'knx:hvacMode',
 };
+

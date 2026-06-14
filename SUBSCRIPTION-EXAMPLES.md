@@ -188,3 +188,4 @@ Ein WebSocket-Subscription-Endpoint ist in der aktuellen Implementierung nicht v
 - Kein WebSocket-Dispatch im `CallbackDispatcher`
 - Event-Dispatch erfolgt aktuell nur ueber HTTP Callback
 
+

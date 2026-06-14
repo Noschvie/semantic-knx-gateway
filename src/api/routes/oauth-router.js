@@ -364,3 +364,4 @@ export function bearerAuthMiddleware(requiredScopes = []) {
         next();
     };
 }
+

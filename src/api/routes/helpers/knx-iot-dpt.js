@@ -115,3 +115,4 @@ export function decodeValueForKnx(valueStr, dpt) {
         }
     }
 }
+
