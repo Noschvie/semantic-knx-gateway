@@ -72,7 +72,35 @@ git commit -m "Add .gitattributes and normalize line endings"
 - Ask on the team's chat or open an issue in this repository with the
   exact `git status` / `git diff` output.
 
+IntelliJ IDEA (Windows) — recommended project settings
+------------------------------------------------------
+If you use IntelliJ / WebStorm on Windows, follow these exact steps to avoid
+accidentally saving files with CRLF and to keep behaviour consistent with the
+repository `.gitattributes` (which enforces LF for source files):
+
+1. Project line separator
+   - File → Settings → Editor → Code Style → Line separator
+   - Set to: "Unix and OS X (\n)" or choose "Use project default" if the
+     project already uses LF.
+
+2. Ensure final newline and trim trailing spaces
+   - File → Settings → Editor → General
+   - Enable: "Ensure line feed at file end on Save"
+   - Set: "Strip trailing spaces on Save" → "All"
+
+3. Per-file quick check and conversion
+   - The bottom-right status bar shows the current file's line endings (CRLF/LF).
+   - Click it to change per-file if needed.
+
+4. Helpful Git setting
+   - In the terminal (project root):
+     ```powershell
+     git config core.autocrlf false
+     ```
+
+Note: the repository `.gitattributes` will ensure files are stored with LF in
+git; IntelliJ configured as above will keep your working copy consistent and
+avoid accidental CRLF commits.
+
 Thank you — small, consistent steps keep the repository healthy for every
 contributor.
-
-
