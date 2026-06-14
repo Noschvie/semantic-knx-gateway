@@ -39,4 +39,3 @@ export function paginate(items, pageNumber, pageSize) {
     const start = num * size;
     return { items: items.slice(start, start + size), total, number: num, size };
 }
-

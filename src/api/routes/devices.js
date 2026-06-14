@@ -184,5 +184,3 @@ export function devicesRouter(semanticEngine) {
 
     return router;
 }
-
-

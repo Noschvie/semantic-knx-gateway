@@ -280,4 +280,3 @@ export class GraphBuilder {
         return typeMap[main] ?? 'unknown';
     }
 }
-

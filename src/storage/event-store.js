@@ -181,4 +181,3 @@ export class EventStore {
         return result.rows;
     }
 }
-

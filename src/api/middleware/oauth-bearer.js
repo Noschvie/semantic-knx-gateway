@@ -87,4 +87,3 @@ export function bearer(...requiredScopes) {
         next();
     };
 }
-

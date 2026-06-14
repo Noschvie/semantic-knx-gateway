@@ -291,4 +291,3 @@ export class TTLLoader {
         return { topology, groupAddresses, deviceMap };
     }
 }
-

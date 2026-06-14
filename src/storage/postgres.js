@@ -322,4 +322,3 @@ export class PostgresClient {
         return await this.pool.connect();
     }
 }
-

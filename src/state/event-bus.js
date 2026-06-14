@@ -27,4 +27,3 @@ export class EventBus extends EventEmitter {
         return super.off(event, listener);
     }
 }
-

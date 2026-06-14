@@ -209,4 +209,3 @@ export class ResourceStore {
         return result.rows.map(row => row.resource);
     }
 }
-

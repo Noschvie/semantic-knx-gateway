@@ -360,5 +360,3 @@ export class RestAPI {
         }
     }
 }
-
-

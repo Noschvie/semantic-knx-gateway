@@ -64,5 +64,3 @@ const baseLogger = pino({
 export function createLogger(module) {
     return baseLogger.child({ module });
 }
-
-
