@@ -38,4 +38,3 @@
 
 # Ensure pack files (node modules, caches) are not normalized
 node_modules/** -text
-
