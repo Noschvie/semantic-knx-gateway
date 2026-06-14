@@ -1,4 +1,4 @@
-# Changelog
+﻿# Changelog
 
 All notable changes to this project will be documented in this file.
 
@@ -47,5 +47,4 @@ Example entry
 
 If you want, I can open a pull request with this changelog and the
 renormalization commits grouped under the 2026-06-14 entry. Tell me which
-branch you prefer to use for the PR (e.g. `development`).
-
+branch you prefer to use for the PR (e.g. `development`).\r\n
