@@ -107,4 +107,3 @@ runtime.start().catch((error) => {
     logger.error('Unhandled error:', error);
     process.exit(1);
 });
-
