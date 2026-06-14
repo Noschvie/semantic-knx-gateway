@@ -60,7 +60,6 @@ export class TunnelManager {
                 }, 10000);
 
                 // ===== EVENTS =====
-
                 this.connection.on('connected', () => {
                     clearTimeout(timeout);
                     this.isConnecting = false;

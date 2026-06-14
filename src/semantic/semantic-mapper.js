@@ -12,7 +12,7 @@ export class SemanticMapper {
     }
 
     /**
-     * Map datapoints to group addresses in state engine
+     * Map datapoints to group addresses in the state engine
      */
     async mapDatapointsToStateEngine(graph) {
         this.logger.info('Mapping datapoints to state engine...');
@@ -115,7 +115,7 @@ export class SemanticMapper {
             return `${ga}/0`;
         }
 
-        // Convert from integer (e.g., 2561 -> 1/2/1)
+        // Convert from integer (e.g. 2561 -> 1/2/1)
         if (/^\d+$/.test(ga)) {
             const num = parseInt(ga);
             const main = (num >> 11) & 0x1F;
