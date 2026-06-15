@@ -1,6 +1,6 @@
-﻿// SPDX-License-Identifier: AGPL-3.0-or-later
-// Copyright (c) 2026 Noschvie
-// KNX Runtime Engine – https://github.com/Noschvie/semantic-knx-gateway.git
+﻿# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright (c) 2026 Noschvie
+# KNX Runtime Engine – https://github.com/Noschvie/semantic-knx-gateway.git
 
 import asyncio
 
@@ -11,7 +11,7 @@ async def main():
     # Create an XKNX instance with tunneling connection to the KNX/IP gateway
     xknx = XKNX(
         connection_config=ConnectionConfig(
-            connection_type=ConnectionType.TUNNELING,  # Use KNX IP Tunneling protocol
+            connection_type=ConnectionType.TUNNELING,  # Use KNX IP Tunnelling protocol
             gateway_ip="192.168.7.18",                 # IP address of the KNX/IP gateway
         )
     )

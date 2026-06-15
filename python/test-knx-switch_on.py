@@ -1,6 +1,6 @@
-﻿// SPDX-License-Identifier: AGPL-3.0-or-later
-// Copyright (c) 2026 Noschvie
-// KNX Runtime Engine – https://github.com/Noschvie/semantic-knx-gateway.git
+﻿# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright (c) 2026 Noschvie
+# KNX Runtime Engine – https://github.com/Noschvie/semantic-knx-gateway.git
 
 import asyncio
 
