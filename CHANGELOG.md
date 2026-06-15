@@ -14,6 +14,8 @@ Unreleased
   CRLF for PowerShell/batch scripts where appropriate).
 
 ### Changed
+- Updated license identifiers to AGPL-3.0-or-later across all JavaScript and test files
+  (commits 0667a48, 264783f, 1434b7c).
 - Normalized line endings across the repository to LF for source and
   documentation files. This included multiple commits to ensure CR/CRLF
   characters were removed and files were encoded with LF endings.
