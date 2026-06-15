@@ -12,6 +12,16 @@ Unreleased
 - TEAM-README.md — short team guidelines for line endings and git config.
 - .gitattributes — repository-level EOL normalization rules (LF for source,
   CRLF for PowerShell/batch scripts where appropriate).
+ - TTL parsing: support for ETS Application Functions (parsed from TTL into
+   `applicationFunctions`) in `src/semantic/ttl-loader.js`.
+ - Semantic graph: Functions are now represented as `applicationFunction`
+   entities in the graph via `src/semantic/graph-builder.js` (includes
+   `buildFunctions()` and function → groupAddress relationships).
+ - ResourceStore: convenience methods `getApplicationFunctions()` and
+   `getFunctions()` added to `src/semantic/resource-store.js` (backwards
+   compatible getter that falls back to legacy `function` type).
+ - Test scripts: `scripts/test-ttl.js` and `scripts/test-ttl-summary.js` to
+   quickly validate TTL parsing and function→groupAddress relationships.
 
 ### Changed
 - Updated license identifiers to AGPL-3.0-or-later across all JavaScript and test files
@@ -19,6 +29,13 @@ Unreleased
 - Normalized line endings across the repository to LF for source and
   documentation files. This included multiple commits to ensure CR/CRLF
   characters were removed and files were encoded with LF endings.
+ - KNX Function type rename: internal semantic resources for ETS functions
+   now use `type: 'applicationFunction'`. A backwards-compatible getter
+   (`ResourceStore.getFunctions`) is provided to avoid breaking existing
+   callers.
+ - `SemanticEngine.getAllFunctions()` now uses the new convenience getter
+   to ensure both `applicationFunction` and legacy `function` types are
+   supported.
 
 2026-06-14
 ----------
