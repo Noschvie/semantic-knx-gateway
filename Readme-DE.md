@@ -596,6 +596,14 @@ Danach:
 
 ## License
 
-This project is licensed under [CC BY-NC-SA 4.0](https://creativecommons.org/licenses/by-nc-sa/4.0/) — free to use and adapt for non-commercial purposes, with attribution and under the same license.
+This project is licensed under the GNU Affero General Public License v3.0 or later (AGPL-3.0-or-later).
 
+Commercial licenses are available on request for organizations that wish to use this software under alternative terms.
 
+See the LICENSE and COMMERCIAL-LICENSE.md files for details.
+
+## Disclaimer
+
+KNX is a trademark of the KNX Association.
+
+This project is an independent implementation and is not affiliated with, endorsed by, or sponsored by the KNX Association.
