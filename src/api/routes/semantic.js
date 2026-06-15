@@ -78,7 +78,7 @@ export function semanticRouter(semanticEngine) {
     // GET /api/v1/semantic/functions - all functions (proprietary)
     router.get('/functions', bearer('read'), async (req, res) => {
         try {
-            const functions = await semanticEngine.getAllFunctions();
+            const functions = await semanticEngine.getAllApplicationFunctions();
             res.json({ functions, count: functions.length });
         } catch (error) {
             res.status(500).json({ error: error.message });

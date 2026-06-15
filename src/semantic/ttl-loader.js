@@ -10,6 +10,7 @@ import { createLogger } from '../utils/logger.js';
 
 const KNX = rdf.namespace('http://schema.knx.org/2020/ontology/knx#');
 const RDFS = rdf.namespace('http://www.w3.org/2000/01/rdf-schema#');
+const RDF = rdf.namespace('http://www.w3.org/1999/02/22-rdf-syntax-ns#');
 const DC = rdf.namespace('http://purl.org/dc/terms/');
 const CORE = rdf.namespace('http://schema.knx.org/2023/en50090-6-2/core#');
 const LOC = rdf.namespace('http://schema.knx.org/2023/en50090-6-2/loc#');
@@ -267,6 +268,44 @@ export class TTLLoader {
 
         groupAddresses.sort((a, b) => parseInt(a.decimal) - parseInt(b.decimal));
 
+        // Function lookup
+        const gaMap = new Map();
+        for (const ga of groupAddresses) {
+            gaMap.set(ga.uri, ga);
+        }
+
+        // ETS Functions / KNX Application Functions
+        const applicationFunctions = [];
+
+        for (const quad of dataset.match(null, RDF.type, CORE.ApplicationFunction)) {
+            const fnNode = quad.subject;
+
+            const title =
+                [...dataset.match(fnNode, DC.title)][0]?.object?.value
+                ?? this.getLabel(dataset, fnNode);
+
+            const functionPoints = [];
+            const groupAddressesForFunction = [];
+
+            for (const fpQuad of dataset.match(fnNode, KNX.hasFunctionPoint)) {
+                const fpId = fpQuad.object.value.split('#').pop();
+
+                functionPoints.push(fpId);
+
+                const ga = gaMap.get(fpId);
+                if (ga) {
+                    groupAddressesForFunction.push(ga);
+                }
+            }
+
+            applicationFunctions.push({
+                uri: fnNode.value.split('#').pop(),
+                title,
+                functionPoints,
+                groupAddresses: groupAddressesForFunction
+            });
+        }
+
         // Assign GAs to rooms
         const roomGAMap = new Map();
         for (const ga of groupAddresses) {
@@ -288,6 +327,11 @@ export class TTLLoader {
             }
         }
 
-        return { topology, groupAddresses, deviceMap };
+        return {
+            topology,
+            groupAddresses,
+            applicationFunctions,
+            deviceMap
+        };
     }
 }

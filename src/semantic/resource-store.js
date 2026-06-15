@@ -135,6 +135,13 @@ export class ResourceStore {
     }
 
     /**
+     * Convenience: get application functions stored under the type 'applicationFunction'
+     */
+    async getApplicationFunctions() {
+        return this.getResourcesByType('applicationFunction');
+    }
+
+    /**
      * Get all locations with hierarchy
      */
     async getLocationHierarchy() {

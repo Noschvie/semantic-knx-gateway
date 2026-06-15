@@ -118,8 +118,8 @@ export class SemanticEngine {
     /**
      * Get all functions
      */
-    async getAllFunctions() {
-        return await this.resourceStore.getResourcesByType('function');
+    async getAllApplicationFunctions() {
+        return await this.resourceStore.getApplicationFunctions();
     }
 
     /**

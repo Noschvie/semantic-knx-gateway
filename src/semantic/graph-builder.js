@@ -37,15 +37,20 @@ export class GraphBuilder {
         this.logger.info('Building semantic graph from TTL...');
 
         // TTLLoader performs the full parse - we use the result directly
-        const { topology, groupAddresses, deviceMap } = await this.ttlLoader.loadTTLFull(ttlFilePath);
+        const {
+            topology,
+            groupAddresses,
+            applicationFunctions,
+            deviceMap
+        } = await this.ttlLoader.loadTTLFull(ttlFilePath);
 
         const graph = {
             locations: this.buildLocations(topology),
             devices: this.buildDevices(deviceMap),
-            functions: [], // KNX IoT TTL has no brick:Function types
+            functions: this.buildFunctions(applicationFunctions),
             datapoints: [], // covered via groupAddresses
             groupAddresses: this.buildGroupAddresses(groupAddresses),
-            relationships: this.buildRelationships(topology, groupAddresses)
+            relationships: this.buildRelationships(topology, groupAddresses, applicationFunctions)
         };
 
         this.logger.info('✅ Semantic graph built:', {
@@ -176,7 +181,7 @@ export class GraphBuilder {
      * @param {Array} groupAddresses - Group addresses
      * @returns {Array} Relationships array
      */
-    buildRelationships(topology, groupAddresses) {
+    buildRelationships(topology, groupAddresses, applicationFunctions) {
         const relationships = [];
 
         // Building → Floor → Room
@@ -206,10 +211,32 @@ export class GraphBuilder {
             }
         }
 
+        // Function → GroupAddress
+        for (const fn of applicationFunctions) {
+            for (const ga of fn.groupAddresses) {
+                relationships.push({
+                    subject: fn.uri,
+                    predicate: 'hasGroupAddress',
+                    object: ga.uri
+                });
+            }
+        }
+
         return relationships;
     }
 
     // ── Helpers ───────────────────────────────────────────────────────────────
+
+    buildFunctions(applicationFunctions) {
+        return applicationFunctions.map((fn) => ({
+            id: fn.uri,
+            type: 'applicationFunction',
+            uri: fn.uri,
+            name: fn.title,
+            functionPointCount: fn.functionPoints.length,
+            groupAddressCount: fn.groupAddresses.length
+        }));
+    }
 
     /**
      * Extracts normalized ID string from URI or name.

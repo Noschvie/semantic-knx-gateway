@@ -104,7 +104,7 @@ export function knxIotRouter(semanticEngine, stateEngine) {
             const rawNumber = req.query['page[number]'] ?? req.query.page?.number;
             const rawSize   = req.query['page[size]']   ?? req.query.page?.size;
 
-            const allFunctions = await semanticEngine.getAllFunctions();
+            const allFunctions = await semanticEngine.getAllApplicationFunctions();
             const resources    = allFunctions.map(toFunctionResource);
 
             const filters           = parseFilters(req.query);
@@ -123,7 +123,7 @@ export function knxIotRouter(semanticEngine, stateEngine) {
         try {
             const { id } = req.params;
 
-            const allFunctions = await semanticEngine.getAllFunctions();
+            const allFunctions = await semanticEngine.getAllApplicationFunctions();
             const fn = allFunctions.find(
                 f => stableUuid(f.id ?? f.uri ?? '') === id || f.id === id
             );
