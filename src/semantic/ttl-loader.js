@@ -280,6 +280,12 @@ export class TTLLoader {
         for (const quad of dataset.match(null, RDF.type, CORE.ApplicationFunction)) {
             const fnNode = quad.subject;
 
+            const fpQuads = [...dataset.match(fnNode, KNX.hasFunctionPoint)];
+
+            // Skip nodes without function points – these are ontology-level
+            // class definitions, not actual ETS functions configured by the user.
+            if (fpQuads.length === 0) continue;
+
             const title =
                 [...dataset.match(fnNode, DC.title)][0]?.object?.value
                 ?? this.getLabel(dataset, fnNode);
@@ -287,7 +293,7 @@ export class TTLLoader {
             const functionPoints = [];
             const groupAddressesForFunction = [];
 
-            for (const fpQuad of dataset.match(fnNode, KNX.hasFunctionPoint)) {
+            for (const fpQuad of fpQuads) {
                 const fpId = fpQuad.object.value.split('#').pop();
 
                 functionPoints.push(fpId);
