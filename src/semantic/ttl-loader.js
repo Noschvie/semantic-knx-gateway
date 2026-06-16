@@ -102,7 +102,7 @@ export class TTLLoader {
             lastDl: [...dataset.match(device, CORE.lastDownloaded)][0]?.object?.value ?? '',
             manufacturer,
             orderNumber,
-            mediaType
+            mediaType,
         };
     }
 
@@ -195,7 +195,7 @@ export class TTLLoader {
 
                 const roomUris = new Set([
                     ...[...dataset.match(floor, LOC.hasRoom)].map((q) => q.object.value),
-                    ...[...dataset.match(floor, LOC.hasSpace)].map((q) => q.object.value)
+                    ...[...dataset.match(floor, LOC.hasSpace)].map((q) => q.object.value),
                 ]);
 
                 for (const roomUri of roomUris) {
@@ -203,7 +203,7 @@ export class TTLLoader {
                     const roomEntry = {
                         name: this.getLabel(dataset, room),
                         devices: [],
-                        groupAddresses: []
+                        groupAddresses: [],
                     };
 
                     for (const eQuad of dataset.match(room, LOC.containsEquipment)) {
@@ -213,7 +213,7 @@ export class TTLLoader {
                             ...info,
                             room: roomEntry.name,
                             floor: floorEntry.name,
-                            building: buildingEntry.name
+                            building: buildingEntry.name,
                         });
                     }
 
@@ -249,7 +249,7 @@ export class TTLLoader {
                         label: d.label,
                         physAddr: d.physAddr,
                         room: d.room,
-                        floor: d.floor
+                        floor: d.floor,
                     });
                 }
             }
@@ -262,7 +262,7 @@ export class TTLLoader {
                 dpt,
                 readable,
                 writable,
-                connectedDevices
+                connectedDevices,
             });
         }
 
@@ -308,7 +308,7 @@ export class TTLLoader {
                 uri: fnNode.value.split('#').pop(),
                 title,
                 functionPoints,
-                groupAddresses: groupAddressesForFunction
+                groupAddresses: groupAddressesForFunction,
             });
         }
 
@@ -337,7 +337,7 @@ export class TTLLoader {
             topology,
             groupAddresses,
             applicationFunctions,
-            deviceMap
+            deviceMap,
         };
     }
 }

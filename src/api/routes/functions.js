@@ -21,7 +21,7 @@ export function functionsRouter(semanticEngine) {
 
     // ── GET /api/v1/functions ─────────────────────────────────────────────────
     // Spec §/functions: page[number], page[size], typeFilter, tagFilter, attributeFilter
-    router.get('/', bearer('read'), async (req, res) => {
+    router.get('/', bearer('read'), async(req, res) => {
         try {
             const rawNumber = req.query['page[number]'] ?? req.query.page?.number;
             const rawSize   = req.query['page[size]']   ?? req.query.page?.size;
@@ -40,12 +40,12 @@ export function functionsRouter(semanticEngine) {
 
     // ── GET /api/v1/functions/:id ─────────────────────────────────────────────
     // Spec §/functions/{functionId}
-    router.get('/:id', bearer('read'), async (req, res) => {
+    router.get('/:id', bearer('read'), async(req, res) => {
         try {
             const { id } = req.params;
             const allFunctions = await semanticEngine.getAllApplicationFunctions();
             const fn = allFunctions.find(
-                f => stableUuid(f.id ?? f.uri ?? '') === id || f.id === id
+                f => stableUuid(f.id ?? f.uri ?? '') === id || f.id === id,
             );
             if (!fn) {
                 return res.status(404).json(knxError(404, 'Not Found', `Function ${id} not found`));
@@ -58,7 +58,7 @@ export function functionsRouter(semanticEngine) {
 
     // ── GET /api/v1/functions/:id/datapoints ─────────────────────────────────
     // Spec §/functions/{functionId}/datapoints: typeFilter, tagFilter, attributeFilter, timeFilter
-    router.get('/:id/datapoints', bearer('read'), async (req, res) => {
+    router.get('/:id/datapoints', bearer('read'), async(req, res) => {
         try {
             const { id } = req.params;
             const rawNumber = req.query['page[number]'] ?? req.query.page?.number;
@@ -66,7 +66,7 @@ export function functionsRouter(semanticEngine) {
 
             const allFunctions = await semanticEngine.getAllApplicationFunctions();
             const fn = allFunctions.find(
-                f => stableUuid(f.id ?? f.uri ?? '') === id || f.id === id
+                f => stableUuid(f.id ?? f.uri ?? '') === id || f.id === id,
             );
             if (!fn) {
                 return res.status(404).json(knxError(404, 'Not Found', `Function ${id} not found`));
@@ -95,12 +95,12 @@ export function functionsRouter(semanticEngine) {
 
     // ── GET /api/v1/functions/:id/location ───────────────────────────────────
     // Spec §/functions/{functionId}/location – data MAY be null
-    router.get('/:id/location', bearer('read'), async (req, res) => {
+    router.get('/:id/location', bearer('read'), async(req, res) => {
         try {
             const { id } = req.params;
             const allFunctions = await semanticEngine.getAllApplicationFunctions();
             const fn = allFunctions.find(
-                f => stableUuid(f.id ?? f.uri ?? '') === id || f.id === id
+                f => stableUuid(f.id ?? f.uri ?? '') === id || f.id === id,
             );
             if (!fn) {
                 return res.status(404).json(knxError(404, 'Not Found', `Function ${id} not found`));

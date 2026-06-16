@@ -22,7 +22,7 @@ export class GraphBuilder {
             loc: 'http://schema.knx.org/2023/en50090-6-2/loc#',
             mac: 'http://schema.knx.org/2020/ontology/mac#',
             owl: 'http://www.w3.org/2002/07/owl#',
-            tag: 'http://schema.knx.org/2023/en50090-6-2/tag#'
+            tag: 'http://schema.knx.org/2023/en50090-6-2/tag#',
         };
     }
 
@@ -41,7 +41,7 @@ export class GraphBuilder {
             topology,
             groupAddresses,
             applicationFunctions,
-            deviceMap
+            deviceMap,
         } = await this.ttlLoader.loadTTLFull(ttlFilePath);
 
         const graph = {
@@ -50,14 +50,14 @@ export class GraphBuilder {
             functions: this.buildFunctions(applicationFunctions),
             datapoints: [], // covered via groupAddresses
             groupAddresses: this.buildGroupAddresses(groupAddresses),
-            relationships: this.buildRelationships(topology, groupAddresses, applicationFunctions)
+            relationships: this.buildRelationships(topology, groupAddresses, applicationFunctions),
         };
 
         this.logger.info('✅ Semantic graph built:', {
             locations: graph.locations.length,
             devices: graph.devices.length,
             groupAddresses: graph.groupAddresses.length,
-            relationships: graph.relationships.length
+            relationships: graph.relationships.length,
         });
 
         return graph;
@@ -80,7 +80,7 @@ export class GraphBuilder {
                 subtype: 'building',
                 uri: building.uri ?? null,
                 name: building.name,
-                parentId: null
+                parentId: null,
             });
 
             for (const floor of building.floors) {
@@ -92,7 +92,7 @@ export class GraphBuilder {
                     subtype: 'floor',
                     uri: floor.uri ?? null,
                     name: floor.name,
-                    parentId: this.extractId(building.name)
+                    parentId: this.extractId(building.name),
                 });
 
                 for (const room of floor.rooms) {
@@ -106,7 +106,7 @@ export class GraphBuilder {
                         name: room.name,
                         parentId: floorId,
                         deviceCount: room.devices.length,
-                        gaCount: room.groupAddresses.length
+                        gaCount: room.groupAddresses.length,
                     });
                 }
             }
@@ -139,7 +139,7 @@ export class GraphBuilder {
                 lastDl: d.lastDl,
                 room: d.room,
                 floor: d.floor,
-                building: d.building
+                building: d.building,
             }))
             .sort((a, b) => {
                 const pa = (a.physAddr ?? '9.9.999').split('.').map(Number);
@@ -167,9 +167,9 @@ export class GraphBuilder {
             valueType: this.getValueTypeFromDPT(ga.dpt),
             flags: {
                 readable: ga.readable === 'True',
-                writable: ga.writable === 'True'
+                writable: ga.writable === 'True',
             },
-            connectedDevices: ga.connectedDevices
+            connectedDevices: ga.connectedDevices,
         }));
     }
 
@@ -217,7 +217,7 @@ export class GraphBuilder {
                 relationships.push({
                     subject: fn.uri,
                     predicate: 'hasGroupAddress',
-                    object: ga.uri
+                    object: ga.uri,
                 });
             }
         }
@@ -234,7 +234,7 @@ export class GraphBuilder {
             uri: fn.uri,
             name: fn.title,
             functionPointCount: fn.functionPoints.length,
-            groupAddressCount: fn.groupAddresses.length
+            groupAddressCount: fn.groupAddresses.length,
         }));
     }
 
@@ -276,7 +276,7 @@ export class GraphBuilder {
         if (!/^\d/.test(dpt)) {
             resolved = DPT_NAME_MAP[dpt]
                 ?? DPT_NAME_MAP[Object.keys(DPT_NAME_MAP).find(
-                    (k) => k.toLowerCase() === dpt.toLowerCase()
+                    (k) => k.toLowerCase() === dpt.toLowerCase(),
                 )]
                 ?? dpt;
         }
@@ -301,7 +301,7 @@ export class GraphBuilder {
             17: 'number',
             18: 'object',
             19: 'datetime',
-            20: 'number'
+            20: 'number',
         };
 
         return typeMap[main] ?? 'unknown';

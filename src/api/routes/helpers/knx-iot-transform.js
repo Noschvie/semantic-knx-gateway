@@ -38,8 +38,8 @@ export function toDatapointResource(state) {
         },
         relationships: {
             datapointFunctions: { links: { related: `/functions?datapointId=${uuid}` } },
-            datapointDevice:    { links: { related: `/devices?datapointId=${uuid}` } }
-        }
+            datapointDevice:    { links: { related: `/devices?datapointId=${uuid}` } },
+        },
     };
 }
 
@@ -55,8 +55,8 @@ export function toLocationResource(loc) {
         meta: { '@type': [`knx:${loc.subtype ?? 'location'}`], internalId: loc.id, uri: loc.uri },
         relationships: {
             childLocations: { links: { related: `/locations/${uuid}/childlocations` } },
-            parentLocation: { links: { related: `/locations/${uuid}/parentlocation` } }
-        }
+            parentLocation: { links: { related: `/locations/${uuid}/parentlocation` } },
+        },
     };
 }
 
@@ -79,8 +79,8 @@ export function toDeviceResource(dev) {
         meta: { '@type': ['knx:device'], internalId: dev.id, uri: dev.uri },
         relationships: {
             datapoints: { links: { related: `/api/v1/datapoints?filter[deviceId]=${uuid}` } },
-            ...(dev.room ? { location: { links: { related: `/api/v1/locations?filter[deviceId]=${uuid}` } } } : {})
-        }
+            ...(dev.room ? { location: { links: { related: `/api/v1/locations?filter[deviceId]=${uuid}` } } } : {}),
+        },
     };
 }
 

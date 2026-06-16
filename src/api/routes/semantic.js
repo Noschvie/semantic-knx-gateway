@@ -24,7 +24,7 @@ export function semanticRouter(semanticEngine) {
     }
 
     // GET /api/v1/semantic/locations - location hierarchy (proprietary)
-    router.get('/locations', bearer('read'), async (req, res) => {
+    router.get('/locations', bearer('read'), async(req, res) => {
         try {
             const hierarchy = await semanticEngine.getLocationHierarchy();
             res.json({ locations: hierarchy });
@@ -34,7 +34,7 @@ export function semanticRouter(semanticEngine) {
     });
 
     // GET /api/v1/semantic/locations/hierarchy - alias
-    router.get('/locations/hierarchy', bearer('read'), async (req, res) => {
+    router.get('/locations/hierarchy', bearer('read'), async(req, res) => {
         try {
             const hierarchy = await semanticEngine.getLocationHierarchy();
             res.json({ locations: hierarchy });
@@ -44,7 +44,7 @@ export function semanticRouter(semanticEngine) {
     });
 
     // GET /api/v1/semantic/locations/:id - single location (proprietary)
-    router.get('/locations/:id', bearer('read'), async (req, res) => {
+    router.get('/locations/:id', bearer('read'), async(req, res) => {
         try {
             const location = await semanticEngine.getLocation(req.params.id);
             if (!location) return res.status(404).json({ error: 'Location not found' });
@@ -55,7 +55,7 @@ export function semanticRouter(semanticEngine) {
     });
 
     // GET /api/v1/semantic/devices - all devices (proprietary)
-    router.get('/devices', bearer('read'), async (req, res) => {
+    router.get('/devices', bearer('read'), async(req, res) => {
         try {
             const devices = await semanticEngine.getAllDevices();
             res.json({ devices, count: devices.length });
@@ -65,7 +65,7 @@ export function semanticRouter(semanticEngine) {
     });
 
     // GET /api/v1/semantic/devices/:id - device details (proprietary)
-    router.get('/devices/:id', bearer('read'), async (req, res) => {
+    router.get('/devices/:id', bearer('read'), async(req, res) => {
         try {
             const device = await semanticEngine.getDeviceDetails(req.params.id);
             if (!device) return res.status(404).json({ error: 'Device not found' });
@@ -76,7 +76,7 @@ export function semanticRouter(semanticEngine) {
     });
 
     // GET /api/v1/semantic/functions - all functions (proprietary)
-    router.get('/functions', bearer('read'), async (req, res) => {
+    router.get('/functions', bearer('read'), async(req, res) => {
         try {
             const functions = await semanticEngine.getAllApplicationFunctions();
             res.json({ functions, count: functions.length });
@@ -86,7 +86,7 @@ export function semanticRouter(semanticEngine) {
     });
 
     // GET /api/v1/semantic/datapoints/:id - datapoint semantic info (proprietary)
-    router.get('/datapoints/:id', bearer('read'), async (req, res) => {
+    router.get('/datapoints/:id', bearer('read'), async(req, res) => {
         try {
             const info = await semanticEngine.getDatapointInfo(req.params.id);
             if (!info) return res.status(404).json({ error: 'Datapoint not found' });
@@ -97,7 +97,7 @@ export function semanticRouter(semanticEngine) {
     });
 
     // GET /api/v1/semantic/search?q=... - free-text search (proprietary)
-    router.get('/search', bearer('read'), async (req, res) => {
+    router.get('/search', bearer('read'), async(req, res) => {
         try {
             const { q } = req.query;
             if (!q) return res.status(400).json({ error: 'Query parameter "q" required' });

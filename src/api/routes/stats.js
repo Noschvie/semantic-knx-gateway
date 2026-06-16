@@ -24,7 +24,7 @@ export function statsRouter(stateEngine, db) {
     const router = Router();
 
     // GET /api/v1/stats - Database statistics
-    router.get('/', bearer('read'), async (req, res) => {
+    router.get('/', bearer('read'), async(req, res) => {
         try {
             // Count records in all tables
             const [events, states, datapoints, resources] = await Promise.all([
@@ -90,7 +90,7 @@ export function statsRouter(stateEngine, db) {
     });
 
     // GET /api/v1/stats/events - Event statistics
-    router.get('/events', bearer('read'), async (req, res) => {
+    router.get('/events', bearer('read'), async(req, res) => {
         try {
             const hours = parseHours(req.query.hours);
             const since = new Date(Date.now() - hours * 60 * 60 * 1000);
@@ -142,7 +142,7 @@ export function statsRouter(stateEngine, db) {
     });
 
     // GET /api/v1/stats/states - Current state statistics
-    router.get('/states', bearer('read'), async (req, res) => {
+    router.get('/states', bearer('read'), async(req, res) => {
         try {
             const stats = await db.query(`
                 SELECT
@@ -181,7 +181,7 @@ export function statsRouter(stateEngine, db) {
     });
 
     // GET /api/v1/stats/top-active - Most active datapoints
-    router.get('/top-active', bearer('read'), async (req, res) => {
+    router.get('/top-active', bearer('read'), async(req, res) => {
         try {
             const hours = parseHours(req.query.hours);
             const limit = parseLimit(req.query.limit);

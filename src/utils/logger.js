@@ -37,8 +37,8 @@ const transport = process.env.NODE_ENV === 'production'
             /** Use system timezone and a standard readable time format */
             translateTime: 'SYS:standard',
             /** Hide pid and hostname to reduce noise in console output */
-            ignore: 'pid,hostname'
-        }
+            ignore: 'pid,hostname',
+        },
     };
 
 /**
@@ -47,7 +47,7 @@ const transport = process.env.NODE_ENV === 'production'
  */
 const baseLogger = pino({
     level: logLevel,
-    transport
+    transport,
 });
 
 /**

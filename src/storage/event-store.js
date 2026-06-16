@@ -22,7 +22,7 @@ export class EventStore {
             eventType,
             value,
             dpt,
-            rawPayload
+            rawPayload,
         } = event;
 
         // Handle Buffer objects
@@ -58,7 +58,7 @@ export class EventStore {
             valueType === 'number' && Number.isInteger(actualValue) ? actualValue : null,
             valueType === 'string' ? actualValue : null,
             dpt,
-            JSON.stringify(rawPayload || {})
+            JSON.stringify(rawPayload || {}),
         ];
 
         try {
@@ -68,7 +68,7 @@ export class EventStore {
                 datapointId: datapointId,
                 value: actualValue,
                 originalValueType: typeof value,
-                valueType: valueType
+                valueType: valueType,
             });
 
             await this.db.query(query, params);
@@ -80,7 +80,7 @@ export class EventStore {
                 errorDetail: error.detail,
                 errorCode: error.code,
                 query: query,
-                params: params
+                params: params,
             });
             throw error;
         }
@@ -93,7 +93,7 @@ export class EventStore {
         const {
             startTime = new Date(Date.now() - 24 * 60 * 60 * 1000),
             endTime = new Date(),
-            limit = 1000
+            limit = 1000,
         } = options;
 
         const query = `
@@ -127,7 +127,7 @@ export class EventStore {
         const {
             startTime = new Date(Date.now() - 24 * 60 * 60 * 1000),
             endTime = new Date(),
-            limit = 1000
+            limit = 1000,
         } = options;
 
         const query = `
@@ -161,7 +161,7 @@ export class EventStore {
         const {
             startTime = new Date(Date.now() - 24 * 60 * 60 * 1000),
             endTime = new Date(),
-            interval = '1 hour'
+            interval = '1 hour',
         } = options;
 
         const query = `

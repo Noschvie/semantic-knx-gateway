@@ -19,6 +19,7 @@ export class CallbackDispatcher {
     #telegramHandler = null;
     // Active listeners: datapointId → handler function
     // Required for clean unsubscribe on stop()
+    // eslint-disable-next-line no-unused-private-class-members
     #listeners       = new Map();
 
     constructor(stateEngine, subscriptionStore) {
@@ -89,8 +90,8 @@ export class CallbackDispatcher {
         // does not block the others
         await Promise.allSettled(
             subscriptions.map(sub =>
-                this.#deliver(sub, { datapointId, value, timestamp })
-            )
+                this.#deliver(sub, { datapointId, value, timestamp }),
+            ),
         );
     }
 

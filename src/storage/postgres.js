@@ -272,7 +272,7 @@ export class PostgresClient {
             this.query('SELECT COUNT(*) as count FROM datapoint_mappings'),
             this.query('SELECT COUNT(*) as count FROM semantic_resources'),
             this.query('SELECT COUNT(DISTINCT ga) as count FROM current_state'),
-            this.query(`SELECT pg_size_pretty(pg_database_size(current_database())) as size`),
+            this.query('SELECT pg_size_pretty(pg_database_size(current_database())) as size'),
             this.query('SELECT COUNT(*) as count FROM subscriptions WHERE active = TRUE'),
         ]);
 
@@ -304,7 +304,7 @@ export class PostgresClient {
                 errorHint: error.hint,
                 errorCode: error.code,
                 errorWhere: error.where,
-                errorPosition: error.position
+                errorPosition: error.position,
             });
             throw error;
         }

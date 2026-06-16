@@ -3,6 +3,7 @@
 // KNX Runtime Engine – https://github.com/Noschvie/semantic-knx-gateway.git
 
 import { createLogger } from '../utils/logger.js';
+import { stableUuid } from '../api/routes/helpers/knx-iot-uuid.js';
 
 export class ResourceStore {
     constructor(db) {
@@ -77,7 +78,7 @@ export class ResourceStore {
         await client.query(query, [
             resource.id,
             resource.type,
-            JSON.stringify(resource)
+            JSON.stringify(resource),
         ]);
     }
 
@@ -112,7 +113,7 @@ export class ResourceStore {
     async getResource(id) {
         const result = await this.db.query(
             'SELECT * FROM semantic_resources WHERE id = $1',
-            [id]
+            [id],
         );
 
         if (result.rows.length === 0) {
@@ -128,7 +129,7 @@ export class ResourceStore {
     async getResourcesByType(type) {
         const result = await this.db.query(
             'SELECT * FROM semantic_resources WHERE type = $1',
-            [type]
+            [type],
         );
 
         return result.rows.map(row => row.resource);
@@ -145,7 +146,7 @@ export class ResourceStore {
             const result = await this.db.query(
                 `SELECT object FROM semantic_relationships
                  WHERE subject = $1 AND predicate = 'hasGroupAddress'`,
-                [fn.id]
+                [fn.id],
             );
             fn.groupAddressUris = result.rows.map(r => r.object);
         }

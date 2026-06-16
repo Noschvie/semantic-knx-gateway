@@ -82,7 +82,7 @@ export class StatsLogger {
                 output.push(
                     `   • ${ga.ga.padEnd(12)} → ${String(ga.count).padStart(4)} events` +
                     `   | ${formatTimestamp(ga.lastSeen) || 'N/A'}` +
-                    `   | Value: ${ga.currentValue ?? 'N/A'}`
+                    `   | Value: ${ga.currentValue ?? 'N/A'}`,
                 );
             }
 
@@ -98,7 +98,7 @@ export class StatsLogger {
         } catch (error) {
             this.logger.error('Failed to log statistics:', {
                 errorMessage: error.message,
-                errorStack: error.stack
+                errorStack: error.stack,
             });
         }
     }
@@ -118,7 +118,7 @@ export class StatsLogger {
             uniqueGAs,
             eventTimes,
             dbSize,
-            topGAs
+            topGAs,
         ] = await Promise.all([
             this.db.query('SELECT COUNT(*) as count FROM knx_events'),
             this.db.query('SELECT COUNT(*) as count FROM current_state'),
@@ -149,7 +149,7 @@ export class StatsLogger {
                 GROUP BY e.ga
                 ORDER BY count DESC
                 LIMIT 5
-            `, [fifteenMinutesAgo])
+            `, [fifteenMinutesAgo]),
         ]);
 
         return {
@@ -165,8 +165,8 @@ export class StatsLogger {
                 ga: row.ga,
                 count: parseInt(row.count),
                 lastSeen: row.last_seen,
-                currentValue: row.current_value
-            }))
+                currentValue: row.current_value,
+            })),
         };
     }
 }

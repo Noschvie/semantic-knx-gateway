@@ -21,7 +21,7 @@ export function sitesRouter(semanticEngine) {
 
     // ── GET /api/v1/sites ─────────────────────────────────────────────────────
     // Spec §/sites: root locations only (no parentId), typeFilter, tagFilter, attributeFilter
-    router.get('/', bearer('read'), async (req, res) => {
+    router.get('/', bearer('read'), async(req, res) => {
         try {
             const rawNumber = req.query['page[number]'] ?? req.query.page?.number;
             const rawSize   = req.query['page[size]']   ?? req.query.page?.size;

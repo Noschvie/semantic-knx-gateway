@@ -108,7 +108,7 @@ export class SubscriptionStore {
                 await client.query(
                     `INSERT INTO subscription_datapoints (subscription_id, datapoint_id, expand)
                      VALUES ${dpValues}`,
-                    dpParams
+                    dpParams,
                 );
             }
 
@@ -121,7 +121,7 @@ export class SubscriptionStore {
                 await client.query(
                     `INSERT INTO subscription_installations (subscription_id, installation_id, expand)
                      VALUES ${instValues}`,
-                    instParams
+                    instParams,
                 );
             }
 
@@ -130,7 +130,7 @@ export class SubscriptionStore {
                 await client.query(
                     `INSERT INTO subscription_node (subscription_id, node_id, expand)
                      VALUES ($1, $2, $3)`,
-                    [id, node.nodeId, node.expand ?? false]
+                    [id, node.nodeId, node.expand ?? false],
                 );
             }
 
@@ -168,7 +168,7 @@ export class SubscriptionStore {
             ORDER BY created_at DESC
             LIMIT $1 OFFSET $2
         `;
-        const countQuery = `SELECT COUNT(*) FROM subscriptions WHERE active = TRUE`;
+        const countQuery = 'SELECT COUNT(*) FROM subscriptions WHERE active = TRUE';
 
         const [result, countResult] = await Promise.all([
             this.db.query(query, [size, offset]),

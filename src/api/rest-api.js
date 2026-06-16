@@ -3,6 +3,7 @@
 // KNX Runtime Engine – https://github.com/Noschvie/semantic-knx-gateway.git
 
 import express from 'express';
+import { readFile as fsReadFile } from 'node:fs/promises';
 
 import { createLogger } from '../utils/logger.js';
 import { formatTimestamp } from '../utils/timezone.js';
@@ -65,7 +66,7 @@ const HTTP_TITLES = {
 //   - URL must NOT include an API base path (so /.well-known/knx, not /api/v2/...)
 //
 function wellKnownKnxHandler() {
-    return async (req, res) => {
+    return async(req, res) => {
         // Spec requires application/json (not vnd.api+json)
         res.setHeader('Content-Type', 'application/json');
 
@@ -131,8 +132,8 @@ export class RestAPI {
         this.app.use(express.json({
             type: [
                 'application/json',
-                'application/vnd.api+json'
-            ]
+                'application/vnd.api+json',
+            ],
         }));
 
         this.app.use((req, res, next) => {
@@ -154,7 +155,7 @@ export class RestAPI {
                 !accept.includes('application/vnd.api+json')
             ) {
                 return res.status(406).json(
-                    knxError(406, 'Not Acceptable', 'Only application/vnd.api+json is supported in Accept header.')
+                    knxError(406, 'Not Acceptable', 'Only application/vnd.api+json is supported in Accept header.'),
                 );
             }
 
@@ -188,8 +189,8 @@ export class RestAPI {
                             'Unsupported Media Type',
                             'Content-Type must be application/vnd.api+json ' +
                             `(fallback application/json allowed for PUT ${API_BASE}/datapoints/values ` +
-                            `and POST/PATCH ${API_BASE}/subscriptions*).`
-                        )
+                            `and POST/PATCH ${API_BASE}/subscriptions*).`,
+                        ),
                     );
                 }
 
@@ -205,8 +206,8 @@ export class RestAPI {
                         knxError(
                             415,
                             'Unsupported Media Type',
-                            'JSON:API Content-Type must not contain unsupported media type parameters.'
-                        )
+                            'JSON:API Content-Type must not contain unsupported media type parameters.',
+                        ),
                     );
                 }
             }
@@ -256,8 +257,8 @@ export class RestAPI {
                     knxError(
                         501,
                         'Not Implemented',
-                        `${kind} certificate endpoint is currently disabled (runtime operates without certificates).`
-                    )
+                        `${kind} certificate endpoint is currently disabled (runtime operates without certificates).`,
+                    ),
                 );
         };
 
@@ -265,7 +266,7 @@ export class RestAPI {
         this.app.use('/oauth', oauthRouter());
 
         // /.well-known/knx - KNX IoT discovery endpoint (required by spec)
-        this.app.get(`${API_BASE}/.well-known/knx/idevid`, async (req, res) => {
+        this.app.get(`${API_BASE}/.well-known/knx/idevid`, async(req, res) => {
             const certPath = process.env.IDEVID_CERT_PATH;
             if (!certPath) {
                 return res.status(501)
@@ -273,7 +274,7 @@ export class RestAPI {
                     .json(knxError(501, 'Not Implemented',
                         'iDevID certificate endpoint is currently disabled.'));
             }
-            const cert = await fs.readFile(certPath);
+            const cert = await fsReadFile(certPath);
             res.status(200)
                 .set('Content-Type', 'application/pkcs7-mime')
                 .send(cert);
@@ -291,7 +292,7 @@ export class RestAPI {
                 status: 'ok',
                 timestamp: formatTimestamp(now),
                 timestampISO: now.toISOString(),
-                semantic: this.semanticEngine !== null
+                semantic: this.semanticEngine !== null,
             });
         });
 
@@ -341,11 +342,12 @@ export class RestAPI {
                 path: req.path,
             });
             res.status(404).json(
-                knxError(404, 'Not Found', `Endpoint ${req.path} does not exist.`)
+                knxError(404, 'Not Found', `Endpoint ${req.path} does not exist.`),
             );
         });
 
         // ── Global error handler ──────────────────────────────────────────────
+        // eslint-disable-next-line no-unused-vars
         this.app.use((err, req, res, _next) => {
             const status = err.status || err.statusCode || 500;
             const title = HTTP_TITLES[status] || 'Internal Server Error';

@@ -83,12 +83,12 @@ function matchValue(fieldVal, filterVal, operator) {
     const bStripped = b.includes(':') ? b.split(':').pop() : b;
 
     switch (operator) {
-        case 'eq':  return aStripped === bStripped;
-        case 'le':  return isNaN(fieldVal) ? a <= b : Number(fieldVal) <= Number(filterVal);
-        case 'ge':  return isNaN(fieldVal) ? a >= b : Number(fieldVal) >= Number(filterVal);
-        case 'lt':  return isNaN(fieldVal) ? a <  b : Number(fieldVal) <  Number(filterVal);
-        case 'gt':  return isNaN(fieldVal) ? a >  b : Number(fieldVal) >  Number(filterVal);
-        default:    return aStripped === bStripped;
+    case 'eq':  return aStripped === bStripped;
+    case 'le':  return isNaN(fieldVal) ? a <= b : Number(fieldVal) <= Number(filterVal);
+    case 'ge':  return isNaN(fieldVal) ? a >= b : Number(fieldVal) >= Number(filterVal);
+    case 'lt':  return isNaN(fieldVal) ? a <  b : Number(fieldVal) <  Number(filterVal);
+    case 'gt':  return isNaN(fieldVal) ? a >  b : Number(fieldVal) >  Number(filterVal);
+    default:    return aStripped === bStripped;
     }
 }
 
@@ -141,12 +141,12 @@ function applyTimeFilters(entries, filters) {
             if (isNaN(ref)) return true; // invalid filter → ignore
 
             switch (operator) {
-                case 'ge': return t >= ref;
-                case 'gt': return t >  ref;
-                case 'le': return t <= ref;
-                case 'lt': return t <  ref;
-                case 'eq': return t === ref;
-                default:   return true;
+            case 'ge': return t >= ref;
+            case 'gt': return t >  ref;
+            case 'le': return t <= ref;
+            case 'lt': return t <  ref;
+            case 'eq': return t === ref;
+            default:   return true;
             }
         });
     });
@@ -215,7 +215,7 @@ async function writeDatapointValue(uuid, value, stateEngine, tunnelManager) {
                 timestamp: timestamp.toISOString(),
             },
             meta: { datapointId: state.datapointId, ga: state.ga, dpt: state.dpt },
-        }
+        },
     };
 }
 
@@ -229,7 +229,7 @@ export function datapointsRouter(stateEngine, tunnelManager) {
     //                  attributeFilter, timeFilter
     // Vendor extensions: filter[deviceId], filter[locationId], filter[ga],
     //                    filter[datapointId]  (not in Spec, but harmless)
-    router.get('/', bearer('read'), async (req, res) => {
+    router.get('/', bearer('read'), async(req, res) => {
         try {
             const rawNumber = req.query['page[number]'] ?? req.query.page?.number;
             const rawSize   = req.query['page[size]']   ?? req.query.page?.size;
@@ -245,7 +245,7 @@ export function datapointsRouter(stateEngine, tunnelManager) {
             if (filterLocationId) {
                 const allLocations = await getAllLocations(stateEngine);
                 const loc = allLocations.find(
-                    l => stableUuid(l.id ?? l.uri ?? '') === filterLocationId
+                    l => stableUuid(l.id ?? l.uri ?? '') === filterLocationId,
                 );
                 if (!loc) {
                     return res.json({ meta: { collection: { number: 0, size: 0, total: 0 } }, data: [] });
@@ -254,7 +254,7 @@ export function datapointsRouter(stateEngine, tunnelManager) {
             }
 
             let allStates = await stateEngine.getAllStates(
-                resolvedLocationId ? { locationId: resolvedLocationId } : {}
+                resolvedLocationId ? { locationId: resolvedLocationId } : {},
             );
 
             // Apply vendor filters on raw states
@@ -264,7 +264,7 @@ export function datapointsRouter(stateEngine, tunnelManager) {
             if (filterDeviceId) {
                 const allDevices  = await stateEngine.semanticEngine?.getAllDevices() ?? [];
                 const device = allDevices.find(
-                    d => stableUuid(d.id ?? d.uri ?? '') === filterDeviceId
+                    d => stableUuid(d.id ?? d.uri ?? '') === filterDeviceId,
                 );
                 if (!device) {
                     return res.json({ meta: { collection: { number: 0, size: 0, total: 0 } }, data: [] });
@@ -298,7 +298,7 @@ export function datapointsRouter(stateEngine, tunnelManager) {
 
     // ── GET /api/v1/datapoints/values (must come BEFORE /:id!) ───────────
     // Not in Spec as GET – vendor extension for bulk-read
-    router.get('/values', bearer('read'), async (req, res) => {
+    router.get('/values', bearer('read'), async(req, res) => {
         try {
             const allStates = await stateEngine.getAllStates();
             res.json({
@@ -325,20 +325,20 @@ export function datapointsRouter(stateEngine, tunnelManager) {
     //   }
     //
     // Response: 200 + written value (analogous to PUT /datapoints)
-    router.put('/by-ga', bearer('write'), async (req, res) => {
+    router.put('/by-ga', bearer('write'), async(req, res) => {
         const body = req.body;
         const ga    = body?.data?.meta?.ga;
         const value = body?.data?.attributes?.value;
 
         if (!ga) {
             return res.status(400).json(
-                knxError(400, 'Bad Request', 'Body must contain data.meta.ga')
+                knxError(400, 'Bad Request', 'Body must contain data.meta.ga'),
             );
         }
 
         if (value === undefined) {
             return res.status(400).json(
-                knxError(400, 'Bad Request', 'Body must contain data.attributes.value')
+                knxError(400, 'Bad Request', 'Body must contain data.attributes.value'),
             );
         }
 
@@ -348,7 +348,7 @@ export function datapointsRouter(stateEngine, tunnelManager) {
 
         if (!state) {
             return res.status(404).json(
-                knxError(404, 'Not Found', `No datapoint found for group address "${ga}"`)
+                knxError(404, 'Not Found', `No datapoint found for group address "${ga}"`),
             );
         }
 
@@ -362,7 +362,7 @@ export function datapointsRouter(stateEngine, tunnelManager) {
 
     // ── GET /api/v1/datapoints/:id/timeseries ─────────────────────────────
     // Spec parameters: page[number], page[size], filter[timestamp][ge/le/gt/lt]
-    router.get('/:id/timeseries', bearer('read'), async (req, res) => {
+    router.get('/:id/timeseries', bearer('read'), async(req, res) => {
         try {
             const { id } = req.params;
             const rawNumber = req.query['page[number]'] ?? req.query.page?.number;
@@ -370,7 +370,7 @@ export function datapointsRouter(stateEngine, tunnelManager) {
 
             const allStates = await stateEngine.getAllStates();
             const state = allStates.find(
-                s => stableUuid(s.datapointId) === id || s.datapointId === id
+                s => stableUuid(s.datapointId) === id || s.datapointId === id,
             );
 
             if (!state) {
@@ -404,13 +404,13 @@ export function datapointsRouter(stateEngine, tunnelManager) {
     });
 
     // ── GET /api/v1/datapoints/:id ────────────────────────────────────────
-    router.get('/:id', bearer('read'), async (req, res) => {
+    router.get('/:id', bearer('read'), async(req, res) => {
         try {
             const { id } = req.params;
 
             const allStates = await stateEngine.getAllStates();
             const state = allStates.find(
-                s => stableUuid(s.datapointId) === id || s.datapointId === id
+                s => stableUuid(s.datapointId) === id || s.datapointId === id,
             );
 
             if (!state) {
@@ -426,7 +426,7 @@ export function datapointsRouter(stateEngine, tunnelManager) {
     // ── GET /api/v1/datapoints/:id/history ───────────────────────────────
     // Vendor extension (not in Spec) – proprietary format for internal use.
     // Supports startTime/endTime as convenience aliases for filter[timestamp].
-    router.get('/:id/history', bearer('read'), async (req, res) => {
+    router.get('/:id/history', bearer('read'), async(req, res) => {
         try {
             const { id }                        = req.params;
             const { startTime, endTime, limit } = req.query;
@@ -447,19 +447,19 @@ export function datapointsRouter(stateEngine, tunnelManager) {
 
     // ── PUT /api/v1/datapoints/values ─────────────────────────────────────
     // Spec §/datapoints/values – bulk write, responds with 204 No Content
-    router.put('/values', bearer('write'), async (req, res) => {
+    router.put('/values', bearer('write'), async(req, res) => {
         const body = req.body;
 
         if (!Array.isArray(body?.data) || body.data.length === 0) {
             return res.status(400).json(
-                knxError(400, 'Bad Request', 'Body must contain data[] with datapoint id and attributes.value')
+                knxError(400, 'Bad Request', 'Body must contain data[] with datapoint id and attributes.value'),
             );
         }
 
         for (const item of body.data) {
             if (!item?.id || item?.attributes?.value === undefined) {
                 return res.status(400).json(
-                    knxError(400, 'Bad Request', 'Each data item must contain id and attributes.value')
+                    knxError(400, 'Bad Request', 'Each data item must contain id and attributes.value'),
                 );
             }
 
@@ -473,12 +473,12 @@ export function datapointsRouter(stateEngine, tunnelManager) {
 
     // ── PUT /api/v1/datapoints ────────────────────────────────────────────
     // Vendor extension: single datapoint write via JSON:API body
-    router.put('/', bearer('write'), async (req, res) => {
+    router.put('/', bearer('write'), async(req, res) => {
         const body = req.body;
 
         if (!body?.data?.id || body?.data?.attributes?.value === undefined) {
             return res.status(400).json(
-                knxError(400, 'Bad Request', 'Body must contain data.id and data.attributes.value')
+                knxError(400, 'Bad Request', 'Body must contain data.id and data.attributes.value'),
             );
         }
 

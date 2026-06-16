@@ -22,7 +22,7 @@ export class MessagingWebSocketServer {
 
     resolveDatapointId(identifier, allStates) {
         const state = allStates.find((entry) =>
-            entry.datapointId === identifier || stableUuid(entry.datapointId) === identifier
+            entry.datapointId === identifier || stableUuid(entry.datapointId) === identifier,
         );
         return state?.datapointId ?? null;
     }
@@ -69,7 +69,7 @@ export class MessagingWebSocketServer {
             401: 'Unauthorized',
             403: 'Forbidden',
             404: 'Not Found',
-            500: 'Internal Server Error'
+            500: 'Internal Server Error',
         }[statusCode] ?? 'Bad Request';
 
         const body = detail ? `${detail}\n` : '';
@@ -79,7 +79,7 @@ export class MessagingWebSocketServer {
             'Content-Type: text/plain; charset=utf-8',
             `Content-Length: ${Buffer.byteLength(body)}`,
             '',
-            body
+            body,
         ].join('\r\n');
 
         socket.write(response);
@@ -150,7 +150,7 @@ export class MessagingWebSocketServer {
             if (items.length === 0) {
                 this.sendWsMessage(ws, {
                     type: 'error',
-                    errors: [{ status: '422', detail: 'items[] is required for subscribe.' }]
+                    errors: [{ status: '422', detail: 'items[] is required for subscribe.' }],
                 });
                 return;
             }
@@ -174,14 +174,14 @@ export class MessagingWebSocketServer {
                             type: 'datapoint',
                             attributes: {
                                 ...toSpecValue(event.value),
-                                timestamp: event.timestamp
+                                timestamp: event.timestamp,
                             },
                             meta: {
                                 datapointId: event.datapointId,
                                 ga: event.ga,
-                                dpt: event.dpt
-                            }
-                        }]
+                                dpt: event.dpt,
+                            },
+                        }],
                     });
                 };
 
@@ -192,7 +192,7 @@ export class MessagingWebSocketServer {
 
             this.sendWsMessage(ws, {
                 type: 'subscribed',
-                data: subscribed
+                data: subscribed,
             });
 
             if (subscribed.length > 0) {
@@ -217,7 +217,7 @@ export class MessagingWebSocketServer {
             if (!requestedId) {
                 this.sendWsMessage(ws, {
                     type: 'error',
-                    errors: [{ status: '422', detail: 'id is required for read.' }]
+                    errors: [{ status: '422', detail: 'id is required for read.' }],
                 });
                 return;
             }
@@ -227,7 +227,7 @@ export class MessagingWebSocketServer {
             if (!datapointId) {
                 this.sendWsMessage(ws, {
                     type: 'error',
-                    errors: [{ status: '404', detail: `Datapoint with id "${requestedId}" not found.` }]
+                    errors: [{ status: '404', detail: `Datapoint with id "${requestedId}" not found.` }],
                 });
                 return;
             }
@@ -236,7 +236,7 @@ export class MessagingWebSocketServer {
             if (!state) {
                 this.sendWsMessage(ws, {
                     type: 'error',
-                    errors: [{ status: '404', detail: `No state available for datapoint "${requestedId}".` }]
+                    errors: [{ status: '404', detail: `No state available for datapoint "${requestedId}".` }],
                 });
                 return;
             }
@@ -248,14 +248,14 @@ export class MessagingWebSocketServer {
                     type: 'datapoint',
                     attributes: {
                         ...toSpecValue(state.value),
-                        timestamp: state.timestamp
+                        timestamp: state.timestamp,
                     },
                     meta: {
                         datapointId,
                         ga: state.ga,
-                        dpt: state.dpt
-                    }
-                }
+                        dpt: state.dpt,
+                    },
+                },
             });
             return;
         }
@@ -265,20 +265,20 @@ export class MessagingWebSocketServer {
             if (!requestedId || msg.value === undefined) {
                 this.sendWsMessage(ws, {
                     type: 'error',
-                    errors: [{ status: '422', detail: 'id and value are required for write.' }]
+                    errors: [{ status: '422', detail: 'id and value are required for write.' }],
                 });
                 return;
             }
 
             const allStates = await this.stateEngine.getAllStates();
             const state = allStates.find((entry) =>
-                entry.datapointId === requestedId || stableUuid(entry.datapointId) === requestedId
+                entry.datapointId === requestedId || stableUuid(entry.datapointId) === requestedId,
             );
 
             if (!state) {
                 this.sendWsMessage(ws, {
                     type: 'error',
-                    errors: [{ status: '404', detail: `Datapoint with id "${requestedId}" not found.` }]
+                    errors: [{ status: '404', detail: `Datapoint with id "${requestedId}" not found.` }],
                 });
                 return;
             }
@@ -286,7 +286,7 @@ export class MessagingWebSocketServer {
             if (state.writable === false) {
                 this.sendWsMessage(ws, {
                     type: 'error',
-                    errors: [{ status: '403', detail: `Datapoint "${state.name ?? state.ga}" is not writable.` }]
+                    errors: [{ status: '403', detail: `Datapoint "${state.name ?? state.ga}" is not writable.` }],
                 });
                 return;
             }
@@ -294,7 +294,7 @@ export class MessagingWebSocketServer {
             if (!this.tunnelManager) {
                 this.sendWsMessage(ws, {
                     type: 'error',
-                    errors: [{ status: '503', detail: 'KNX runtime not available.' }]
+                    errors: [{ status: '503', detail: 'KNX runtime not available.' }],
                 });
                 return;
             }
@@ -302,10 +302,10 @@ export class MessagingWebSocketServer {
             let nativeValue;
             try {
                 nativeValue = decodeValueForKnx(this.normalizeIncomingValue(msg.value), state.dpt);
-            } catch (err) {
+            } catch (_) {
                 this.sendWsMessage(ws, {
                     type: 'error',
-                    errors: [{ status: '422', detail: err.message }]
+                    errors: [{ status: '422', detail: err.message }],
                 });
                 return;
             }
@@ -318,7 +318,7 @@ export class MessagingWebSocketServer {
                     value: nativeValue,
                     dpt: state.dpt,
                     source: 'websocket',
-                    timestamp: now
+                    timestamp: now,
                 });
 
                 this.sendWsMessage(ws, {
@@ -328,19 +328,19 @@ export class MessagingWebSocketServer {
                         type: 'datapoint',
                         attributes: {
                             value: String(msg.value),
-                            timestamp: now.toISOString()
+                            timestamp: now.toISOString(),
                         },
                         meta: {
                             datapointId: state.datapointId,
                             ga: state.ga,
-                            dpt: state.dpt
-                        }
-                    }
+                            dpt: state.dpt,
+                        },
+                    },
                 });
-            } catch (err) {
+            } catch (_) {
                 this.sendWsMessage(ws, {
                     type: 'error',
-                    errors: [{ status: '502', detail: `KNX write failed: ${err.message}` }]
+                    errors: [{ status: '502', detail: `KNX write failed: ${err.message}` }],
                 });
             }
             return;
@@ -348,7 +348,7 @@ export class MessagingWebSocketServer {
 
         this.sendWsMessage(ws, {
             type: 'error',
-            errors: [{ status: '400', detail: `Unsupported action "${action}".` }]
+            errors: [{ status: '400', detail: `Unsupported action "${action}".` }],
         });
     }
 
@@ -369,8 +369,8 @@ export class MessagingWebSocketServer {
                 protocol: 'gw.knx.org',
                 path: '/messaging/ws',
                 clientId: context?.oauth?.clientId ?? 'unknown',
-                scope: context?.oauth?.scope ?? ''
-            }
+                scope: context?.oauth?.scope ?? '',
+            },
         });
 
         // Heartbeat: send a ping every 30s
@@ -380,31 +380,31 @@ export class MessagingWebSocketServer {
                 data: {
                     serverTime: new Date().toLocaleString('sv-SE', {
                         timeZone: 'Europe/Vienna',
-                        hour12: false
-                    }).replace('T', ' ')
-                }
+                        hour12: false,
+                    }).replace('T', ' '),
+                },
             });
         }, 30_000);
 
-        ws.on('message', async (raw) => {
+        ws.on('message', async(raw) => {
             let msg;
             try {
                 msg = JSON.parse(raw.toString('utf8'));
             } catch (_err) {
                 this.sendWsMessage(ws, {
                     type: 'error',
-                    errors: [{ status: '400', detail: 'Message must be valid JSON.' }]
+                    errors: [{ status: '400', detail: 'Message must be valid JSON.' }],
                 });
                 return;
             }
 
             try {
                 await this.onMessage(ws, msg, subscriptions, context);
-            } catch (err) {
+            } catch (_) {
                 this.logger.error({ msg: 'WebSocket message handling failed', error: err.message });
                 this.sendWsMessage(ws, {
                     type: 'error',
-                    errors: [{ status: '500', detail: 'Internal server error while processing message.' }]
+                    errors: [{ status: '500', detail: 'Internal server error while processing message.' }],
                 });
             }
         });

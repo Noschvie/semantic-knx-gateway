@@ -25,7 +25,7 @@ export class StateStore {
      * Update the current state for a datapoint
      */
     async updateState(datapointId, state) {
-        const {ga, value, dpt, source, timestamp} = state;
+        const { ga, value, dpt, source, timestamp } = state;
 
         // Handle Buffer objects properly
         let valueForJson = value;
@@ -40,7 +40,7 @@ export class StateStore {
         } else if (Buffer.isBuffer(value)) {
             // Handle actual Buffer instances
             valueForText = value.toString('hex');
-            valueForJson = {type: 'Buffer', data: Array.from(value)};
+            valueForJson = { type: 'Buffer', data: Array.from(value) };
         } else {
             // Regular values
             valueForText = String(value);
@@ -65,7 +65,7 @@ export class StateStore {
             valueForText,
             dpt,
             timestamp,
-            source
+            source,
         ];
 
         try {
@@ -85,7 +85,7 @@ export class StateStore {
                 valueForText: valueForText,
                 dpt: dpt,
                 timestamp: timestamp,
-                source: source
+                source: source,
             });
             throw error;
         }
@@ -113,7 +113,7 @@ export class StateStore {
             value: this.normalizeValue(row.value),
             dpt: row.dpt,
             updatedAt: row.updated_at,
-            source: row.source
+            source: row.source,
         };
     }
 
@@ -191,7 +191,7 @@ export class StateStore {
             value: this.normalizeValue(row.value),
             dpt: row.dpt,
             updatedAt: row.updated_at,
-            source: row.source
+            source: row.source,
         };
     }
 }

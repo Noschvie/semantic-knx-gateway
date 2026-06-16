@@ -49,12 +49,12 @@ function matchValue(fieldVal, filterVal, operator) {
     const aStripped = a.includes(':') ? a.split(':').pop() : a;
     const bStripped = b.includes(':') ? b.split(':').pop() : b;
     switch (operator) {
-        case 'eq':  return aStripped === bStripped;
-        case 'le':  return isNaN(fieldVal) ? a <= b : Number(fieldVal) <= Number(filterVal);
-        case 'ge':  return isNaN(fieldVal) ? a >= b : Number(fieldVal) >= Number(filterVal);
-        case 'lt':  return isNaN(fieldVal) ? a <  b : Number(fieldVal) <  Number(filterVal);
-        case 'gt':  return isNaN(fieldVal) ? a >  b : Number(fieldVal) >  Number(filterVal);
-        default:    return aStripped === bStripped;
+    case 'eq':  return aStripped === bStripped;
+    case 'le':  return isNaN(fieldVal) ? a <= b : Number(fieldVal) <= Number(filterVal);
+    case 'ge':  return isNaN(fieldVal) ? a >= b : Number(fieldVal) >= Number(filterVal);
+    case 'lt':  return isNaN(fieldVal) ? a <  b : Number(fieldVal) <  Number(filterVal);
+    case 'gt':  return isNaN(fieldVal) ? a >  b : Number(fieldVal) >  Number(filterVal);
+    default:    return aStripped === bStripped;
     }
 }
 
@@ -91,7 +91,7 @@ export function locationsRouter(semanticEngine) {
 
     // ── GET /api/v1/locations ─────────────────────────────────────────────
     // Spec-Parameter: page[number], page[size], typeFilter, tagFilter, attributeFilter
-    router.get('/', bearer('read'), async (req, res) => {
+    router.get('/', bearer('read'), async(req, res) => {
         try {
             const rawNumber = req.query['page[number]'] ?? req.query.page?.number;
             const rawSize   = req.query['page[size]']   ?? req.query.page?.size;
@@ -111,7 +111,7 @@ export function locationsRouter(semanticEngine) {
     });
 
     // ── GET /api/v1/locations/:id ─────────────────────────────────────────
-    router.get('/:id', bearer('read'), async (req, res) => {
+    router.get('/:id', bearer('read'), async(req, res) => {
         try {
             const { loc } = await findLocation(semanticEngine, req.params.id);
 
@@ -127,7 +127,7 @@ export function locationsRouter(semanticEngine) {
 
     // ── GET /api/v1/locations/:id/parentlocation ──────────────────────────
     // Spec: data MAY be null when no parent location exists
-    router.get('/:id/parentlocation', bearer('read'), async (req, res) => {
+    router.get('/:id/parentlocation', bearer('read'), async(req, res) => {
         try {
             const { allLocations, loc } = await findLocation(semanticEngine, req.params.id);
 
@@ -150,7 +150,7 @@ export function locationsRouter(semanticEngine) {
     // ── GET /api/v1/locations/:id/childlocations ──────────────────────────
     // Spec: only directly subordinate locations (no recursive traversal)
     // Spec-Parameter: page[number], page[size], typeFilter, tagFilter, attributeFilter
-    router.get('/:id/childlocations', bearer('read'), async (req, res) => {
+    router.get('/:id/childlocations', bearer('read'), async(req, res) => {
         try {
             const rawNumber = req.query['page[number]'] ?? req.query.page?.number;
             const rawSize   = req.query['page[size]']   ?? req.query.page?.size;
@@ -177,7 +177,7 @@ export function locationsRouter(semanticEngine) {
 
     // ── GET /api/v1/locations/:id/devices ─────────────────────────────────
     // Spec-Parameter: page[number], page[size], typeFilter, tagFilter, attributeFilter
-    router.get('/:id/devices', bearer('read'), async (req, res) => {
+    router.get('/:id/devices', bearer('read'), async(req, res) => {
         try {
             const rawNumber = req.query['page[number]'] ?? req.query.page?.number;
             const rawSize   = req.query['page[size]']   ?? req.query.page?.size;

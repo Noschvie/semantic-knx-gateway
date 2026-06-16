@@ -19,7 +19,7 @@ export function nodeRouter(stateEngine) {
 
     // ── GET /api/v1/node ──────────────────────────────────────────────────────
     // Spec §/node: type = "service", no pagination
-    router.get('/', bearer('read'), async (req, res) => {
+    router.get('/', bearer('read'), async(req, res) => {
         try {
             const nowIso = new Date().toISOString();
             const nodeId = stableUuid('knx-node-default');

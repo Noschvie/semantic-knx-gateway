@@ -72,7 +72,7 @@ export class SemanticEngine {
         return {
             ...datapoint,
             semanticPath,
-            mqttTopic
+            mqttTopic,
         };
     }
 
@@ -94,7 +94,7 @@ export class SemanticEngine {
         if (!location) {
             const all = await this.resourceStore.getResourcesByType('location');
             location = all.find(
-                (l) => l.name?.toLowerCase() === idOrName.toLowerCase()
+                (l) => l.name?.toLowerCase() === idOrName.toLowerCase(),
             ) ?? null;
         }
 

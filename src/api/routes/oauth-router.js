@@ -62,7 +62,7 @@ class OAuthTokenStore {
             redirectUri,
             scope,
             clientId,
-            expiresAt: this._nowSec() + ttl
+            expiresAt: this._nowSec() + ttl,
         });
     }
 
@@ -117,8 +117,8 @@ function getClientConfig(clientId) {
         'knx-default-client': {
             secret: process.env.OAUTH_CLIENT_SECRET ?? 'change-me-in-production',
             allowedGrantTypes: ['authorization_code', 'client_credentials', 'refresh_token'],
-            allowedScopes: ['read', 'write', 'manage']
-        }
+            allowedScopes: ['read', 'write', 'manage'],
+        },
     };
     return clients[clientId] ?? defaults[clientId] ?? null;
 }
@@ -150,7 +150,7 @@ function authenticateClient(req) {
         if (!cfg) return null;
         const valid = crypto.timingSafeEqual(
             Buffer.from(cfg.secret),
-            Buffer.from(secret ?? '')
+            Buffer.from(secret ?? ''),
         );
         return valid ? { clientId: id, config: cfg } : null;
     }
@@ -163,7 +163,7 @@ function authenticateClient(req) {
         if (client_secret) {
             const valid = crypto.timingSafeEqual(
                 Buffer.from(cfg.secret),
-                Buffer.from(client_secret)
+                Buffer.from(client_secret),
             );
             if (!valid) return null;
         }
@@ -194,7 +194,7 @@ export function oauthRouter() {
         if (!grant_type) {
             return res.status(400).json({
                 error: 'invalid_request',
-                error_description: 'grant_type is required'
+                error_description: 'grant_type is required',
             });
         }
 
@@ -210,7 +210,7 @@ export function oauthRouter() {
             if (!code) {
                 return res.status(400).json({
                     error: 'invalid_request',
-                    error_description: 'code is required for authorization_code grant'
+                    error_description: 'code is required for authorization_code grant',
                 });
             }
 
@@ -222,7 +222,7 @@ export function oauthRouter() {
             if (!codeEntry) {
                 return res.status(400).json({
                     error: 'invalid_grant',
-                    error_description: 'Authorization code is invalid or has expired'
+                    error_description: 'Authorization code is invalid or has expired',
                 });
             }
 
@@ -230,7 +230,7 @@ export function oauthRouter() {
             if (codeEntry.redirectUri && codeEntry.redirectUri !== redirect_uri) {
                 return res.status(400).json({
                     error: 'invalid_grant',
-                    error_description: 'redirect_uri mismatch'
+                    error_description: 'redirect_uri mismatch',
                 });
             }
 
@@ -251,7 +251,7 @@ export function oauthRouter() {
             if (!valid) {
                 return res.status(400).json({
                     error: 'invalid_scope',
-                    error_description: `Requested scope "${scope}" is not allowed for this client`
+                    error_description: `Requested scope "${scope}" is not allowed for this client`,
                 });
             }
 
@@ -266,7 +266,7 @@ export function oauthRouter() {
             if (!refresh_token) {
                 return res.status(400).json({
                     error: 'invalid_request',
-                    error_description: 'refresh_token is required'
+                    error_description: 'refresh_token is required',
                 });
             }
 
@@ -274,7 +274,7 @@ export function oauthRouter() {
             if (!rtEntry) {
                 return res.status(400).json({
                     error: 'invalid_grant',
-                    error_description: 'Refresh token is invalid or has expired'
+                    error_description: 'Refresh token is invalid or has expired',
                 });
             }
 
@@ -284,7 +284,7 @@ export function oauthRouter() {
         // ── Unknown grant_type ────────────────────────────────────────────
         return res.status(400).json({
             error: 'unsupported_grant_type',
-            error_description: `grant_type "${grant_type}" is not supported`
+            error_description: `grant_type "${grant_type}" is not supported`,
         });
     });
 
@@ -299,7 +299,7 @@ function issueTokens(res, scope, clientId, includeRefresh = true) {
         access_token:  accessToken,
         token_type:    'Bearer',
         expires_in:    expiresIn,
-        scope:         scope || undefined
+        scope:         scope || undefined,
     };
 
     if (includeRefresh) {
@@ -321,7 +321,7 @@ function unauthorizedResponse(res) {
         .set('WWW-Authenticate', 'Basic realm="KNX IoT Authorization Server"')
         .json({
             error: 'invalid_client',
-            error_description: 'Client authentication failed'
+            error_description: 'Client authentication failed',
         });
 }
 

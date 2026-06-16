@@ -88,12 +88,12 @@ function matchValue(fieldVal, filterVal, operator) {
     const bStripped = b.includes(':') ? b.split(':').pop() : b;
 
     switch (operator) {
-        case 'eq':  return aStripped === bStripped;
-        case 'le':  return isNaN(fieldVal) ? a <= b : Number(fieldVal) <= Number(filterVal);
-        case 'ge':  return isNaN(fieldVal) ? a >= b : Number(fieldVal) >= Number(filterVal);
-        case 'lt':  return isNaN(fieldVal) ? a <  b : Number(fieldVal) <  Number(filterVal);
-        case 'gt':  return isNaN(fieldVal) ? a >  b : Number(fieldVal) >  Number(filterVal);
-        default:    return aStripped === bStripped;
+    case 'eq':  return aStripped === bStripped;
+    case 'le':  return isNaN(fieldVal) ? a <= b : Number(fieldVal) <= Number(filterVal);
+    case 'ge':  return isNaN(fieldVal) ? a >= b : Number(fieldVal) >= Number(filterVal);
+    case 'lt':  return isNaN(fieldVal) ? a <  b : Number(fieldVal) <  Number(filterVal);
+    case 'gt':  return isNaN(fieldVal) ? a >  b : Number(fieldVal) >  Number(filterVal);
+    default:    return aStripped === bStripped;
     }
 }
 
@@ -139,7 +139,7 @@ export function devicesRouter(semanticEngine) {
     const router = Router();
 
     // GET /api/v1/devices
-    router.get('/', bearer('read'), async (req, res) => {
+    router.get('/', bearer('read'), async(req, res) => {
         try {
             const rawNumber = req.query['page[number]'] ?? req.query.page?.number;
             const rawSize   = req.query['page[size]']   ?? req.query.page?.size;
@@ -163,13 +163,13 @@ export function devicesRouter(semanticEngine) {
     });
 
     // GET /api/v1/devices/:id
-    router.get('/:id', bearer('read'), async (req, res) => {
+    router.get('/:id', bearer('read'), async(req, res) => {
         try {
             const { id } = req.params;
 
             const allDevices = await semanticEngine.getAllDevices();
             const device = allDevices.find(
-                d => stableUuid(d.id ?? d.uri ?? '') === id || d.id === id
+                d => stableUuid(d.id ?? d.uri ?? '') === id || d.id === id,
             );
 
             if (!device) {

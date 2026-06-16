@@ -32,7 +32,7 @@ function defaultInstallationResource() {
         relationships: {
             // Spec §/installations/{id}: links to subscriptions
             installationSubscriptions: {
-                links: { related: `/api/v1/subscriptions` },
+                links: { related: '/api/v1/subscriptions' },
             },
         },
     };
@@ -43,7 +43,7 @@ export function installationsRouter() {
 
     // ── GET /api/v1/installations ─────────────────────────────────────────────
     // Spec §/installations: page[number], page[size] only (no typeFilter etc.)
-    router.get('/', bearer('read'), async (req, res) => {
+    router.get('/', bearer('read'), async(req, res) => {
         try {
             const rawNumber = req.query['page[number]'] ?? req.query.page?.number;
             const rawSize   = req.query['page[size]']   ?? req.query.page?.size;
@@ -59,7 +59,7 @@ export function installationsRouter() {
 
     // ── GET /api/v1/installations/:installationId ─────────────────────────────
     // Spec §/installations/{installationId}
-    router.get('/:installationId', bearer('read'), async (req, res) => {
+    router.get('/:installationId', bearer('read'), async(req, res) => {
         try {
             const { installationId } = req.params;
             const installation = defaultInstallationResource();
@@ -69,7 +69,7 @@ export function installationsRouter() {
                 installationId !== 'knx-installation-default'
             ) {
                 return res.status(404).json(
-                    knxError(404, 'Not Found', `Installation ${installationId} not found`)
+                    knxError(404, 'Not Found', `Installation ${installationId} not found`),
                 );
             }
 

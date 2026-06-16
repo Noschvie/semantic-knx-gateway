@@ -39,7 +39,7 @@ export class StateEngine {
                 this.datapointMappings.set(row.ga, {
                     datapointId: row.datapoint_id,
                     dpt: row.dpt,
-                    name: row.name
+                    name: row.name,
                 });
             });
 
@@ -74,7 +74,7 @@ export class StateEngine {
             locationId,
             deviceId,
             functionId,
-            JSON.stringify(metadata || {})
+            JSON.stringify(metadata || {}),
         ]);
 
         this.datapointMappings.set(ga, { datapointId, dpt, name });
@@ -108,7 +108,7 @@ export class StateEngine {
                 value: value,
                 dpt: effectiveDpt,
                 source: source,
-                hasMapping: !!mapping
+                hasMapping: !!mapping,
             });
 
             // Create enriched event
@@ -120,7 +120,7 @@ export class StateEngine {
                 eventType: event,
                 value,
                 dpt: effectiveDpt,
-                rawPayload: telegram
+                rawPayload: telegram,
             };
 
             // Store event in TimescaleDB
@@ -132,7 +132,7 @@ export class StateEngine {
                 value,
                 dpt: effectiveDpt,
                 source,
-                timestamp: enrichedEvent.timestamp
+                timestamp: enrichedEvent.timestamp,
             });
 
             // Emit to subscribers
@@ -145,7 +145,7 @@ export class StateEngine {
                 msg: '✅ Telegram processed successfully',
                 ga: ga,
                 datapointId: datapointId,
-                value: value
+                value: value,
             });
         } catch (error) {
             this.logger.error({
@@ -156,7 +156,7 @@ export class StateEngine {
                 telegramValue: telegram?.value,
                 telegramSource: telegram?.source,
                 telegramEvent: telegram?.event,
-                datapointId: datapointId || 'unknown'
+                datapointId: datapointId || 'unknown',
             });
             throw error;
         }

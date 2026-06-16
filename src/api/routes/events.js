@@ -9,14 +9,14 @@ export function eventsRouter(stateEngine, db) {
     const router = Router();
 
     // GET /api/v1/events - Get recent events
-    router.get('/', bearer('read'), async (req, res) => {
+    router.get('/', bearer('read'), async(req, res) => {
         try {
             const { limit = 100, ga, startTime, endTime } = req.query;
 
             const options = {
                 startTime: startTime ? new Date(startTime) : undefined,
                 endTime: endTime ? new Date(endTime) : undefined,
-                limit: parseInt(limit)
+                limit: parseInt(limit),
             };
 
             let rows;
@@ -28,7 +28,7 @@ export function eventsRouter(stateEngine, db) {
                     `SELECT ts AS timestamp, datapoint_id, ga, source, event_type, dpt,
                      COALESCE(value_text, value_bool::text, value_float::text, value_int::text) AS value
                      FROM knx_events ORDER BY ts DESC LIMIT $1`,
-                    params
+                    params,
                 );
                 rows = result.rows;
             }

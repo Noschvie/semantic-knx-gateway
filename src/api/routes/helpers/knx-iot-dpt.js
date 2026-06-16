@@ -16,7 +16,7 @@ export function resolveDatapointTypes(dpt) {
     if (!/^\d/.test(dpt)) {
         resolved = DPT_NAME_MAP[dpt]
             ?? DPT_NAME_MAP[Object.keys(DPT_NAME_MAP).find(
-                (k) => k.toLowerCase() === dpt.toLowerCase()
+                (k) => k.toLowerCase() === dpt.toLowerCase(),
             )]
             ?? dpt;
     }
@@ -96,22 +96,22 @@ export function decodeValueForKnx(valueStr, dpt) {
 
     const [main] = dpt.split('.').map(Number);
     switch (main) {
-        case 1:  // Boolean (switching, step, ...)
-            if (str === '1' || str === 'true')  return true;
-            if (str === '0' || str === 'false') return false;
-            throw new Error(`Invalid boolean value for DPT ${dpt}: "${str}"`);
-        case 2: case 3: case 5: case 6: case 7: case 8: case 17: case 18: case 20:
-            return parseInt(str, 10);
-        case 9: case 14:
-            return parseFloat(str);
-        case 4: case 16:
-            return str;
-        case 10: case 11: case 19: case 232:
-            try { return JSON.parse(str); }
-            catch { throw new Error(`Invalid object value for DPT ${dpt}: "${str}"`); }
-        default: {
-            const num = Number(str);
-            return isNaN(num) ? str : num;
-        }
+    case 1:  // Boolean (switching, step, ...)
+        if (str === '1' || str === 'true')  return true;
+        if (str === '0' || str === 'false') return false;
+        throw new Error(`Invalid boolean value for DPT ${dpt}: "${str}"`);
+    case 2: case 3: case 5: case 6: case 7: case 8: case 17: case 18: case 20:
+        return parseInt(str, 10);
+    case 9: case 14:
+        return parseFloat(str);
+    case 4: case 16:
+        return str;
+    case 10: case 11: case 19: case 232:
+        try { return JSON.parse(str); }
+        catch { throw new Error(`Invalid object value for DPT ${dpt}: "${str}"`); }
+    default: {
+        const num = Number(str);
+        return isNaN(num) ? str : num;
+    }
     }
 }

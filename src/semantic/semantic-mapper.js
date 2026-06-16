@@ -60,8 +60,8 @@ export class SemanticMapper {
                 uri: datapoint.uri,
                 valueType: datapoint.valueType,
                 flags: datapoint.flags,
-                properties: datapoint.properties
-            }
+                properties: datapoint.properties,
+            },
         };
 
         await this.stateEngine.registerDatapoint(ga, mapping);
@@ -87,8 +87,8 @@ export class SemanticMapper {
             metadata: {
                 uri: ga.uri,
                 datapoints: ga.datapoints,
-                properties: ga.properties
-            }
+                properties: ga.properties,
+            },
         };
 
         await this.stateEngine.registerDatapoint(address, mapping);

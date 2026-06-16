@@ -19,7 +19,7 @@ export function formatTimestamp(timestamp) {
         day: '2-digit',
         hour: '2-digit',
         minute: '2-digit',
-        second: '2-digit'
+        second: '2-digit',
     });
 }
 
@@ -42,7 +42,7 @@ export function toLocalISO(timestamp) {
         hour: '2-digit',
         minute: '2-digit',
         second: '2-digit',
-        hour12: false
+        hour12: false,
     });
 
     const parts = formatter.formatToParts(date);

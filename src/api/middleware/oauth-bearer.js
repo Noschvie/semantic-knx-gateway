@@ -42,8 +42,8 @@ export function bearer(...requiredScopes) {
                     errors: [{
                         status: '401',
                         title: 'Unauthorized',
-                        detail: 'A Bearer token is required. Use POST /oauth/access to obtain one.'
-                    }]
+                        detail: 'A Bearer token is required. Use POST /oauth/access to obtain one.',
+                    }],
                 });
         }
 
@@ -58,8 +58,8 @@ export function bearer(...requiredScopes) {
                     errors: [{
                         status: '401',
                         title: 'Unauthorized',
-                        detail: 'The provided Bearer token is invalid or has expired.'
-                    }]
+                        detail: 'The provided Bearer token is invalid or has expired.',
+                    }],
                 });
         }
 
@@ -76,8 +76,8 @@ export function bearer(...requiredScopes) {
                         errors: [{
                             status: '403',
                             title: 'Forbidden',
-                            detail: `Insufficient scope. Required: "${requiredScopes.join(' ')}". Granted: "${entry.scope ?? ''}".`
-                        }]
+                            detail: `Insufficient scope. Required: "${requiredScopes.join(' ')}". Granted: "${entry.scope ?? ''}".`,
+                        }],
                     });
             }
         }

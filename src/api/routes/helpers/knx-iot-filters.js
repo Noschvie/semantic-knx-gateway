@@ -51,12 +51,12 @@ export function matchValue(fieldVal, filterVal, operator) {
     const aStripped = a.includes(':') ? a.split(':').pop() : a;
     const bStripped = b.includes(':') ? b.split(':').pop() : b;
     switch (operator) {
-        case 'eq':  return aStripped === bStripped;
-        case 'le':  return isNaN(fieldVal) ? a <= b : Number(fieldVal) <= Number(filterVal);
-        case 'ge':  return isNaN(fieldVal) ? a >= b : Number(fieldVal) >= Number(filterVal);
-        case 'lt':  return isNaN(fieldVal) ? a <  b : Number(fieldVal) <  Number(filterVal);
-        case 'gt':  return isNaN(fieldVal) ? a >  b : Number(fieldVal) >  Number(filterVal);
-        default:    return aStripped === bStripped;
+    case 'eq':  return aStripped === bStripped;
+    case 'le':  return isNaN(fieldVal) ? a <= b : Number(fieldVal) <= Number(filterVal);
+    case 'ge':  return isNaN(fieldVal) ? a >= b : Number(fieldVal) >= Number(filterVal);
+    case 'lt':  return isNaN(fieldVal) ? a <  b : Number(fieldVal) <  Number(filterVal);
+    case 'gt':  return isNaN(fieldVal) ? a >  b : Number(fieldVal) >  Number(filterVal);
+    default:    return aStripped === bStripped;
     }
 }
 

@@ -82,13 +82,13 @@ export class TunnelManager {
 
                     this.logger.error({
                         msg: 'KNX connection error',
-                        error: err?.message ?? String(err)
+                        error: err?.message ?? String(err),
                     });
 
                     reject(err);
                 });
 
-                this.connection.on('indication', async (telegram) => {
+                this.connection.on('indication', async(telegram) => {
                     this.logger.debug({ msg: '📨 RAW indication telegram', telegram });
 
                     try {
@@ -119,9 +119,9 @@ export class TunnelManager {
 
                         let evt = 'Unknown';
                         switch (apciCmd) {
-                            case 0x00: evt = 'GroupValue_Read';     break;
-                            case 0x40: evt = 'GroupValue_Response'; break;
-                            case 0x80: evt = 'GroupValue_Write';    break;
+                        case 0x00: evt = 'GroupValue_Read';     break;
+                        case 0x40: evt = 'GroupValue_Response'; break;
+                        case 0x80: evt = 'GroupValue_Write';    break;
                         }
 
                         // Read requests have no payload - do not store in state
@@ -172,7 +172,7 @@ export class TunnelManager {
                         this.logger.error({
                             msg: 'Error handling indication telegram',
                             error: err?.message,
-                            stack: err?.stack
+                            stack: err?.stack,
                         });
                     }
                 });
@@ -219,7 +219,7 @@ export class TunnelManager {
             event: evt,
             source: src,
             destination: dest,
-            rawValue: rawValue
+            rawValue: rawValue,
         };
 
         this.logger.debug({
@@ -228,7 +228,7 @@ export class TunnelManager {
             source: src,
             destination: dest,
             rawValue: rawValue,
-            rawValueType: typeof rawValue
+            rawValueType: typeof rawValue,
         });
 
         try {
@@ -245,7 +245,7 @@ export class TunnelManager {
                 valueType: typeof decoded.value,
                 dpt: decoded.dpt,
                 decoded: decoded.decoded,
-                source: decoded.source
+                source: decoded.source,
             });
 
             await this.stateEngine.processTelegram(decoded);
@@ -254,7 +254,7 @@ export class TunnelManager {
                 msg: 'Error processing telegram',
                 errorMessage: error.message,
                 errorStack: error.stack,
-                evt, src, dest, rawValue
+                evt, src, dest, rawValue,
             });
         }
     }

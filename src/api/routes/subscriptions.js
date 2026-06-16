@@ -148,13 +148,13 @@ export function subscriptionsRouter(subscriptionStore, stateEngine) {
     // --------------------------------------------------------
     // GET /subscriptions
     // --------------------------------------------------------
-    router.get('/', async (req, res) => {
+    router.get('/', async(req, res) => {
         try {
             const pagination = parsePagination(req.query);
             const { rows, total } = await subscriptionStore.findAll(pagination);
 
             return res.status(200).json(
-                collectionResponse(rows, total, pagination, baseUrl(req))
+                collectionResponse(rows, total, pagination, baseUrl(req)),
             );
         } catch (err) {
             return res.status(500).json(errorResponse(500, err.message));
@@ -164,14 +164,14 @@ export function subscriptionsRouter(subscriptionStore, stateEngine) {
     // --------------------------------------------------------
     // POST /subscriptions  (scope: manage)
     // --------------------------------------------------------
-    router.post('/', async (req, res) => {
+    router.post('/', async(req, res) => {
         try {
             const body = req.body;
 
             // Minimal JSON:API validation
             if (!body?.data?.type || body.data.type !== 'subscription') {
                 return res.status(400).json(
-                    errorResponse(400, 'Request body must contain a JSON:API resource object of type "subscription".')
+                    errorResponse(400, 'Request body must contain a JSON:API resource object of type "subscription".'),
                 );
             }
 
@@ -184,7 +184,7 @@ export function subscriptionsRouter(subscriptionStore, stateEngine) {
             // Callback requires URL
             if (subType === 'callback' && !attr.url) {
                 return res.status(422).json(
-                    errorResponse(422, 'Attribute "url" is required for callback subscriptions.')
+                    errorResponse(422, 'Attribute "url" is required for callback subscriptions.'),
                 );
             }
 
@@ -223,7 +223,7 @@ export function subscriptionsRouter(subscriptionStore, stateEngine) {
 
             if (nodeRel?.type && nodeRel.type !== 'node') {
                 return res.status(422).json(
-                    errorResponse(422, `Invalid relationship type "${nodeRel.type}" for subscriptionNode.`)
+                    errorResponse(422, `Invalid relationship type "${nodeRel.type}" for subscriptionNode.`),
                 );
             }
 
@@ -239,8 +239,8 @@ export function subscriptionsRouter(subscriptionStore, stateEngine) {
                 return res.status(422).json(
                     errorResponse(
                         422,
-                        'At least one resource (subscriptionDatapoints, subscriptionInstallations or subscriptionNode) must be provided.'
-                    )
+                        'At least one resource (subscriptionDatapoints, subscriptionInstallations or subscriptionNode) must be provided.',
+                    ),
                 );
             }
 
@@ -260,7 +260,7 @@ export function subscriptionsRouter(subscriptionStore, stateEngine) {
                 console.error(err);
 
                 return res.status(500).json(
-                    errorResponse(500, err.message)
+                    errorResponse(500, err.message),
                 );
             }
 
@@ -304,13 +304,13 @@ export function subscriptionsRouter(subscriptionStore, stateEngine) {
     // --------------------------------------------------------
     // GET /subscriptions/:id
     // --------------------------------------------------------
-    router.get('/:id', async (req, res) => {
+    router.get('/:id', async(req, res) => {
         try {
             const row = await subscriptionStore.findById(req.params.id);
 
             if (!row) {
                 return res.status(404).json(
-                    errorResponse(404, `Subscription "${req.params.id}" not found.`)
+                    errorResponse(404, `Subscription "${req.params.id}" not found.`),
                 );
             }
 
@@ -324,7 +324,7 @@ export function subscriptionsRouter(subscriptionStore, stateEngine) {
     // PATCH /subscriptions/:id
     // Only url, secret, caCert, lifetime are mutable (according to spec).
     // --------------------------------------------------------
-    router.patch('/:id', async (req, res) => {
+    router.patch('/:id', async(req, res) => {
         try {
             const body = req.body;
 
@@ -333,8 +333,8 @@ export function subscriptionsRouter(subscriptionStore, stateEngine) {
                 return res.status(400).json(
                     errorResponse(
                         400,
-                        'Request body must contain a JSON:API resource object of type "subscription".'
-                    )
+                        'Request body must contain a JSON:API resource object of type "subscription".',
+                    ),
                 );
             }
 
@@ -343,8 +343,8 @@ export function subscriptionsRouter(subscriptionStore, stateEngine) {
                 return res.status(409).json(
                     errorResponse(
                         409,
-                        'Resource id in body does not match URL parameter.'
-                    )
+                        'Resource id in body does not match URL parameter.',
+                    ),
                 );
             }
 
@@ -382,8 +382,8 @@ export function subscriptionsRouter(subscriptionStore, stateEngine) {
                 return res.status(422).json(
                     errorResponse(
                         422,
-                        `The following attributes are not patchable: ${invalidFields.join(', ')}`
-                    )
+                        `The following attributes are not patchable: ${invalidFields.join(', ')}`,
+                    ),
                 );
             }
 
@@ -392,8 +392,8 @@ export function subscriptionsRouter(subscriptionStore, stateEngine) {
                 return res.status(422).json(
                     errorResponse(
                         422,
-                        'No patchable attributes provided (url, secret, caCert, lifetime).'
-                    )
+                        'No patchable attributes provided (url, secret, caCert, lifetime).',
+                    ),
                 );
             }
 
@@ -402,8 +402,8 @@ export function subscriptionsRouter(subscriptionStore, stateEngine) {
                 return res.status(422).json(
                     errorResponse(
                         422,
-                        'Relationships cannot be modified via PATCH /subscriptions/:id.'
-                    )
+                        'Relationships cannot be modified via PATCH /subscriptions/:id.',
+                    ),
                 );
             }
 
@@ -413,8 +413,8 @@ export function subscriptionsRouter(subscriptionStore, stateEngine) {
                 return res.status(404).json(
                     errorResponse(
                         404,
-                        `Subscription "${req.params.id}" not found.`
-                    )
+                        `Subscription "${req.params.id}" not found.`,
+                    ),
                 );
             }
 
@@ -423,7 +423,7 @@ export function subscriptionsRouter(subscriptionStore, stateEngine) {
 
         } catch (err) {
             return res.status(500).json(
-                errorResponse(500, err.message)
+                errorResponse(500, err.message),
             );
         }
     });
@@ -431,12 +431,12 @@ export function subscriptionsRouter(subscriptionStore, stateEngine) {
     // --------------------------------------------------------
     // DELETE /subscriptions/:id
     // --------------------------------------------------------
-    router.delete('/:id', async (req, res) => {
+    router.delete('/:id', async(req, res) => {
         try {
             const deleted = await subscriptionStore.delete(req.params.id);
             if (!deleted) {
                 return res.status(404).json(
-                    errorResponse(404, `Subscription "${req.params.id}" not found.`)
+                    errorResponse(404, `Subscription "${req.params.id}" not found.`),
                 );
             }
             return res.status(204).send(); // No Content
@@ -448,13 +448,13 @@ export function subscriptionsRouter(subscriptionStore, stateEngine) {
     // --------------------------------------------------------
     // GET /subscriptions/:id/datapoints
     // --------------------------------------------------------
-    router.get('/:id/datapoints', async (req, res) => {
+    router.get('/:id/datapoints', async(req, res) => {
         try {
             const exists = await subscriptionStore.findById(req.params.id);
 
             if (!exists) {
                 return res.status(404).json(
-                    errorResponse(404, `Subscription "${req.params.id}" not found.`)
+                    errorResponse(404, `Subscription "${req.params.id}" not found.`),
                 );
             }
 
@@ -491,7 +491,7 @@ export function subscriptionsRouter(subscriptionStore, stateEngine) {
             });
         } catch (err) {
             return res.status(500).json(
-                errorResponse(500, err.message)
+                errorResponse(500, err.message),
             );
         }
     });
@@ -499,13 +499,13 @@ export function subscriptionsRouter(subscriptionStore, stateEngine) {
     // --------------------------------------------------------
     // GET /subscriptions/:id/installations
     // --------------------------------------------------------
-    router.get('/:id/installations', async (req, res) => {
+    router.get('/:id/installations', async(req, res) => {
         try {
             const exists = await subscriptionStore.findById(req.params.id);
 
             if (!exists) {
                 return res.status(404).json(
-                    errorResponse(404, `Subscription "${req.params.id}" not found.`)
+                    errorResponse(404, `Subscription "${req.params.id}" not found.`),
                 );
             }
 
@@ -542,7 +542,7 @@ export function subscriptionsRouter(subscriptionStore, stateEngine) {
             });
         } catch (err) {
             return res.status(500).json(
-                errorResponse(500, err.message)
+                errorResponse(500, err.message),
             );
         }
     });
@@ -550,12 +550,12 @@ export function subscriptionsRouter(subscriptionStore, stateEngine) {
     // --------------------------------------------------------
     // GET /subscriptions/:id/node
     // --------------------------------------------------------
-    router.get('/:id/node', async (req, res) => {
+    router.get('/:id/node', async(req, res) => {
         try {
             const exists = await subscriptionStore.findById(req.params.id);
             if (!exists) {
                 return res.status(404).json(
-                    errorResponse(404, `Subscription "${req.params.id}" not found.`)
+                    errorResponse(404, `Subscription "${req.params.id}" not found.`),
                 );
             }
 
