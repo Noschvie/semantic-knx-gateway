@@ -10,7 +10,7 @@ API_URL="http://localhost:3000"
 
 ## 🔐 OAuth Quickstart
 
-Die meisten Endpunkte unter `/api/v1/*` sind per Bearer Token geschützt.
+Die meisten Endpunkte unter `/api/v2/*` sind per Bearer Token geschützt.
 
 ```bash
 # Read-Token (für GET-Endpoints)
@@ -19,13 +19,13 @@ READ_TOKEN=$(curl -s -X POST "$API_URL/oauth/access" \
   -u 'knx-default-client:change-me-in-production' \
   -d 'grant_type=client_credentials&scope=read' | jq -r '.access_token')
 
-# Manage-Token (für /api/v1/subscriptions)
+# Manage-Token (für /api/v2/subscriptions)
 MANAGE_TOKEN=$(curl -s -X POST "$API_URL/oauth/access" \
   -H 'Content-Type: application/x-www-form-urlencoded' \
   -u 'knx-default-client:change-me-in-production' \
   -d 'grant_type=client_credentials&scope=manage' | jq -r '.access_token')
 
-# Write-Token (für PUT /api/v1/datapoints*)
+# Write-Token (für PUT /api/v2/datapoints*)
 WRITE_TOKEN=$(curl -s -X POST "$API_URL/oauth/access" \
   -H 'Content-Type: application/x-www-form-urlencoded' \
   -u 'knx-default-client:change-me-in-production' \
@@ -83,11 +83,11 @@ curl -s $API_URL/info | jq
     "restAPI": true
   },
   "endpoints": {
-    "stats": "/api/v1/stats",
-    "datapoints": "/api/v1/datapoints",
-    "events": "/api/v1/events",
-    "devices": "/api/v1/devices",
-    "semantic": "/api/v1/semantic"
+    "stats": "/api/v2/stats",
+    "datapoints": "/api/v2/datapoints",
+    "events": "/api/v2/events",
+    "devices": "/api/v2/devices",
+    "semantic": "/api/v2/semantic"
   }
 }
 ```
@@ -101,13 +101,13 @@ curl -s $API_URL/info | jq
 Übersicht über alle Datenbank-Statistiken:
 
 ```bash
-curl -s -H "$AUTH_READ" $API_URL/api/v1/stats | jq
+curl -s -H "$AUTH_READ" $API_URL/api/v2/stats | jq
 ```
 
 **Formatierte Ausgabe:**
 
 ```bash
-curl -s -H "$AUTH_READ" $API_URL/api/v1/stats | jq '{
+curl -s -H "$AUTH_READ" $API_URL/api/v2/stats | jq '{
   timestamp,
   events: .counts.events,
   states: .counts.states,
@@ -123,25 +123,25 @@ Statistiken über Events der letzten X Stunden:
 
 ```bash
 # Letzte 24 Stunden (Standard)
-curl -s -H "$AUTH_READ" "$API_URL/api/v1/stats/events" | jq
+curl -s -H "$AUTH_READ" "$API_URL/api/v2/stats/events" | jq
 
 # Letzte Stunde
-curl -s -H "$AUTH_READ" "$API_URL/api/v1/stats/events?hours=1" | jq
+curl -s -H "$AUTH_READ" "$API_URL/api/v2/stats/events?hours=1" | jq
 
 # Letzte 7 Tage
-curl -s -H "$AUTH_READ" "$API_URL/api/v1/stats/events?hours=168" | jq
+curl -s -H "$AUTH_READ" "$API_URL/api/v2/stats/events?hours=168" | jq
 ```
 
 **Zusammenfassung anzeigen:**
 
 ```bash
-curl -s -H "$AUTH_READ" "$API_URL/api/v1/stats/events?hours=24" | jq '.summary'
+curl -s -H "$AUTH_READ" "$API_URL/api/v2/stats/events?hours=24" | jq '.summary'
 ```
 
 **Stündliche Verteilung:**
 
 ```bash
-curl -s -H "$AUTH_READ" "$API_URL/api/v1/stats/events?hours=24" | jq '.hourly[] | {hour, count}'
+curl -s -H "$AUTH_READ" "$API_URL/api/v2/stats/events?hours=24" | jq '.hourly[] | {hour, count}'
 ```
 
 ### State Statistics
@@ -149,13 +149,13 @@ curl -s -H "$AUTH_READ" "$API_URL/api/v1/stats/events?hours=24" | jq '.hourly[] 
 Statistiken über aktuelle Zustände:
 
 ```bash
-curl -s -H "$AUTH_READ" $API_URL/api/v1/stats/states | jq
+curl -s -H "$AUTH_READ" $API_URL/api/v2/stats/states | jq
 ```
 
 **DPT-Verteilung:**
 
 ```bash
-curl -s -H "$AUTH_READ" $API_URL/api/v1/stats/states | jq '.byDpt'
+curl -s -H "$AUTH_READ" $API_URL/api/v2/stats/states | jq '.byDpt'
 ```
 
 ### Top Active Datapoints
@@ -164,36 +164,36 @@ Die aktivsten Datapoints/Gruppenadressen:
 
 ```bash
 # Top 20 der letzten 24 Stunden (Standard)
-curl -s -H "$AUTH_READ" "$API_URL/api/v1/stats/top-active" | jq
+curl -s -H "$AUTH_READ" "$API_URL/api/v2/stats/top-active" | jq
 
 # Top 10 der letzten Stunde
-curl -s -H "$AUTH_READ" "$API_URL/api/v1/stats/top-active?limit=10&hours=1" | jq
+curl -s -H "$AUTH_READ" "$API_URL/api/v2/stats/top-active?limit=10&hours=1" | jq
 
 # Top 50 der letzten Woche
-curl -s -H "$AUTH_READ" "$API_URL/api/v1/stats/top-active?limit=50&hours=168" | jq
+curl -s -H "$AUTH_READ" "$API_URL/api/v2/stats/top-active?limit=50&hours=168" | jq
 ```
 
 **Nur die Top 5 mit Formatierung:**
 
 ```bash
-curl -s -H "$AUTH_READ" "$API_URL/api/v1/stats/top-active?limit=5" | \
+curl -s -H "$AUTH_READ" "$API_URL/api/v2/stats/top-active?limit=5" | \
   jq -r '.datapoints[] | "\(.ga) - \(.eventCount) events - \(.currentValue)"'
 ```
 
 ---
 
-## 📍 Datapoints Endpoints (v1 – intern)
+## 📍 Datapoints Endpoints (v2 – intern)
 
 ### Alle Datapoints auflisten
 
 ```bash
-curl -s -H "$AUTH_READ" $API_URL/api/v1/datapoints | jq
+curl -s -H "$AUTH_READ" $API_URL/api/v2/datapoints | jq
 ```
 
 **Nur IDs und Namen:**
 
 ```bash
-curl -s -H "$AUTH_READ" $API_URL/api/v1/datapoints | \
+curl -s -H "$AUTH_READ" $API_URL/api/v2/datapoints | \
   jq '.datapoints[] | {datapointId, ga, name}'
 ```
 
@@ -201,17 +201,17 @@ curl -s -H "$AUTH_READ" $API_URL/api/v1/datapoints | \
 
 ```bash
 # Nach Datapoint-ID
-curl -s -H "$AUTH_READ" $API_URL/api/v1/datapoints/ga-1-5-1 | jq
+curl -s -H "$AUTH_READ" $API_URL/api/v2/datapoints/ga-1-5-1 | jq
 
 # Nach Gruppenadresse
-curl -s -H "$AUTH_READ" "$API_URL/api/v1/datapoints?ga=1/5/1" | jq
+curl -s -H "$AUTH_READ" "$API_URL/api/v2/datapoints?ga=1/5/1" | jq
 ```
 
 ---
 
 ## 🌐 KNX IoT 3rd Party API (Spec v2.1.0)
 
-> Basis-Pfad: `/api/v1` – nur verfügbar wenn TTL-Datei geladen
+> Basis-Pfad: `/api/v2` – nur verfügbar wenn TTL-Datei geladen
 
 ### Discovery
 
@@ -230,7 +230,7 @@ curl -s $API_URL/.well-known/knx | jq
       "title": "KNX Installation",
       "apiVersion": "2.1.0",
       "endpoints": {
-        "datapoints": "/api/v1/datapoints",
+        "datapoints": "/api/v2/datapoints",
         "...": "..."
       },
       "counts": {
@@ -250,26 +250,26 @@ curl -s $API_URL/.well-known/knx | jq
 
 ```bash
 # Alle Datapoints (JSON:API, paginiert)
-curl -s -H "$AUTH_READ" $API_URL/api/v1/datapoints | jq
+curl -s -H "$AUTH_READ" $API_URL/api/v2/datapoints | jq
 
 # Mit Paginierung – URL-encoded (empfohlen)
-curl -s -H "$AUTH_READ" "$API_URL/api/v1/datapoints?page%5Bnumber%5D=0&page%5Bsize%5D=50" | jq
+curl -s -H "$AUTH_READ" "$API_URL/api/v2/datapoints?page%5Bnumber%5D=0&page%5Bsize%5D=50" | jq
 
 # Seite 1 (zweite Seite)
-curl -s -H "$AUTH_READ" "$API_URL/api/v1/datapoints?page%5Bnumber%5D=1&page%5Bsize%5D=50" | jq
+curl -s -H "$AUTH_READ" "$API_URL/api/v2/datapoints?page%5Bnumber%5D=1&page%5Bsize%5D=50" | jq
 
 # Anzahl und erste GA ausgeben
-curl -s -H "$AUTH_READ" $API_URL/api/v1/datapoints | \
+curl -s -H "$AUTH_READ" $API_URL/api/v2/datapoints | \
   jq '{total: .meta.collection.total, first: .data[0].attributes["knx:groupAddress"]}'
 
 # Alle Datapoints – nur Titel + Wert + GA
-curl -s -H "$AUTH_READ" $API_URL/api/v1/datapoints | \
+curl -s -H "$AUTH_READ" $API_URL/api/v2/datapoints | \
   jq '.data[] | {id, title: .attributes.title, value: .attributes.value, ga: .attributes["knx:groupAddress"]}'
 
 # Einen spezifischen Datapoint per UUID abrufen
 # (UUID zuerst aus der Collection holen)
-DPID=$(curl -s -H "$AUTH_READ" $API_URL/api/v1/datapoints | jq -r '.data[0].id')
-curl -s -H "$AUTH_READ" "$API_URL/api/v1/datapoints/$DPID" | jq
+DPID=$(curl -s -H "$AUTH_READ" $API_URL/api/v2/datapoints | jq -r '.data[0].id')
+curl -s -H "$AUTH_READ" "$API_URL/api/v2/datapoints/$DPID" | jq
 ```
 
 **Struktur eines Datapoints:**
@@ -300,7 +300,7 @@ curl -s -H "$AUTH_READ" "$API_URL/api/v1/datapoints/$DPID" | jq
 
 > ℹ️ **Hinweis zu `valueType: "object"`:** Bei komplexen DPTs (z.B. `11.001` Datum, `10.001` Uhrzeit) ist `value` ein **JSON-String** (doppelt serialisiert). Zum Parsen:
 > ```bash
-> curl -s -H "$AUTH_READ" "$API_URL/api/v1/datapoints/$DPID" | jq '.data.attributes.value | fromjson'
+> curl -s -H "$AUTH_READ" "$API_URL/api/v2/datapoints/$DPID" | jq '.data.attributes.value | fromjson'
 > ```
 
 ---
@@ -309,16 +309,16 @@ curl -s -H "$AUTH_READ" "$API_URL/api/v1/datapoints/$DPID" | jq
 
 ```bash
 # UUID des ersten Datapoints holen
-DPID=$(curl -s -H "$AUTH_READ" $API_URL/api/v1/datapoints | jq -r '.data[0].id')
+DPID=$(curl -s -H "$AUTH_READ" $API_URL/api/v2/datapoints | jq -r '.data[0].id')
 
 # Zeitreihe abrufen
-curl -s -H "$AUTH_READ" "$API_URL/api/v1/datapoints/$DPID/timeseries" | jq
+curl -s -H "$AUTH_READ" "$API_URL/api/v2/datapoints/$DPID/timeseries" | jq
 
 # Mit Zeitfilter
-curl -s -H "$AUTH_READ" "$API_URL/api/v1/datapoints/$DPID/timeseries?startTime=2026-05-26T00:00:00Z&limit=100" | jq
+curl -s -H "$AUTH_READ" "$API_URL/api/v2/datapoints/$DPID/timeseries?startTime=2026-05-26T00:00:00Z&limit=100" | jq
 
 # Nur Werte und Timestamps
-curl -s -H "$AUTH_READ" "$API_URL/api/v1/datapoints/$DPID/timeseries" | \
+curl -s -H "$AUTH_READ" "$API_URL/api/v2/datapoints/$DPID/timeseries" | \
   jq '.data[] | {ts: .attributes.timestamp, val: .attributes.value}'
 ```
 
@@ -330,29 +330,29 @@ curl -s -H "$AUTH_READ" "$API_URL/api/v1/datapoints/$DPID/timeseries" | \
 
 ```bash
 # UUID des Ziel-Datapoints ermitteln
-DPID=$(curl -s -H "$AUTH_READ" $API_URL/api/v1/datapoints | \
+DPID=$(curl -s -H "$AUTH_READ" $API_URL/api/v2/datapoints | \
   jq -r '.data[] | select(.attributes["knx:groupAddress"] == 2049) | .id' | head -1)
 
 # Einschalten (Spec: value immer als String)
-curl -s -X PUT $API_URL/api/v1/datapoints \
+curl -s -X PUT $API_URL/api/v2/datapoints \
   -H "$AUTH_WRITE" \
   -H 'Content-Type: application/vnd.api+json' \
   -d "{"data": {"id": "$DPID", "attributes": {"value": "1"}}}" | jq
 
 # Ausschalten
-curl -s -X PUT $API_URL/api/v1/datapoints \
+curl -s -X PUT $API_URL/api/v2/datapoints \
   -H "$AUTH_WRITE" \
   -H 'Content-Type: application/vnd.api+json' \
   -d "{"data": {"id": "$DPID", "attributes": {"value": "0"}}}" | jq
 ```
 
-**Via Gruppenadresse** (Vendor-Extension – `PUT /api/v1/datapoints/by-ga`):
+**Via Gruppenadresse** (Vendor-Extension – `PUT /api/v2/datapoints/by-ga`):
 
 > GA wird über `data.meta.ga` übergeben (JSON:API-konform: `meta` für nicht-standardisierte Felder).
 
 ```bash
 # Einschalten
-curl -s -X PUT "$API_URL/api/v1/datapoints/by-ga" \
+curl -s -X PUT "$API_URL/api/v2/datapoints/by-ga" \
   -H "$AUTH_WRITE" \
   -H 'Content-Type: application/vnd.api+json' \
   -d '{
@@ -364,7 +364,7 @@ curl -s -X PUT "$API_URL/api/v1/datapoints/by-ga" \
   }' | jq
 
 # Ausschalten
-curl -s -X PUT "$API_URL/api/v1/datapoints/by-ga" \
+curl -s -X PUT "$API_URL/api/v2/datapoints/by-ga" \
   -H "$AUTH_WRITE" \
   -H 'Content-Type: application/vnd.api+json' \
   -d '{
@@ -376,7 +376,7 @@ curl -s -X PUT "$API_URL/api/v1/datapoints/by-ga" \
   }' | jq
 
 # Numerischer Wert (z.B. Dimmer DPT 5.001)
-curl -s -X PUT "$API_URL/api/v1/datapoints/by-ga" \
+curl -s -X PUT "$API_URL/api/v2/datapoints/by-ga" \
   -H "$AUTH_WRITE" \
   -H 'Content-Type: application/vnd.api+json' \
   -d '{
@@ -391,7 +391,7 @@ curl -s -X PUT "$API_URL/api/v1/datapoints/by-ga" \
 **Fehlerfall – GA nicht gefunden:**
 
 ```bash
-curl -s -X PUT "$API_URL/api/v1/datapoints/by-ga" \
+curl -s -X PUT "$API_URL/api/v2/datapoints/by-ga" \
   -H "$AUTH_WRITE" \
   -H 'Content-Type: application/vnd.api+json' \
   -d '{"data": {"type": "datapoint", "attributes": {"value": "1"}, "meta": {"ga": "9/9/999"}}}' | jq
@@ -404,24 +404,24 @@ curl -s -X PUT "$API_URL/api/v1/datapoints/by-ga" \
 
 ```bash
 # Alle Geräte
-curl -s -H "$AUTH_READ" $API_URL/api/v1/devices | jq
+curl -s -H "$AUTH_READ" $API_URL/api/v2/devices | jq
 
 # Anzahl
-curl -s -H "$AUTH_READ" $API_URL/api/v1/devices | jq '.meta.collection.total'
+curl -s -H "$AUTH_READ" $API_URL/api/v2/devices | jq '.meta.collection.total'
 
 # Alle Hersteller
-curl -s -H "$AUTH_READ" $API_URL/api/v1/devices |
+curl -s -H "$AUTH_READ" $API_URL/api/v2/devices |
   jq '[.data[].attributes.manufacturer] | unique'
 
 # Spezifisches Gerät per UUID
-DEVID=$(curl -s -H "$AUTH_READ" $API_URL/api/v1/devices | jq -r '.data[0].id')
-curl -s -H "$AUTH_READ" "$API_URL/api/v1/devices/$DEVID" | jq
+DEVID=$(curl -s -H "$AUTH_READ" $API_URL/api/v2/devices | jq -r '.data[0].id')
+curl -s -H "$AUTH_READ" "$API_URL/api/v2/devices/$DEVID" | jq
 
 # Relationships prüfen – zeigt Link zu Datapoints des Geräts
-curl -s -H "$AUTH_READ" "$API_URL/api/v1/devices/$DEVID" | jq '.data.relationships'
+curl -s -H "$AUTH_READ" "$API_URL/api/v2/devices/$DEVID" | jq '.data.relationships'
 
 # Datapoints eines Geräts abrufen (--globoff wegen eckiger Klammern in filter[deviceId])
-curl -sg --globoff -H "$AUTH_READ" "$API_URL/api/v1/datapoints?filter[deviceId]=$DEVID" | \
+curl -sg --globoff -H "$AUTH_READ" "$API_URL/api/v2/datapoints?filter[deviceId]=$DEVID" | \
   jq '{total: .meta.collection.total, datapoints: [.data[].attributes.title]}'
 ```
 
@@ -433,11 +433,11 @@ curl -sg --globoff -H "$AUTH_READ" "$API_URL/api/v1/datapoints?filter[deviceId]=
 
 ```bash
 # Alle Funktionen
-curl -s -H "$AUTH_READ" $API_URL/api/v1/functions | jq
+curl -s -H "$AUTH_READ" $API_URL/api/v2/functions | jq
 
 # Spezifische Funktion
-FNID=$(curl -s -H "$AUTH_READ" $API_URL/api/v1/functions | jq -r '.data[0].id')
-curl -s -H "$AUTH_READ" "$API_URL/api/v1/functions/$FNID" | jq
+FNID=$(curl -s -H "$AUTH_READ" $API_URL/api/v2/functions | jq -r '.data[0].id')
+curl -s -H "$AUTH_READ" "$API_URL/api/v2/functions/$FNID" | jq
 ```
 
 ---
@@ -446,77 +446,77 @@ curl -s -H "$AUTH_READ" "$API_URL/api/v1/functions/$FNID" | jq
 
 ```bash
 # Alle Locations (flach)
-curl -s -H "$AUTH_READ" $API_URL/api/v1/locations | jq
+curl -s -H "$AUTH_READ" $API_URL/api/v2/locations | jq
 
 # Nur Namen und Subtypen
-curl -s -H "$AUTH_READ" $API_URL/api/v1/locations | \
+curl -s -H "$AUTH_READ" $API_URL/api/v2/locations | \
   jq '.data[] | {id, title: .attributes.title, subtype: .attributes.subtype}'
 
 # Spezifische Location
-LOCID=$(curl -s -H "$AUTH_READ" $API_URL/api/v1/locations | jq -r '.data[0].id')
-curl -s -H "$AUTH_READ" "$API_URL/api/v1/locations/$LOCID" | jq
+LOCID=$(curl -s -H "$AUTH_READ" $API_URL/api/v2/locations | jq -r '.data[0].id')
+curl -s -H "$AUTH_READ" "$API_URL/api/v2/locations/$LOCID" | jq
 
 # Child-Locations (z.B. Räume eines Stockwerks)
-curl -s -H "$AUTH_READ" "$API_URL/api/v1/locations/$LOCID/childlocations" | jq
+curl -s -H "$AUTH_READ" "$API_URL/api/v2/locations/$LOCID/childlocations" | jq
 
 # Parent-Location (z.B. Stockwerk eines Raums)
-curl -s -H "$AUTH_READ" "$API_URL/api/v1/locations/$LOCID/parentlocation" | jq
+curl -s -H "$AUTH_READ" "$API_URL/api/v2/locations/$LOCID/parentlocation" | jq
 ```
 
 **Gesamte Hierarchie traversieren:**
 
 ```bash
 # Alle Gebäude (subtype = building)
-curl -s -H "$AUTH_READ" $API_URL/api/v1/locations | \
+curl -s -H "$AUTH_READ" $API_URL/api/v2/locations | \
   jq '.data[] | select(.attributes.subtype == "building") | {id, title: .attributes.title}'
 
 # Alle Räume
-curl -s -H "$AUTH_READ" $API_URL/api/v1/locations | \
+curl -s -H "$AUTH_READ" $API_URL/api/v2/locations | \
   jq '.data[] | select(.attributes.subtype == "room") | .attributes.title'
 
 # Alle Stockwerke (subtype = floor)
-curl -s -H "$AUTH_READ" $API_URL/api/v1/locations | \
+curl -s -H "$AUTH_READ" $API_URL/api/v2/locations | \
   jq '.data[] | select(.attributes.subtype == "floor") | {id, title: .attributes.title}'
 
 # Vollständige Hierarchie: Gebäude → Stockwerke → Räume
-BUILDING_ID=$(curl -s -H "$AUTH_READ" $API_URL/api/v1/locations | \
+BUILDING_ID=$(curl -s -H "$AUTH_READ" $API_URL/api/v2/locations | \
   jq -r '.data[] | select(.attributes.subtype == "building") | .id' | head -1)
 
 # Child-Locations des Gebäudes (Stockwerke)
-curl -s -H "$AUTH_READ" "$API_URL/api/v1/locations/$BUILDING_ID/childlocations" | \
+curl -s -H "$AUTH_READ" "$API_URL/api/v2/locations/$BUILDING_ID/childlocations" | \
   jq '.data[] | {id, title: .attributes.title, subtype: .attributes.subtype}'
 
 # Für jedes Stockwerk die Räume auflisten (Beispiel: erstes Stockwerk)
-FLOOR_ID=$(curl -s -H "$AUTH_READ" "$API_URL/api/v1/locations/$BUILDING_ID/childlocations" | \
+FLOOR_ID=$(curl -s -H "$AUTH_READ" "$API_URL/api/v2/locations/$BUILDING_ID/childlocations" | \
   jq -r '.data[0].id')
 
-curl -s -H "$AUTH_READ" "$API_URL/api/v1/locations/$FLOOR_ID/childlocations" | \
+curl -s -H "$AUTH_READ" "$API_URL/api/v2/locations/$FLOOR_ID/childlocations" | \
   jq '.data[] | {id, title: .attributes.title}'
 
 # Alle Stockwerke mit ihren Räumen (kompakt)
-curl -s -H "$AUTH_READ" "$API_URL/api/v1/locations/$BUILDING_ID/childlocations" | \
+curl -s -H "$AUTH_READ" "$API_URL/api/v2/locations/$BUILDING_ID/childlocations" | \
   jq -r '.data[].id' | while read FLOOR_ID; do
-    FLOOR_NAME=$(curl -s -H "$AUTH_READ" "$API_URL/api/v1/locations/$FLOOR_ID" | \
+    FLOOR_NAME=$(curl -s -H "$AUTH_READ" "$API_URL/api/v2/locations/$FLOOR_ID" | \
       jq -r '.data.attributes.title')
     echo "=== $FLOOR_NAME ==="
-    curl -s -H "$AUTH_READ" "$API_URL/api/v1/locations/$FLOOR_ID/childlocations" | \
+    curl -s -H "$AUTH_READ" "$API_URL/api/v2/locations/$FLOOR_ID/childlocations" | \
       jq -r '.data[] | "  - \(.attributes.title)"'
   done
 
 # Parent-Location eines Raums ermitteln (Beispiel: Wohnen → Erdgeschoss)
-ROOM_ID=$(curl -s -H "$AUTH_READ" $API_URL/api/v1/locations | \
+ROOM_ID=$(curl -s -H "$AUTH_READ" $API_URL/api/v2/locations | \
   jq -r '.data[] | select(.attributes.title | contains("Wohnen")) | .id')
 
-curl -s -H "$AUTH_READ" "$API_URL/api/v1/locations/$ROOM_ID/parentlocation" | \
+curl -s -H "$AUTH_READ" "$API_URL/api/v2/locations/$ROOM_ID/parentlocation" | \
   jq '{floor: .data.attributes.title, subtype: .data.attributes.subtype}'
 # → { "floor": "Erdgeschoss", "subtype": "floor" }
 
 # Location-ID ermitteln (Beispiel: Wohnen)
-ROOM_ID=$(curl -s -H "$AUTH_READ" $API_URL/api/v1/locations | \
+ROOM_ID=$(curl -s -H "$AUTH_READ" $API_URL/api/v2/locations | \
   jq -r '.data[] | select(.attributes.title | contains("Wohnen")) | .id')
 
 # Datapoints eines Raums abrufen (--globoff wegen eckiger Klammern)
-curl -sg --globoff -H "$AUTH_READ" "$API_URL/api/v1/datapoints?filter[locationId]=$ROOM_ID" | \
+curl -sg --globoff -H "$AUTH_READ" "$API_URL/api/v2/datapoints?filter[locationId]=$ROOM_ID" | \
   jq '{total: .meta.collection.total, datapoints: [.data[] | {title: .attributes.title, ga: .meta.ga, value: .attributes.value}]}'
 ```
 
@@ -524,30 +524,30 @@ curl -sg --globoff -H "$AUTH_READ" "$API_URL/api/v1/datapoints?filter[locationId
 ### Installations
 
 ```bash
-curl -s -H "$AUTH_READ" $API_URL/api/v1/installations | jq
+curl -s -H "$AUTH_READ" $API_URL/api/v2/installations | jq
 
 # Einzelne Installation
-INSTALLATION_ID=$(curl -s -H "$AUTH_READ" $API_URL/api/v1/installations | jq -r '.data[0].id')
-curl -s -H "$AUTH_READ" "$API_URL/api/v1/installations/$INSTALLATION_ID" | jq
+INSTALLATION_ID=$(curl -s -H "$AUTH_READ" $API_URL/api/v2/installations | jq -r '.data[0].id')
+curl -s -H "$AUTH_READ" "$API_URL/api/v2/installations/$INSTALLATION_ID" | jq
 ```
 
 ### Node
 
 ```bash
-curl -s -H "$AUTH_READ" $API_URL/api/v1/node | jq
+curl -s -H "$AUTH_READ" $API_URL/api/v2/node | jq
 
 # Limits und Zeitstempel ausgeben
-curl -s -H "$AUTH_READ" $API_URL/api/v1/node | \
+curl -s -H "$AUTH_READ" $API_URL/api/v2/node | \
   jq '.data.attributes | {currentSubscriptions, maxSubscriptions, currentDateTime}'
 ```
 
 ### Sites (Root-Locations)
 
 ```bash
-curl -s -H "$AUTH_READ" $API_URL/api/v1/sites | jq
+curl -s -H "$AUTH_READ" $API_URL/api/v2/sites | jq
 
 # Mit Paginierung
-curl -s -H "$AUTH_READ" "$API_URL/api/v1/sites?page%5Bnumber%5D=0&page%5Bsize%5D=10" | jq
+curl -s -H "$AUTH_READ" "$API_URL/api/v2/sites?page%5Bnumber%5D=0&page%5Bsize%5D=10" | jq
 ```
 
 ---
@@ -567,22 +567,22 @@ chmod +x test-knx-iot.sh
 
 ```bash
 # Alle Events (letzte 1000)
-curl -s -H "$AUTH_READ" $API_URL/api/v1/events | jq
+curl -s -H "$AUTH_READ" $API_URL/api/v2/events | jq
 
 # Events für spezifische Gruppenadresse
-curl -s -H "$AUTH_READ" "$API_URL/api/v1/events?ga=1/5/1&limit=50" | jq
+curl -s -H "$AUTH_READ" "$API_URL/api/v2/events?ga=1/5/1&limit=50" | jq
 ```
 
 ---
 
-## 🧠 Semantic Endpoints (v1 – intern)
+## 🧠 Semantic Endpoints (v2 – intern)
 
 > Nur verfügbar wenn TTL-Datei geladen
 
 ```bash
-curl -s -H "$AUTH_READ" $API_URL/api/v1/semantic/locations | jq
-curl -s -H "$AUTH_READ" $API_URL/api/v1/semantic/locations/hierarchy | jq
-curl -s -H "$AUTH_READ" $API_URL/api/v1/semantic/functions | jq
+curl -s -H "$AUTH_READ" $API_URL/api/v2/semantic/locations | jq
+curl -s -H "$AUTH_READ" $API_URL/api/v2/semantic/locations/hierarchy | jq
+curl -s -H "$AUTH_READ" $API_URL/api/v2/semantic/functions | jq
 ```
 
 ---
@@ -591,20 +591,20 @@ curl -s -H "$AUTH_READ" $API_URL/api/v1/semantic/functions | jq
 
 ```bash
 # Verbose Output
-curl -v -H "$AUTH_READ" $API_URL/api/v1/datapoints
+curl -v -H "$AUTH_READ" $API_URL/api/v2/datapoints
 
 # Headers prüfen (Content-Type muss application/vnd.api+json sein)
-curl -I -H "$AUTH_READ" $API_URL/api/v1/datapoints
+curl -I -H "$AUTH_READ" $API_URL/api/v2/datapoints
 
 # Response Time messen
-time curl -s -H "$AUTH_READ" $API_URL/api/v1/datapoints > /dev/null
+time curl -s -H "$AUTH_READ" $API_URL/api/v2/datapoints > /dev/null
 ```
 
 ---
 
 ## 🔔 Subscriptions Endpoints (HTTP Callback)
 
-> Basis-Pfad: `/api/v1/subscriptions`  
+> Basis-Pfad: `/api/v2/subscriptions`  
 > Scope: `manage` (lt. KNX IoT Spec 2.1.0)  
 > Auth: `Authorization: Bearer <token>`  
 > WebSocket-Subscription ist aktuell nicht implementiert.
@@ -613,7 +613,7 @@ time curl -s -H "$AUTH_READ" $API_URL/api/v1/datapoints > /dev/null
 
 ```bash
 # Verwendet die globale Basis-URL aus "## Basis-URL"
-SUB_URL="$API_URL/api/v1/subscriptions"
+SUB_URL="$API_URL/api/v2/subscriptions"
 
 # OAuth Access Token (manage scope) holen
 TOKEN=$(curl -s -X POST "$API_URL/oauth/access" \
@@ -624,7 +624,7 @@ TOKEN=$(curl -s -X POST "$API_URL/oauth/access" \
 AUTH="Authorization: Bearer $TOKEN"
 
 # Einen vorhandenen Datapoint-ID holen (für Subscription-Beispiele)
-DPID=$(curl -s -H "$AUTH" "$API_URL/api/v1/datapoints" | jq -r '.datapoints[0].datapointId // .datapoints[0].id')
+DPID=$(curl -s -H "$AUTH" "$API_URL/api/v2/datapoints" | jq -r '.datapoints[0].datapointId // .datapoints[0].id')
 echo "Datapoint ID: $DPID"
 ```
 
@@ -690,7 +690,7 @@ curl -s -X POST $SUB_URL \
     "type": "subscription",
     "relationships": {
       "subscriptionDatapoints": {
-        "links": { "related": "/api/v1/subscriptions/550e8400-.../datapoints" }
+        "links": { "related": "/api/v2/subscriptions/550e8400-.../datapoints" }
       }
     }
   }
@@ -723,7 +723,7 @@ echo "Subscription ID: $SUB_ID"
 **Auf eine Installation subscriben (mit expand=true):**
 
 ```bash
-INSTID=$(curl -s -H "$AUTH" $API_URL/api/v1/installations | jq -r '.data[0].id')
+INSTID=$(curl -s -H "$AUTH" $API_URL/api/v2/installations | jq -r '.data[0].id')
 
 curl -s -X POST $SUB_URL \
   -H "$AUTH" \
@@ -749,7 +749,7 @@ curl -s -X POST $SUB_URL \
 **Auf den Node subscriben:**
 
 ```bash
-NODE_ID=$(curl -s -H "$AUTH" $API_URL/api/v1/node | jq -r '.data.id')
+NODE_ID=$(curl -s -H "$AUTH" $API_URL/api/v2/node | jq -r '.data.id')
 
 curl -s -X POST $SUB_URL \
   -H "$AUTH" \
@@ -929,7 +929,7 @@ Speichern als `test-subscriptions.sh`:
 #!/usr/bin/env bash
 set -e
 API_URL="${API_URL:-http://localhost:3000}"
-SUB_URL="$API_URL/api/v1/subscriptions"
+SUB_URL="$API_URL/api/v2/subscriptions"
 H='Content-Type: application/vnd.api+json'
 
 TOKEN=$(curl -sf -X POST "$API_URL/oauth/access" \
@@ -940,7 +940,7 @@ TOKEN=$(curl -sf -X POST "$API_URL/oauth/access" \
 AUTH="Authorization: Bearer $TOKEN"
 
 echo "=== 1. Datapoint-ID holen ==="
-DPID=$(curl -sf -H "$AUTH" $API_URL/api/v1/datapoints | jq -r '.datapoints[0].datapointId // .datapoints[0].id')
+DPID=$(curl -sf -H "$AUTH" $API_URL/api/v2/datapoints | jq -r '.datapoints[0].datapointId // .datapoints[0].id')
 echo "Datapoint: $DPID"
 
 echo "=== 2. Subscription erstellen ==="
@@ -1022,7 +1022,7 @@ npx --yes http-echo-server 9999
 ## 📝 Notes
 
 - KNX IoT Endpunkte liefern `Content-Type: application/vnd.api+json`
-- Alle IDs in `/api/v1/*` sind stabile **UUIDs** (deterministisch aus der internen ID generiert)
+- Alle IDs in `/api/v2/*` sind stabile **UUIDs** (deterministisch aus der internen ID generiert)
 - Paginierung via `page%5Bnumber%5D` und `page%5Bsize%5D` Query-Parameter – eckige Klammern müssen URL-encodiert werden (`[` → `%5B`, `]` → `%5D`)
 - **Filter-Parameter** (`filter[deviceId]` etc.) ebenfalls URL-encodieren **oder** `curl -g`/`--globoff` verwenden – sonst verwirft die Bash die Parameter stillschweigend
 - `value` ist immer ein **String** – bei `valueType: "object"` (z.B. Datum/Uhrzeit) ist es ein doppelt serialisierter JSON-String → mit `| fromjson` parsen
