@@ -14,7 +14,7 @@ function knxError(status, title, detail) {
     return { errors: [{ title, links: KNX_SCHEMA_LINK, status: String(status), detail }] };
 }
 
-export function node(stateEngine) {
+export function nodeRouter(stateEngine) {
     const router = Router();
 
     // ── GET /api/v1/node ──────────────────────────────────────────────────────
