@@ -279,6 +279,9 @@ export class RestAPI {
                 .send(cert);
         });
 
+        // /.well-known/knx - KNX IoT discovery endpoint (required by spec)
+        this.app.get('/.well-known/knx', wellKnownKnxHandler());
+
         this.app.get(`${API_BASE}/.well-known/knx/ldevid`, certificateNotConfigured('lDevID'));
 
         // ── Health check ──────────────────────────────────────────────────────
