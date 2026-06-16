@@ -7,6 +7,7 @@ import { bearer } from '../middleware/oauth-bearer.js';
 import { paginate, stableUuid } from './helpers/knx-iot-uuid.js';
 import { getAllLocations, toDatapointResource } from './helpers/knx-iot-transform.js';
 import { decodeValueForKnx, toSpecValue } from './helpers/knx-iot-dpt.js';
+import { parseFilters } from './helpers/knx-iot-filters.js';
 
 // ── KNX IoT Spec §Errors ──────────────────────────────────────────────────────
 const KNX_SCHEMA_LINK = 'https://schema.knx.org/2020/api';
@@ -16,36 +17,6 @@ function knxError(status, title, detail) {
 }
 
 // ── Filter Helpers (identical to devices.js) ──────────────────────────────────
-
-/**
- * Parses all filter[...][operator] query parameters from req.query.
- *
- * Spec examples:
- *   filter[meta.@type]=DPT_Switch
- *   filter[title][eq]=Light
- *   filter[timestamp][ge]=2021-02-17T17:17:13Z
- *   filter[timestamp][le]=2021-02-17T17:17:17Z
- *   filter[hasTag]=actuator
- *
- * @returns {Array<{ key: string, operator: string, values: string[] }>}
- */
-function parseFilters(query) {
-    const filters = [];
-    const re = /^filter\[([^\]]+)\](?:\[([^\]]+)\])?$/;
-
-    for (const [param, raw] of Object.entries(query)) {
-        const m = param.match(re);
-        if (!m) continue;
-
-        const key      = m[1];
-        const operator = (m[2] ?? 'eq').toLowerCase();
-        const values   = String(raw).split(',').map(v => v.trim()).filter(Boolean);
-
-        filters.push({ key, operator, values });
-    }
-
-    return filters;
-}
 
 /**
  * Reads a field value from a JSON:API resource object.

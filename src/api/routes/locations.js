@@ -6,28 +6,13 @@ import { Router } from 'express';
 import { bearer } from '../middleware/oauth-bearer.js';
 import { paginate, stableUuid } from './helpers/knx-iot-uuid.js';
 import { getAllLocations, toLocationResource, toDeviceResource } from './helpers/knx-iot-transform.js';
+import { parseFilters } from './helpers/knx-iot-filters.js';
 
 // KNX IoT Spec §Errors
 const KNX_SCHEMA_LINK = 'https://schema.knx.org/2020/api';
 
 function knxError(status, title, detail) {
     return { errors: [{ title, links: KNX_SCHEMA_LINK, status: String(status), detail }] };
-}
-
-// Filter Helpers (same as devices.js / datapoints.js)
-
-function parseFilters(query) {
-    const filters = [];
-    const re = /^filter\[([^\]]+)\](?:\[([^\]]+)\])?$/;
-    for (const [param, raw] of Object.entries(query)) {
-        const m = param.match(re);
-        if (!m) continue;
-        const key      = m[1];
-        const operator = (m[2] ?? 'eq').toLowerCase();
-        const values   = String(raw).split(',').map(v => v.trim()).filter(Boolean);
-        filters.push({ key, operator, values });
-    }
-    return filters;
 }
 
 function getField(resource, key) {

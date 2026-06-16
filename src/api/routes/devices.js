@@ -6,44 +6,13 @@ import { Router } from 'express';
 import { bearer } from '../middleware/oauth-bearer.js';
 import { toDeviceResource } from './helpers/knx-iot-transform.js';
 import { paginate, stableUuid } from './helpers/knx-iot-uuid.js';
+import { parseFilters } from './helpers/knx-iot-filters.js';
 
 // ── KNX IoT Spec §Errors ──────────────────────────────────────────────────────
 const KNX_SCHEMA_LINK = 'https://schema.knx.org/2020/api';
 
 function knxError(status, title, detail) {
     return { errors: [{ title, links: KNX_SCHEMA_LINK, status: String(status), detail }] };
-}
-
-// ── Filter Helpers ────────────────────────────────────────────────────────────
-
-/**
- * Parses all filter[...]-query parameters from req.query.
- *
- * Spec examples:
- *   filter[meta.@type]=Device
- *   filter[meta.@type][or]=Room,Floor
- *   filter[title]=Actuator
- *   filter[state][eq]=Tested
- *   filter[hasTag]=switch
- *
- * @returns {Array<{ key: string, operator: string, values: string[] }>}
- */
-function parseFilters(query) {
-    const filters = [];
-    const re = /^filter\[([^\]]+)\](?:\[([^\]]+)\])?$/;
-
-    for (const [param, raw] of Object.entries(query)) {
-        const m = param.match(re);
-        if (!m) continue;
-
-        const key      = m[1];                          // e.g. "meta.@type", "title", "hasTag"
-        const operator = (m[2] ?? 'eq').toLowerCase();  // eq | or | and | le | ge | lt | gt
-        const values   = String(raw).split(',').map(v => v.trim()).filter(Boolean);
-
-        filters.push({ key, operator, values });
-    }
-
-    return filters;
 }
 
 /**
