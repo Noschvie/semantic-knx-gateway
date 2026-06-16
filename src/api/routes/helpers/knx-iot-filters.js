@@ -9,7 +9,7 @@
  *   filter[key]
  *   filter[key][operator]
  */
-const FILTER_QUERY_PARAM_RE = /^filter\[([^][]+)\](?:\[([^][]+)\])?$/;
+const FILTER_QUERY_PARAM_RE = /^filter\[([^][]+)](?:\[([^][]+)])?$/;
 
 /**
  * Parses all filter[...][operator] query parameters from req.query.
