@@ -99,14 +99,14 @@ export class TunnelManager {
                         }
 
                         // ===== SOURCE ADDRESS =====
-                        const srcRaw = cemi?.srcAddress?._address;
+                        const srcRaw = cemi?.srcAddress?.get();
 
                         const src = srcRaw != null
                             ? `${(srcRaw >> 12) & 0x0F}.${(srcRaw >> 8) & 0x0F}.${srcRaw & 0xFF}`
                             : '';
 
                         // ===== GROUP ADDRESS =====
-                        const dstRaw = cemi?.dstAddress?._address;
+                        const dstRaw = cemi?.dstAddress?.get();
 
                         const dest = dstRaw != null
                             ? `${(dstRaw >> 11) & 0x1F}/${(dstRaw >> 8) & 0x07}/${dstRaw & 0xFF}`
