@@ -1,4 +1,4 @@
-﻿{
+{
   "name": "semantic-knx-gateway",
   "version": "0.4.0",
   "type": "module",
@@ -11,7 +11,11 @@
     "start": "node src/index.js",
     "dev": "node --watch src/index.js",
     "test:api": "node scripts/test-api.js",
-    "test:ws": "node scripts/test-websocket.js"
+    "test:ws": "node scripts/test-websocket.js",
+    "lint": "eslint src/",
+    "lint:fix": "eslint src/ --fix",
+    "format": "prettier --write src/",
+    "format:check": "prettier --check src/"
   },
   "dependencies": {
     "@rdfjs/parser-n3": "^2.1.0",
@@ -26,8 +30,9 @@
     "ws": "^8.21.0"
   },
   "devDependencies": {
-    "@types/node": "^24.0.0"
+    "@types/node": "^24.0.0",
+    "eslint": "^10.5.0",
+    "eslint-config-prettier": "^10.1.8",
+    "prettier": "^3.8.4"
   }
 }
-
-
