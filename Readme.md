@@ -1,4 +1,4 @@
-﻿# Semantic KNX Runtime Engine
+# Semantic KNX Runtime Engine
 
 > ⚠️ **Status: Work in Progress — v0.1 pre-alpha**
 
@@ -86,7 +86,7 @@ Location
 
 **1. Clone the repository**
 
-```bash
+```
 git clone https://github.com/Noschvie/semantic-knx-gateway.git
 cd semantic-knx-gateway
 ```
@@ -95,7 +95,7 @@ cd semantic-knx-gateway
 
 Copy the example environment file and adjust the values for your setup:
 
-```bash
+```
 cp .env.example .env
 ```
 
@@ -103,13 +103,13 @@ cp .env.example .env
 
 Copy your ETS KNX IoT export to the config directory:
 
-```bash
+```
 cp your-installation.ttl config/project-prod.ttl
 ```
 
 **4. Start the stack**
 
-```bash
+```
 docker compose up -d
 ```
 
@@ -121,7 +121,7 @@ The API will be available at `http://localhost:3000`.
 
 All configuration is done via the `.env` file:
 
-```env
+```
 # KNX/IP Interface
 KNX_IP=192.168.1.100        # IP address of your KNX/IP interface
 KNX_PORT=3671               # KNX/IP tunneling port (default: 3671)
@@ -147,7 +147,7 @@ LOG_LEVEL=info
 
 The engine implements the **KNX IoT 3rd Party API v2.1.0**. Key endpoints:
 
-```http
+```
 GET /api/v1/devices
 GET /api/v1/datapoints
 GET /api/v1/locations
@@ -162,11 +162,13 @@ Full OpenAPI specification is served at `/api/v1/openapi.json`.
 ## Real-time APIs
 
 **WebSocket** — subscribe to live datapoint events:
+
 ```
 ws://localhost:3000/ws
 ```
 
 **MQTT** — semantic topics for datapoint state:
+
 ```
 knx/location/{location-id}/{function}/state
 knx/datapoint/{datapoint-id}/state
@@ -210,15 +212,15 @@ src/
 
 ## Roadmap
 
-| Phase | Description | Status |
-|-------|-------------|--------|
-| 1 | Core Runtime — KNX tunnel, telegram processing, DPT decoding | 🔄 In Progress |
-| 2 | Semantic Engine — TTL parsing, Resource Graph, Digital Twin | 🔄 In Progress |
-| 3 | State Engine — live state cache, event processing | 🔄 In Progress |
-| 4 | TimescaleDB — event & state persistence, historization | 🔄 In Progress |
-| 5 | KNX IoT REST API — OpenAPI-compliant endpoints | 🔄 In Progress |
-| 6 | Realtime & Integration — WebSocket, Subscription API | 🔄 In Progress |
-| 7 | Extensions — Matter Bridge, CoAP, KNX IoT Point API, OAuth2 | ⏳ Future |
+| Phase | Description                                                  | Status        |
+| ----- | ------------------------------------------------------------ | ------------- |
+| 1     | Core Runtime — KNX tunnel, telegram processing, DPT decoding | 🔄 In Progress |
+| 2     | Semantic Engine — TTL parsing, Resource Graph, Digital Twin  | 🔄 In Progress |
+| 3     | State Engine — live state cache, event processing            | 🔄 In Progress |
+| 4     | TimescaleDB — event & state persistence, historization       | 🔄 In Progress |
+| 5     | KNX IoT REST API — OpenAPI-compliant endpoints               | 🔄 In Progress |
+| 6     | Realtime & Integration — WebSocket, Subscription API         | 🔄 In Progress |
+| 7     | Extensions — Matter Bridge, CoAP, KNX IoT Point API, OAuth2  | ⏳ Future      |
 
 ---
 
@@ -227,6 +229,17 @@ src/
 - **KNX bus communication** — [KNXUltimate](https://github.com/Supergiovane/KNXUltimate) by [@Supergiovane](https://github.com/Supergiovane), a full-featured KNX/IP tunneling library for Node.js with KNX Secure support
 - **Runtime** — [Node.js](https://nodejs.org/)
 - **Time-series storage** — [TimescaleDB](https://www.timescale.com/), built on PostgreSQL
+
+---
+
+## References
+
+### KNX IoT 3rd Party API
+
+- **[KNX IoT API Server – Implementation example for KNX PoC 2.x](https://support.knx.org/hc/en-us/articles/23995369446162-KNX-IoT-API-Server-development-Implementation-example-for-KNX-PoC-2-x-version)**  
+  Offizieller Artikel der KNX Association mit Erläuterungen zum Aufbau eines KNX IoT API Servers gemäß KNX Standard v3.0.0 (Kapitel 3_10_4 KNX IoT 3rd Party API).  
+  Behandelt werden: Grundkonzepte des KNX IoT API Servers, Voraussetzungen für die Client-Kommunikation (REST & WebSocket), OAuth2-Authentifizierung sowie konkrete Implementierungsbeispiele in Python für REST-Calls und WebSocket-Subscriptions auf Datenpunkte.  
+  Referenzimplementierung: [KNX IoT PoC (Docker)](https://gitlab.knx.org/knxiot/kitooling/-/wikis/index/KNX-IoT-3rd-Party-API-Demos/KNX-IoT-3rd-Party-API-Local-Environment) · API-Spec: [Swagger v2.1.0](https://schema.knx.org/2020/api/2.1.0?visualisation=swagger)
 
 ---
 
