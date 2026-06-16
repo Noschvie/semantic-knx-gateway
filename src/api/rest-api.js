@@ -1,4 +1,4 @@
-﻿// SPDX-License-Identifier: AGPL-3.0-or-later
+// SPDX-License-Identifier: AGPL-3.0-or-later
 // Copyright (c) 2026 Noschvie
 // KNX Runtime Engine – https://github.com/Noschvie/semantic-knx-gateway.git
 
@@ -131,13 +131,9 @@ export class RestAPI {
         this.setupRoutes();
     }
 
-    // ----------------------------------------------------
-    // GLOBAL JSON:API MIDDLEWARE
-    // ----------------------------------------------------
+    // ── GLOBAL JSON:API MIDDLEWARE ────────────────────────────────────────────
     setupMiddleware() {
-        // ----------------------------------------------------
-        // JSON Parser
-        // ----------------------------------------------------
+        // ── JSON Parser ───────────────────────────────────────────────────────
         this.app.use(express.json({
             type: [
                 'application/json',
@@ -155,9 +151,7 @@ export class RestAPI {
             // JSON:API Response Content-Type
             res.setHeader('Content-Type', 'application/vnd.api+json');
 
-            // ------------------------------------------------
-            // ACCEPT HEADER VALIDATION
-            // ------------------------------------------------
+            // ── ACCEPT HEADER VALIDATION ──────────────────────────────────────
             const accept = req.headers.accept;
 
             if (
@@ -170,19 +164,19 @@ export class RestAPI {
                 );
             }
 
-            // ------------------------------------------------
-            // CONTENT-TYPE VALIDATION
-            // ------------------------------------------------
+            // ── CONTENT-TYPE VALIDATION ───────────────────────────────────────
             const methodsWithBody = ['POST', 'PATCH', 'PUT'];
 
             if (methodsWithBody.includes(req.method)) {
                 const contentType = req.headers['content-type'];
+
                 const allowJsonFallbackForDatapointValues =
                     req.method === 'PUT' &&
                     req.path === '/api/v1/datapoints/values';
                 const allowJsonFallbackForSubscriptions =
                     req.path.startsWith('/api/v1/subscriptions') &&
                     (req.method === 'POST' || req.method === 'PATCH');
+
                 const allowJsonFallback =
                     allowJsonFallbackForDatapointValues ||
                     allowJsonFallbackForSubscriptions;
@@ -225,7 +219,7 @@ export class RestAPI {
             next();
         });
 
-        // CORS
+        // ── CORS ──────────────────────────────────────────────────────────────
         this.app.use((req, res, next) => {
             res.header('Access-Control-Allow-Origin', '*');
             res.header('Access-Control-Allow-Methods', 'GET, POST, PATCH, PUT, DELETE, OPTIONS');
@@ -297,7 +291,7 @@ export class RestAPI {
 
         this.app.get('/api/v1/.well-known/knx/ldevid', certificateNotConfigured('lDevID'));
 
-        // Health check
+        // ── Health check ──────────────────────────────────────────────────────
         this.app.get('/health', (req, res) => {
             const now = new Date();
             res.json({
@@ -308,7 +302,7 @@ export class RestAPI {
             });
         });
 
-        // Info endpoint
+        // ── Info endpoint ─────────────────────────────────────────────────────
         this.app.get('/info', (req, res) => {
             res.json({
                 name: 'Semantic KNX Runtime Engine',
@@ -360,18 +354,18 @@ export class RestAPI {
         // ── Global error handler ──────────────────────────────────────────────
         this.app.use((err, req, res, _next) => {
             const status = err.status || err.statusCode || 500;
-            const title  = HTTP_TITLES[status] || 'Internal Server Error';
+            const title = HTTP_TITLES[status] || 'Internal Server Error';
             const detail = process.env.NODE_ENV !== 'production'
                 ? (err.message || 'Unexpected error.')
                 : 'Unexpected error.';
 
             this.logger.error({
-                msg:    `${req.method} ${req.path} → ${status} – ${err.message || 'unknown error'}`,
+                msg: `${req.method} ${req.path} → ${status} – ${err.message || 'unknown error'}`,
                 method: req.method,
-                path:   req.path,
+                path: req.path,
                 status,
-                error:  err.message,
-                stack:  process.env.NODE_ENV !== 'production' ? err.stack : undefined,
+                error: err.message,
+                stack: process.env.NODE_ENV !== 'production' ? err.stack : undefined,
             });
 
             res.status(status).json(knxError(status, title, detail));
