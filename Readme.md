@@ -232,14 +232,16 @@ src/
 
 ---
 
+Kein Problem, hier die englische Version des References-Abschnitts:
+
 ## References
 
 ### KNX IoT 3rd Party API
 
 - **[KNX IoT API Server – Implementation example for KNX PoC 2.x](https://support.knx.org/hc/en-us/articles/23995369446162-KNX-IoT-API-Server-development-Implementation-example-for-KNX-PoC-2-x-version)**  
-  Offizieller Artikel der KNX Association mit Erläuterungen zum Aufbau eines KNX IoT API Servers gemäß KNX Standard v3.0.0 (Kapitel 3_10_4 KNX IoT 3rd Party API).  
-  Behandelt werden: Grundkonzepte des KNX IoT API Servers, Voraussetzungen für die Client-Kommunikation (REST & WebSocket), OAuth2-Authentifizierung sowie konkrete Implementierungsbeispiele in Python für REST-Calls und WebSocket-Subscriptions auf Datenpunkte.  
-  Referenzimplementierung: [KNX IoT PoC (Docker)](https://gitlab.knx.org/knxiot/kitooling/-/wikis/index/KNX-IoT-3rd-Party-API-Demos/KNX-IoT-3rd-Party-API-Local-Environment) · API-Spec: [Swagger v2.1.0](https://schema.knx.org/2020/api/2.1.0?visualisation=swagger)
+  Official KNX Association article covering the development of a KNX IoT API Server according to KNX Standard v3.0.0 (chapter 3_10_4 KNX IoT 3rd Party API).  
+  Topics include: core concepts of the KNX IoT API Server, prerequisites for client communication (REST & WebSocket), OAuth2 authentication, and concrete Python implementation examples for REST calls and WebSocket datapoint subscriptions.  
+  Reference implementation: [KNX IoT PoC (Docker)](https://gitlab.knx.org/knxiot/kitooling/-/wikis/index/KNX-IoT-3rd-Party-API-Demos/KNX-IoT-3rd-Party-API-Local-Environment) · API spec: [Swagger v2.1.0](https://schema.knx.org/2020/api/2.1.0?visualisation=swagger)
 
 ---
 
