@@ -8,6 +8,9 @@ contributors and users to follow meaningful changes over time.
 Unreleased
 ----------
 
+2026-06-16
+----------
+
 ### Added
 - TEAM-README.md — short team guidelines for line endings and git config.
 - .gitattributes — repository-level EOL normalization rules (LF for source,
@@ -32,16 +35,24 @@ Unreleased
   implements spec-compliant `typeFilter`, `tagFilter` and `attributeFilter`
   query parameters for all collection endpoints.
 - KNX IoT API: dedicated route modules extracted from `knx-iot-router.js`:
-    - `src/api/routes/functions.js` — `GET /functions`, `GET /functions/:id`,
-      `GET /functions/:id/datapoints`, `GET /functions/:id/location`
-    - `src/api/routes/installations.js` — `GET /installations`,
-      `GET /installations/:installationId`
-    - `src/api/routes/node.js` — `GET /node`
-    - `src/api/routes/sites.js` — `GET /sites`
+  - `src/api/routes/functions.js` — `GET /functions`, `GET /functions/:id`,
+    `GET /functions/:id/datapoints`, `GET /functions/:id/location`
+  - `src/api/routes/installations.js` — `GET /installations`,
+    `GET /installations/:installationId`
+  - `src/api/routes/node.js` — `GET /node`
+  - `src/api/routes/sites.js` — `GET /sites`
 - TTL loader: ETS `ApplicationFunction` nodes without any `hasFunctionPoint`
   relation are now skipped (ontology-class definitions, not real user functions).
 - Debug scripts: `scripts/debug-ttl-content.js` extended to distinguish
   functions with vs. without FunctionPoints for easier ETS data validation.
+- KNX IoT API: `functionLocation` relationship added to function resources in
+  `knx-iot-transform.js` as per spec.
+- KNX IoT REST API: discovery endpoint added (`/.well-known/knx` or equivalent)
+  to `rest-api.js` for KNX IoT conformance.
+- ESLint + Prettier: `lint`, `lint:fix`, `format` and related scripts added to
+  `package.json`; `eslint.config.js` migrated to flat config format with rules
+  for unused variables and private class members (underscore prefix convention).
+- `.gitignore`: added `.idea/` entry to exclude IntelliJ/JetBrains IDE files.
 
 ### Changed
 - Updated license identifiers to AGPL-3.0-or-later across all JavaScript and test files
@@ -65,6 +76,32 @@ Unreleased
   resource linkage data.
 - Filter helpers (`parseFilters`, `applyAllFilters`) deduplicated across all
   route files by centralising them in `helpers/knx-iot-filters.js`.
+- REST API migrated from `/api/v1` to `/api/v2`; all internal references and
+  documentation updated accordingly.
+- `node` router function renamed to `nodeRouter` for clarity and consistency.
+- `dpt-decoder.js` refactored: switch-case indentation standardized; DPT 19
+  decoding enhanced with richer output (additional date/time fields).
+- `tunnel-manager.js` refactored: `srcAddress` and `dstAddress` now accessed
+  via `.get()` method instead of direct property access.
+- `rest-api.js`, `knxError` helper and multiple modules reformatted for
+  consistency (unified section headers, streamlined logger usage, object
+  literal style).
+
+### Details (recent commits)
+- 3b7f447 — Refactor `tunnel-manager.js`: use `get()` for srcAddress/dstAddress
+- 8124811 — Refactor multiple modules for consistent object formatting
+- fb94b54 — ESLint: enforce rules for unused variables and private underscore members
+- 9aa24f6 — Refactor `dpt-decoder.js`: improved formatting and enhanced DPT 19 decoding
+- f3d065e — Update `.gitignore`: add `.idea/` for JetBrains IDE files
+- f7677ba — Add KNX IoT discovery endpoint to REST API
+- ebe7fcd — Migrate REST API to `/api/v2`
+- 181315 — Migrate ESLint configuration to flat `eslint.config.js`
+- 3c6375 — Add `eslint`, `prettier`, and related scripts
+- afafbe5 — Enhance KNX IoT function transformation: add `functionLocation` relationship
+- e405a2e — Rename `node` to `nodeRouter` for clarity
+- 7335382 — Refactor KNX IoT routes into dedicated modules
+- 186a5eb — Enrich application functions with linked group address URIs
+- ddfce1c — Skip ontology-level class definitions without function points
 
 2026-06-14
 ----------
