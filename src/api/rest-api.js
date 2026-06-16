@@ -32,14 +32,7 @@ const KNX_SCHEMA_LINK = 'https://schema.knx.org/2020/api';
  *   { errors: [{ title, links, status, detail }] }
  */
 function knxError(status, title, detail) {
-    return {
-        errors: [{
-            title,
-            links: KNX_SCHEMA_LINK,
-            status: String(status),
-            detail,
-        }]
-    };
+    return { errors: [{ title, links: KNX_SCHEMA_LINK, status: String(status), detail }] };
 }
 
 // HTTP status → title mapping as defined in the KNX IoT OpenAPI spec responses
