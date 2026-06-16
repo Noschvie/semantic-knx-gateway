@@ -6,7 +6,7 @@ Dieses Dokument enthält alle verfügbaren API-Endpunkte mit Beispiel-Curl-Befeh
 
 ```bash
 API_URL="http://localhost:3000"
-KNX_IOT_API_URL="$API_BASE_URL/api/v2"
+KNX_IOT_API_URL="$API_URL/api/v2"
 ```
 
 ## 🔐 OAuth Quickstart
