@@ -234,7 +234,7 @@ export class CallbackDispatcher {
                     id:   datapointId,
                     type: 'datapoint',
                     links: {
-                        self: `/api/v1/datapoints/${datapointId}`,
+                        self: `/api/v2/datapoints/${datapointId}`,
                     },
                     attributes: {
                         value:     value !== undefined ? String(value) : null,

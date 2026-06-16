@@ -142,7 +142,7 @@ export function subscriptionsRouter(subscriptionStore, stateEngine) {
 
     // Base URL for self/related links (without trailing slash)
     function baseUrl(req) {
-        return `${req.protocol}://${req.get('host')}/api/v1/subscriptions`;
+        return `${req.protocol}://${req.get('host')}/api/v2/subscriptions`;
     }
 
     // --------------------------------------------------------
@@ -481,7 +481,7 @@ export function subscriptionsRouter(subscriptionStore, stateEngine) {
                     type: 'datapoint',
 
                     links: {
-                        self: `${req.protocol}://${req.get('host')}/api/v1/datapoints/${stableUuid(row.id)}`,
+                        self: `${req.protocol}://${req.get('host')}/api/v2/datapoints/${stableUuid(row.id)}`,
                     },
 
                     meta: {
@@ -532,7 +532,7 @@ export function subscriptionsRouter(subscriptionStore, stateEngine) {
                     type: 'installation',
 
                     links: {
-                        self: `${req.protocol}://${req.get('host')}/api/v1/installations/${row.id}`,
+                        self: `${req.protocol}://${req.get('host')}/api/v2/installations/${row.id}`,
                     },
 
                     meta: {
