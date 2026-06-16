@@ -24,54 +24,54 @@ export class DPTDecoder {
             const [main, sub] = dpt.split('.').map(Number);
 
             switch (main) {
-                case 1: // DPT 1.xxx - Boolean
-                    return this.decodeDPT1(rawValue);
+            case 1: // DPT 1.xxx - Boolean
+                return this.decodeDPT1(rawValue);
 
-                case 5: // DPT 5.xxx - 8-bit unsigned
-                    return this.decodeDPT5(rawValue, sub);
+            case 5: // DPT 5.xxx - 8-bit unsigned
+                return this.decodeDPT5(rawValue, sub);
 
-                case 6: // DPT 6.xxx - 8-bit signed
-                    return this.decodeDPT6(rawValue);
+            case 6: // DPT 6.xxx - 8-bit signed
+                return this.decodeDPT6(rawValue);
 
-                case 7: // DPT 7.xxx - 16-bit unsigned
-                    return this.decodeDPT7(rawValue);
+            case 7: // DPT 7.xxx - 16-bit unsigned
+                return this.decodeDPT7(rawValue);
 
-                case 8: // DPT 8.xxx - 16-bit signed
-                    return this.decodeDPT8(rawValue);
+            case 8: // DPT 8.xxx - 16-bit signed
+                return this.decodeDPT8(rawValue);
 
-                case 9: // DPT 9.xxx - 2-byte float
-                    return this.decodeDPT9(rawValue);
+            case 9: // DPT 9.xxx - 2-byte float
+                return this.decodeDPT9(rawValue);
 
-                case 10: // DPT 10.xxx - Time of Day
-                    return this.decodeDPT10(rawValue);
+            case 10: // DPT 10.xxx - Time of Day
+                return this.decodeDPT10(rawValue);
 
-                case 11: // DPT 11.xxx - Date
-                    return this.decodeDPT11(rawValue);
+            case 11: // DPT 11.xxx - Date
+                return this.decodeDPT11(rawValue);
 
-                case 12: // DPT 12.xxx - 32-bit unsigned
-                    return this.decodeDPT12(rawValue);
+            case 12: // DPT 12.xxx - 32-bit unsigned
+                return this.decodeDPT12(rawValue);
 
-                case 13: // DPT 13.xxx - 32-bit signed
-                    return this.decodeDPT13(rawValue);
+            case 13: // DPT 13.xxx - 32-bit signed
+                return this.decodeDPT13(rawValue);
 
-                case 14: // DPT 14.xxx - 4-byte float
-                    return this.decodeDPT14(rawValue);
+            case 14: // DPT 14.xxx - 4-byte float
+                return this.decodeDPT14(rawValue);
 
-                case 16: // DPT 16.xxx - String
-                    return this.decodeDPT16(rawValue);
+            case 16: // DPT 16.xxx - String
+                return this.decodeDPT16(rawValue);
 
-                case 17: // DPT 17.xxx - Scene number
-                    return this.decodeDPT17(rawValue);
+            case 17: // DPT 17.xxx - Scene number
+                return this.decodeDPT17(rawValue);
 
-                case 18: // DPT 18.xxx - Scene control
-                    return this.decodeDPT18(rawValue);
+            case 18: // DPT 18.xxx - Scene control
+                return this.decodeDPT18(rawValue);
 
-                case 19: // DPT 19.xxx - Date/Time
-                    return this.decodeDPT19(rawValue);
+            case 19: // DPT 19.xxx - Date/Time
+                return this.decodeDPT19(rawValue);
 
-                default:
-                    this.logger.warn(`Unsupported DPT: ${dpt}`);
-                    return rawValue;
+            default:
+                this.logger.warn(`Unsupported DPT: ${dpt}`);
+                return rawValue;
             }
         } catch (error) {
             this.logger.error(`Error decoding DPT ${dpt}:`, error);
@@ -91,22 +91,22 @@ export class DPTDecoder {
             const [main] = dpt.split('.').map(Number);
 
             switch (main) {
-                case 1:
-                    return this.encodeDPT1(value);
-                case 5:
-                    return this.encodeDPT5(value);
+            case 1:
+                return this.encodeDPT1(value);
+            case 5:
+                return this.encodeDPT5(value);
 
-                case 7: // DPT 7.xxx - 16-bit unsigned
-                    return this.encodeDPT7(value);
+            case 7: // DPT 7.xxx - 16-bit unsigned
+                return this.encodeDPT7(value);
 
-                case 8: // DPT 8.xxx - 16-bit signed
-                    return this.encodeDPT8(value);
+            case 8: // DPT 8.xxx - 16-bit signed
+                return this.encodeDPT8(value);
 
-                case 9: // DPT 9.xxx - 2-byte float
-                    return this.encodeDPT9(value);
-                default:
-                    this.logger.warn(`Encoding not implemented for DPT: ${dpt}`);
-                    return value;
+            case 9: // DPT 9.xxx - 2-byte float
+                return this.encodeDPT9(value);
+            default:
+                this.logger.warn(`Encoding not implemented for DPT: ${dpt}`);
+                return value;
             }
         } catch (error) {
             this.logger.error(`Error encoding DPT ${dpt}:`, error);
@@ -136,14 +136,14 @@ export class DPTDecoder {
         const raw = this.toNumber(value);
 
         switch (sub) {
-            case 1: // Scaling (0-100%)
-                return Math.round((raw / 255) * 100);
-            case 3: // Angle (0-360°)
-                return Math.round((raw / 255) * 360);
-            case 4: // Percent_U8 (0-255%)
-                return raw;
-            default:
-                return raw;
+        case 1: // Scaling (0-100%)
+            return Math.round((raw / 255) * 100);
+        case 3: // Angle (0-360°)
+            return Math.round((raw / 255) * 360);
+        case 4: // Percent_U8 (0-255%)
+            return raw;
+        default:
+            return raw;
         }
     }
 
@@ -209,7 +209,7 @@ export class DPTDecoder {
             hour,
             minute,
             second,
-            formatted: `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}:${String(second).padStart(2, '0')}`
+            formatted: `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}:${String(second).padStart(2, '0')}`,
         };
     }
 
@@ -230,7 +230,7 @@ export class DPTDecoder {
             day,
             month,
             year,
-            formatted: `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`
+            formatted: `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`,
         };
     }
 
@@ -268,13 +268,21 @@ export class DPTDecoder {
         const raw = this.toNumber(value);
         return {
             learn: (raw & 0x80) !== 0,
-            sceneNumber: raw & 0x3F
+            sceneNumber: raw & 0x3F,
         };
     }
 
     decodeDPT19(value) {
-        // Date/Time
+        // Date/Time: 8 Bytes
+        // Byte 0: year (0-255, offset 1900)
+        // Byte 1: month (1-12)
+        // Byte 2: day (1-31)
+        // Byte 3: Bits 7-5 = day of week (0=none, 1=Mon...7=Sun), Bits 4-0 = hour
+        // Byte 4: minute (0-59)
+        // Byte 5: second (0-59)
+        // Byte 6: status flags
         const buf = this.toBuffer(value);
+        if (buf.length < 6) return null;
 
         const year = buf[0] + 1900;
         const month = buf[1] & 0x0F;
@@ -284,7 +292,20 @@ export class DPTDecoder {
         const minute = buf[4] & 0x3F;
         const second = buf[5] & 0x3F;
 
-        return new Date(year, month - 1, day, hour, minute, second);
+        const days = [null, 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+
+        return {
+            year,
+            month,
+            day,
+            dayOfWeek,
+            dayName: days[dayOfWeek] ?? null,
+            hour,
+            minute,
+            second,
+            formatted: `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}T${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}:${String(second).padStart(2, '0')}`,
+            date: new Date(year, month - 1, day, hour, minute, second),
+        };
     }
 
     // ==================== DPT Encoders ====================
@@ -366,7 +387,7 @@ export class DPTDecoder {
             16: 'string',
             17: 'number',
             18: 'object',
-            19: 'datetime'
+            19: 'datetime',
         };
 
         return typeMap[main] || 'unknown';
