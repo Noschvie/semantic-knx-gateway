@@ -279,12 +279,12 @@ export class CallbackDispatcher {
             const parsedUrl     = new URL(callbackUrl);
             const requestLine   = `POST ${parsedUrl.pathname}${parsedUrl.search} HTTP/1.1\r\n`;
             const signingString = requestLine
-                + parsedUrl.host   // Host
+            const signature = createHmac('sha256', secret)
                 + date             // Date
                 + contentLength    // Content-Length
                 + body;            // Message body
 
-            const signature = createHmac('sha256', secret)
+            headers['X-Callback-Signature'] = createHmac('sha256', secret)
                 .update(signingString)
                 .digest('base64');  // base64, not hex (per spec)
 
