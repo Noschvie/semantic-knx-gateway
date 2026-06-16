@@ -136,9 +136,21 @@ export class ResourceStore {
 
     /**
      * Convenience: get application functions stored under the type 'applicationFunction'
+     * Enriches each function with its linked group address URIs from the relationships table.
      */
     async getApplicationFunctions() {
-        return this.getResourcesByType('applicationFunction');
+        const functions = await this.getResourcesByType('applicationFunction');
+
+        for (const fn of functions) {
+            const result = await this.db.query(
+                `SELECT object FROM semantic_relationships
+                 WHERE subject = $1 AND predicate = 'hasGroupAddress'`,
+                [fn.id]
+            );
+            fn.groupAddressUris = result.rows.map(r => r.object);
+        }
+
+        return functions;
     }
 
     /**
@@ -215,4 +227,34 @@ export class ResourceStore {
 
         return result.rows.map(row => row.resource);
     }
+}
+
+/**
+ * Transforms a function into a JSON:API resource.
+ */
+export function toFunctionResource(fn) {
+    const uuid = stableUuid(fn.id ?? fn.uri ?? '');
+
+    // Build datapoint relationship links for each linked group address
+    const groupAddressLinks = (fn.groupAddressUris ?? []).map(gaUri => ({
+        id:   stableUuid(gaUri),
+        type: 'datapoint',
+    }));
+
+    return {
+        id:   uuid,
+        type: 'function',
+        attributes: { title: fn.name ?? '' },
+        meta: {
+            '@type':     ['knx:function'],
+            internalId:  fn.id,
+            uri:         fn.uri,
+            groupAddressCount: fn.groupAddressUris?.length ?? fn.groupAddressCount ?? 0,
+        },
+        relationships: {
+            datapoints: groupAddressLinks.length > 0
+                ? { data: groupAddressLinks }
+                : { links: { related: `/api/v1/datapoints?filter[functionId]=${uuid}` } },
+        },
+    };
 }
