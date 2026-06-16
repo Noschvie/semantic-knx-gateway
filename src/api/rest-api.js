@@ -10,10 +10,13 @@ import { formatTimestamp } from '../utils/timezone.js';
 import { datapointsRouter } from './routes/datapoints.js';
 import { eventsRouter } from './routes/events.js';
 import { devicesRouter } from './routes/devices.js';
+import { functionsRouter } from './routes/functions.js';
 import { semanticRouter } from './routes/semantic.js';
 import { locationsRouter } from './routes/locations.js';
+import { installationsRouter } from './routes/installations.js';
+import { nodeRouter } from './routes/node.js';
+import { sitesRouter } from './routes/sites.js';
 import { statsRouter } from './routes/stats.js';
-import { knxIotRouter, wellKnownKnxHandler } from './routes/knx-iot-router.js';
 import { subscriptionsRouter } from './routes/subscriptions.js';
 import { CallbackDispatcher } from './routes/subscription-dispatcher.js';
 import { oauthRouter } from './routes/oauth-router.js';
@@ -58,6 +61,46 @@ const HTTP_TITLES = {
     504: 'Gateway Timeout',
     505: 'HTTP Version Not Supported',
 };
+
+// ── GET /.well-known/knx Handler ──────────────────────────────────────────────
+//
+// Spec §/.well-known/knx:
+//  - NO JSON:API format - own schema: api / supportedversions / links / context
+//  - Content-Type: application/json (not application/vnd.api+json)
+//  - security: [] - no bearer token required
+//  - URL must NOT include an API base path (so /.well-known/knx, not /api/v1/...)
+//
+function wellKnownKnxHandler() {
+    return async (req, res) => {
+        // Spec requires application/json (not vnd.api+json)
+        res.setHeader('Content-Type', 'application/json');
+
+        res.json({
+            api: {
+                version: '2.1.0',
+                base:    '/api/v1',
+            },
+            supportedversions: [],
+            links: [
+                { href: '/installations', contenttype: 'application/vnd.api+json',                        rel: 'installations'  },
+                { href: '/node',          contenttype: 'application/vnd.api+json',                        rel: 'node',
+                    typedescription: `${KNX_SCHEMA_LINK}/work_in_progress?visualisation=swagger#/information/getNode` },
+                { href: '/datapoints',    contenttype: 'application/vnd.api+json',                        rel: 'datapoints'     },
+                { href: '/devices',       contenttype: 'application/vnd.api+json',                        rel: 'devices'        },
+                { href: '/functions',     contenttype: 'application/vnd.api+json',                        rel: 'functions'      },
+                { href: '/locations',     contenttype: 'application/vnd.api+json',                        rel: 'locations'      },
+                { href: '/sites',         contenttype: 'application/vnd.api+json',                        rel: 'sites'          },
+                { href: '/subscriptions', contenttype: 'application/vnd.api+json',                        rel: 'subscriptions'  },
+            ],
+            context: [
+                { prefix: 'knx', iri: 'http://schema.knx.org/2020/ontology/knx#' },
+                { prefix: 'loc', iri: 'http://schema.knx.org/2020/ontology/loc#' },
+                { prefix: 'dpa', iri: 'http://schema.knx.org/2020/ontology/dpa#' },
+                { prefix: 'tag', iri: 'http://schema.knx.org/2020/ontology/tag#' },
+            ],
+        });
+    };
+}
 
 export class RestAPI {
     constructor(stateEngine, db, semanticEngine = null, tunnelManager) {
@@ -293,10 +336,13 @@ export class RestAPI {
         this.app.use('/api/v1/events', eventsRouter(this.stateEngine, this.db));
         this.app.use('/api/v1/semantic', semanticRouter(this.semanticEngine));
         // API v1 KNX IoT routes
-        this.app.use('/api/v1', knxIotRouter(this.semanticEngine, this.stateEngine));
         this.app.use('/api/v1/datapoints', datapointsRouter(this.stateEngine, this.tunnelManager));
+        this.app.use('/api/v1/functions', functionsRouter(this.semanticEngine));
         this.app.use('/api/v1/devices', devicesRouter(this.semanticEngine));
         this.app.use('/api/v1/locations', locationsRouter(this.semanticEngine));
+        this.app.use('/api/v1/installations', installationsRouter());
+        this.app.use('/api/v1/node', nodeRouter(this.stateEngine));
+        this.app.use('/api/v1/sites', sitesRouter(this.semanticEngine));
         this.app.use('/api/v1/subscriptions', subscriptionsRouter(this.subscriptionStore, this.stateEngine));
 
         // ── 404 handler ───────────────────────────────────────────────────────

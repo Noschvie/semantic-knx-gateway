@@ -89,27 +89,24 @@ export function toDeviceResource(dev) {
  */
 export function toFunctionResource(fn) {
     const uuid = stableUuid(fn.id ?? fn.uri ?? '');
-
-    // Build datapoint relationship links for each linked group address
-    const groupAddressLinks = (fn.groupAddressUris ?? []).map(gaUri => ({
-        id:   stableUuid(gaUri),
-        type: 'datapoint',
-    }));
-
     return {
         id:   uuid,
         type: 'function',
         attributes: { title: fn.name ?? '' },
         meta: {
-            '@type':     ['knx:function'],
-            internalId:  fn.id,
-            uri:         fn.uri,
+            // Vendor extensions (allowed by spec, not standardized)
+            '@type':           ['knx:function'],
+            internalId:        fn.id,
+            uri:               fn.uri,
             groupAddressCount: fn.groupAddressUris?.length ?? fn.groupAddressCount ?? 0,
         },
         relationships: {
-            datapoints: groupAddressLinks.length > 0
-                ? { data: groupAddressLinks }
-                : { links: { related: `/api/v1/datapoints?filter[functionId]=${uuid}` } },
+            // Spec: relationship name is "functionDatapoints", link to sub-endpoint
+            functionDatapoints: {
+                links: {
+                    related: `/api/v1/functions/${uuid}/datapoints`,
+                },
+            },
         },
     };
 }
