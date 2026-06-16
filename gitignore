@@ -23,3 +23,6 @@ Thumbs.db
 .idea/
 *.swp
 *.swo
+
+# IntelliJ / JetBrains IDE
+.idea/
