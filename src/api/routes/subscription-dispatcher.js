@@ -19,8 +19,7 @@ export class CallbackDispatcher {
     #telegramHandler = null;
     // Active listeners: datapointId → handler function
     // Required for clean unsubscribe on stop()
-    // eslint-disable-next-line no-unused-private-class-members
-    #listeners       = new Map();
+    #listeners = new Map();
 
     constructor(stateEngine, subscriptionStore) {
         this.logger      = createLogger('CallbackDispatcher');
@@ -52,6 +51,13 @@ export class CallbackDispatcher {
             this.stateEngine.unsubscribe('telegram', this.#telegramHandler);
             this.#telegramHandler = null;
         }
+
+        // Defensive cleanup in case per-datapoint listeners are used again.
+        for (const [datapointId, handler] of this.#listeners) {
+            this.stateEngine.unsubscribe(`datapoint:${datapointId}`, handler);
+        }
+        this.#listeners.clear();
+
         this.logger.info('CallbackDispatcher stopped');
     }
 
@@ -277,9 +283,8 @@ export class CallbackDispatcher {
 
         if (secret) {
             const parsedUrl     = new URL(callbackUrl);
-            const requestLine   = `POST ${parsedUrl.pathname}${parsedUrl.search} HTTP/1.1\r\n`;
-            const signingString = requestLine
-            const signature = createHmac('sha256', secret)
+            const signingString = `POST ${parsedUrl.pathname}${parsedUrl.search} HTTP/1.1\r\n`
+                + parsedUrl.host   // Host
                 + date             // Date
                 + contentLength    // Content-Length
                 + body;            // Message body
@@ -287,8 +292,6 @@ export class CallbackDispatcher {
             headers['X-Callback-Signature'] = createHmac('sha256', secret)
                 .update(signingString)
                 .digest('base64');  // base64, not hex (per spec)
-
-            headers['X-Callback-Signature'] = signature;
         }
 
         return headers;
