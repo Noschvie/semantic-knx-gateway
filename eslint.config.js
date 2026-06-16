@@ -21,6 +21,8 @@ export default [
             'object-curly-spacing': ['error', 'always'],
             'space-before-function-paren': ['error', 'never'],
             'eol-last': ['error', 'always'],
+            'no-unused-vars': ['error', { varsIgnorePattern: '^_', argsIgnorePattern: '^_' }],
+            'no-unused-private-class-members': ['error', { allowUnusedMembersStartingWithUnderscore: true }],
         },
     },
 ];
