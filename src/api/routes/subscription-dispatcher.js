@@ -218,7 +218,7 @@ export class CallbackDispatcher {
      *     {
      *       "id":    "<datapointId>",
      *       "type":  "datapoint",
-     *       "links": { "self": "/api/v1/datapoints/<id>" },
+     *       "links": { "self": "/api/v2/datapoints/<id>" },
      *       "attributes": {
      *         "value":     "1",
      *         "timestamp": "2026-05-29T10:00:00Z"
