@@ -94,7 +94,7 @@ end
 # Resolves a KNX group address to {uuid, datapointId, name, ga, dpt}.
 def fetch_dp_by_ga(ga, token)
     var cl = webclient()
-    var url = CFG_API_URL + "/api/v1/datapoints?filter%5Bga%5D=" + ga
+    var url = CFG_API_URL + "/api/v2/datapoints?filter%5Bga%5D=" + ga
     cl.begin(url)
     cl.add_header("Authorization", "Bearer " + token)
     var code = cl.GET()
@@ -140,7 +140,7 @@ def create_subscription(dp_uuid, callback_url, token)
         },
     }
     var cl = webclient()
-    cl.begin(CFG_API_URL + "/api/v1/subscriptions")
+    cl.begin(CFG_API_URL + "/api/v2/subscriptions")
     cl.add_header("Authorization", "Bearer " + token)
     cl.add_header("Content-Type", "application/json")
     var code = cl.POST(json.dump(body))
@@ -167,7 +167,7 @@ def renew_subscription()
         },
     }
     var cl = webclient()
-    cl.begin(CFG_API_URL + "/api/v1/subscriptions/" + _subscription_id)
+    cl.begin(CFG_API_URL + "/api/v2/subscriptions/" + _subscription_id)
     cl.add_header("Authorization", "Bearer " + _manage_token)
     cl.add_header("Content-Type", "application/json")
     var code = cl.PATCH(json.dump(body))
@@ -187,7 +187,7 @@ def delete_subscription()
     var sid = _subscription_id
     _subscription_id = nil
     var cl = webclient()
-    cl.begin(CFG_API_URL + "/api/v1/subscriptions/" + sid)
+    cl.begin(CFG_API_URL + "/api/v2/subscriptions/" + sid)
     cl.add_header("Authorization", "Bearer " + _manage_token)
     var code = cl.DELETE()
     if code == 200 || code == 204 || code == 404
