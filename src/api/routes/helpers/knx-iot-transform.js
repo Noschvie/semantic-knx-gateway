@@ -94,18 +94,18 @@ export function toFunctionResource(fn) {
         type: 'function',
         attributes: { title: fn.name ?? '' },
         meta: {
-            // Vendor extensions (allowed by spec, not standardized)
             '@type':           ['knx:function'],
             internalId:        fn.id,
             uri:               fn.uri,
             groupAddressCount: fn.groupAddressUris?.length ?? fn.groupAddressCount ?? 0,
         },
         relationships: {
-            // Spec: relationship name is "functionDatapoints", link to sub-endpoint
+            // Spec §FunctionCollection: both functionLocation and functionDatapoints required
+            functionLocation: {
+                links: { related: `/api/v1/functions/${uuid}/location` },
+            },
             functionDatapoints: {
-                links: {
-                    related: `/api/v1/functions/${uuid}/datapoints`,
-                },
+                links: { related: `/api/v1/functions/${uuid}/datapoints` },
             },
         },
     };
