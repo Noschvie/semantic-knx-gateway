@@ -8,7 +8,7 @@ import { bearer } from '../middleware/oauth-bearer.js';
 // ── Vendor-Extension: Semantic Engine Endpoints ───────────────────────────────
 // These endpoints are NOT defined in the KNX IoT spec.
 // They return proprietary response formats for internal/debug purposes.
-// Registered under /api/v1/semantic/...
+// Registered under /api/v2/semantic/...
 
 export function semanticRouter(semanticEngine) {
     const router = Router();
@@ -23,7 +23,7 @@ export function semanticRouter(semanticEngine) {
         return router;
     }
 
-    // GET /api/v1/semantic/locations - location hierarchy (proprietary)
+    // GET /api/v2/semantic/locations - location hierarchy (proprietary)
     router.get('/locations', bearer('read'), async(req, res) => {
         try {
             const hierarchy = await semanticEngine.getLocationHierarchy();
@@ -33,7 +33,7 @@ export function semanticRouter(semanticEngine) {
         }
     });
 
-    // GET /api/v1/semantic/locations/hierarchy - alias
+    // GET /api/v2/semantic/locations/hierarchy - alias
     router.get('/locations/hierarchy', bearer('read'), async(req, res) => {
         try {
             const hierarchy = await semanticEngine.getLocationHierarchy();
@@ -43,7 +43,7 @@ export function semanticRouter(semanticEngine) {
         }
     });
 
-    // GET /api/v1/semantic/locations/:id - single location (proprietary)
+    // GET /api/v2/semantic/locations/:id - single location (proprietary)
     router.get('/locations/:id', bearer('read'), async(req, res) => {
         try {
             const location = await semanticEngine.getLocation(req.params.id);
@@ -54,7 +54,7 @@ export function semanticRouter(semanticEngine) {
         }
     });
 
-    // GET /api/v1/semantic/devices - all devices (proprietary)
+    // GET /api/v2/semantic/devices - all devices (proprietary)
     router.get('/devices', bearer('read'), async(req, res) => {
         try {
             const devices = await semanticEngine.getAllDevices();
@@ -64,7 +64,7 @@ export function semanticRouter(semanticEngine) {
         }
     });
 
-    // GET /api/v1/semantic/devices/:id - device details (proprietary)
+    // GET /api/v2/semantic/devices/:id - device details (proprietary)
     router.get('/devices/:id', bearer('read'), async(req, res) => {
         try {
             const device = await semanticEngine.getDeviceDetails(req.params.id);
@@ -75,7 +75,7 @@ export function semanticRouter(semanticEngine) {
         }
     });
 
-    // GET /api/v1/semantic/functions - all functions (proprietary)
+    // GET /api/v2/semantic/functions - all functions (proprietary)
     router.get('/functions', bearer('read'), async(req, res) => {
         try {
             const functions = await semanticEngine.getAllApplicationFunctions();
@@ -85,7 +85,7 @@ export function semanticRouter(semanticEngine) {
         }
     });
 
-    // GET /api/v1/semantic/datapoints/:id - datapoint semantic info (proprietary)
+    // GET /api/v2/semantic/datapoints/:id - datapoint semantic info (proprietary)
     router.get('/datapoints/:id', bearer('read'), async(req, res) => {
         try {
             const info = await semanticEngine.getDatapointInfo(req.params.id);
@@ -96,7 +96,7 @@ export function semanticRouter(semanticEngine) {
         }
     });
 
-    // GET /api/v1/semantic/search?q=... - free-text search (proprietary)
+    // GET /api/v2/semantic/search?q=... - free-text search (proprietary)
     router.get('/search', bearer('read'), async(req, res) => {
         try {
             const { q } = req.query;

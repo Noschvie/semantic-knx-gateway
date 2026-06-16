@@ -89,7 +89,7 @@ async function findLocation(semanticEngine, id) {
 export function locationsRouter(semanticEngine) {
     const router = Router();
 
-    // ── GET /api/v1/locations ─────────────────────────────────────────────
+    // ── GET /api/v2/locations ─────────────────────────────────────────────
     // Spec-Parameter: page[number], page[size], typeFilter, tagFilter, attributeFilter
     router.get('/', bearer('read'), async(req, res) => {
         try {
@@ -110,7 +110,7 @@ export function locationsRouter(semanticEngine) {
         }
     });
 
-    // ── GET /api/v1/locations/:id ─────────────────────────────────────────
+    // ── GET /api/v2/locations/:id ─────────────────────────────────────────
     router.get('/:id', bearer('read'), async(req, res) => {
         try {
             const { loc } = await findLocation(semanticEngine, req.params.id);
@@ -125,7 +125,7 @@ export function locationsRouter(semanticEngine) {
         }
     });
 
-    // ── GET /api/v1/locations/:id/parentlocation ──────────────────────────
+    // ── GET /api/v2/locations/:id/parentlocation ──────────────────────────
     // Spec: data MAY be null when no parent location exists
     router.get('/:id/parentlocation', bearer('read'), async(req, res) => {
         try {
@@ -147,7 +147,7 @@ export function locationsRouter(semanticEngine) {
         }
     });
 
-    // ── GET /api/v1/locations/:id/childlocations ──────────────────────────
+    // ── GET /api/v2/locations/:id/childlocations ──────────────────────────
     // Spec: only directly subordinate locations (no recursive traversal)
     // Spec-Parameter: page[number], page[size], typeFilter, tagFilter, attributeFilter
     router.get('/:id/childlocations', bearer('read'), async(req, res) => {
@@ -175,7 +175,7 @@ export function locationsRouter(semanticEngine) {
         }
     });
 
-    // ── GET /api/v1/locations/:id/devices ─────────────────────────────────
+    // ── GET /api/v2/locations/:id/devices ─────────────────────────────────
     // Spec-Parameter: page[number], page[size], typeFilter, tagFilter, attributeFilter
     router.get('/:id/devices', bearer('read'), async(req, res) => {
         try {

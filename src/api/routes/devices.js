@@ -138,7 +138,7 @@ function applyAllFilters(resources, filters) {
 export function devicesRouter(semanticEngine) {
     const router = Router();
 
-    // GET /api/v1/devices
+    // GET /api/v2/devices
     router.get('/', bearer('read'), async(req, res) => {
         try {
             const rawNumber = req.query['page[number]'] ?? req.query.page?.number;
@@ -162,7 +162,7 @@ export function devicesRouter(semanticEngine) {
         }
     });
 
-    // GET /api/v1/devices/:id
+    // GET /api/v2/devices/:id
     router.get('/:id', bearer('read'), async(req, res) => {
         try {
             const { id } = req.params;

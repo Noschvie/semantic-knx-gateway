@@ -224,7 +224,7 @@ async function writeDatapointValue(uuid, value, stateEngine, tunnelManager) {
 export function datapointsRouter(stateEngine, tunnelManager) {
     const router = Router();
 
-    // ── GET /api/v1/datapoints ────────────────────────────────────────────
+    // ── GET /api/v2/datapoints ────────────────────────────────────────────
     // Spec parameters: page[number], page[size], typeFilter, tagFilter,
     //                  attributeFilter, timeFilter
     // Vendor extensions: filter[deviceId], filter[locationId], filter[ga],
@@ -296,7 +296,7 @@ export function datapointsRouter(stateEngine, tunnelManager) {
         }
     });
 
-    // ── GET /api/v1/datapoints/values (must come BEFORE /:id!) ───────────
+    // ── GET /api/v2/datapoints/values (must come BEFORE /:id!) ───────────
     // Not in Spec as GET – vendor extension for bulk-read
     router.get('/values', bearer('read'), async(req, res) => {
         try {
@@ -310,7 +310,7 @@ export function datapointsRouter(stateEngine, tunnelManager) {
         }
     });
 
-    // ── PUT /api/v1/datapoints/by-ga ──────────────────────────────────────
+    // ── PUT /api/v2/datapoints/by-ga ──────────────────────────────────────
     // Vendor extension: write value by group address.
     // GA is passed via data.meta.ga (JSON:API-compliant: meta for
     // non-standard fields, no id required since GA-lookup).
@@ -360,7 +360,7 @@ export function datapointsRouter(stateEngine, tunnelManager) {
         return res.status(200).json({ data: result.data });
     });
 
-    // ── GET /api/v1/datapoints/:id/timeseries ─────────────────────────────
+    // ── GET /api/v2/datapoints/:id/timeseries ─────────────────────────────
     // Spec parameters: page[number], page[size], filter[timestamp][ge/le/gt/lt]
     router.get('/:id/timeseries', bearer('read'), async(req, res) => {
         try {
@@ -403,7 +403,7 @@ export function datapointsRouter(stateEngine, tunnelManager) {
         }
     });
 
-    // ── GET /api/v1/datapoints/:id ────────────────────────────────────────
+    // ── GET /api/v2/datapoints/:id ────────────────────────────────────────
     router.get('/:id', bearer('read'), async(req, res) => {
         try {
             const { id } = req.params;
@@ -423,7 +423,7 @@ export function datapointsRouter(stateEngine, tunnelManager) {
         }
     });
 
-    // ── GET /api/v1/datapoints/:id/history ───────────────────────────────
+    // ── GET /api/v2/datapoints/:id/history ───────────────────────────────
     // Vendor extension (not in Spec) – proprietary format for internal use.
     // Supports startTime/endTime as convenience aliases for filter[timestamp].
     router.get('/:id/history', bearer('read'), async(req, res) => {
@@ -445,7 +445,7 @@ export function datapointsRouter(stateEngine, tunnelManager) {
         }
     });
 
-    // ── PUT /api/v1/datapoints/values ─────────────────────────────────────
+    // ── PUT /api/v2/datapoints/values ─────────────────────────────────────
     // Spec §/datapoints/values – bulk write, responds with 204 No Content
     router.put('/values', bearer('write'), async(req, res) => {
         const body = req.body;
@@ -471,7 +471,7 @@ export function datapointsRouter(stateEngine, tunnelManager) {
         return res.status(204).end();
     });
 
-    // ── PUT /api/v1/datapoints ────────────────────────────────────────────
+    // ── PUT /api/v2/datapoints ────────────────────────────────────────────
     // Vendor extension: single datapoint write via JSON:API body
     router.put('/', bearer('write'), async(req, res) => {
         const body = req.body;

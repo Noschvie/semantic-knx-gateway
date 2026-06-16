@@ -8,7 +8,7 @@ import { bearer } from '../middleware/oauth-bearer.js';
 
 // ── Vendor-Extension: Stats Endpoints ────────────────────────────────────────
 // These endpoints are NOT defined in the KNX IoT spec.
-// Registered under /api/v1/stats/...
+// Registered under /api/v2/stats/...
 
 function parseHours(raw, defaultVal = 24, max = 8760) {
     const n = parseInt(raw);
@@ -23,7 +23,7 @@ function parseLimit(raw, defaultVal = 20, max = 1000) {
 export function statsRouter(stateEngine, db) {
     const router = Router();
 
-    // GET /api/v1/stats - Database statistics
+    // GET /api/v2/stats - Database statistics
     router.get('/', bearer('read'), async(req, res) => {
         try {
             // Count records in all tables
@@ -89,7 +89,7 @@ export function statsRouter(stateEngine, db) {
         }
     });
 
-    // GET /api/v1/stats/events - Event statistics
+    // GET /api/v2/stats/events - Event statistics
     router.get('/events', bearer('read'), async(req, res) => {
         try {
             const hours = parseHours(req.query.hours);
@@ -141,7 +141,7 @@ export function statsRouter(stateEngine, db) {
         }
     });
 
-    // GET /api/v1/stats/states - Current state statistics
+    // GET /api/v2/stats/states - Current state statistics
     router.get('/states', bearer('read'), async(req, res) => {
         try {
             const stats = await db.query(`
@@ -180,7 +180,7 @@ export function statsRouter(stateEngine, db) {
         }
     });
 
-    // GET /api/v1/stats/top-active - Most active datapoints
+    // GET /api/v2/stats/top-active - Most active datapoints
     router.get('/top-active', bearer('read'), async(req, res) => {
         try {
             const hours = parseHours(req.query.hours);
