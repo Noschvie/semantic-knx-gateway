@@ -1,4 +1,4 @@
-# Python Setup – KNX Bus Logger
+﻿# Python Setup – KNX Bus Logger
 
 ## Virtual Environment and Connectivity Tests
 
@@ -12,7 +12,7 @@ install the required dependencies, and verify communication with a KNX/IP interf
 - Debian Trixie
 - Python 3.13
 - Network access to the KNX/IP interface
-- KNXnet/IP tunneling enabled on the interface
+- KNXnet/IP tunnelling enabled on the interface
 
 ---
 
@@ -145,7 +145,7 @@ python test-knx-switch_on.py
 
 ## Summary
 
-After completing these steps you will have:
+After completing these steps, you will have:
 
 - A dedicated Python virtual environment for the project
 - The `xknx` library installed and verified

@@ -25,8 +25,9 @@ import httpserver
 import json
 import string
 
-# ── Configuration ──────────────────────────────────────────────────────────────
+# ── Configuration ─────────────────────────────────────────────────────────────
 var CFG_API_URL        = "http://knx-runtime-engine.example.org
+var CFG_API_BASE       = "/api/v2"
 var CFG_OAUTH_ID       = "knx-default-client"
 var CFG_OAUTH_SECRET   = "change-me-in-production"
 var CFG_GROUP_ADDRESS  = "1/1/114"
@@ -36,14 +37,14 @@ var CFG_CALLBACK_PATH  = "/knx_cov"       # endpoint we register
 var CFG_LIFETIME_MIN   = 5                # subscription lifetime in minutes
 var CFG_INACTIVITY_S   = 60               # shutdown after X seconds without notification
 
-# ── State ──────────────────────────────────────────────────────────────────────
+# ── State ─────────────────────────────────────────────────────────────────────
 var _manage_token    = nil
 var _read_token      = nil
 var _subscription_id = nil
 var _dp_name         = nil
 var _inactivity_ms   = 0  # millis() value of last event; 0 = not yet started
 
-# ── Helpers ────────────────────────────────────────────────────────────────────
+# ── Helpers ───────────────────────────────────────────────────────────────────
 
 def ts()
     # Timestamp string for logging
@@ -62,7 +63,7 @@ def reset_inactivity()
     _inactivity_ms = tasmota.millis()
 end
 
-# ── OAuth ──────────────────────────────────────────────────────────────────────
+# ── OAuth ─────────────────────────────────────────────────────────────────────
 
 # Fetches an OAuth token synchronously via webclient.
 # Returns the token string or nil on error.
@@ -89,12 +90,12 @@ def get_token(scope)
     return data["access_token"]
 end
 
-# ── Datapoint Lookup ───────────────────────────────────────────────────────────
+# ── Datapoint Lookup ──────────────────────────────────────────────────────────
 
 # Resolves a KNX group address to {uuid, datapointId, name, ga, dpt}.
 def fetch_dp_by_ga(ga, token)
     var cl = webclient()
-    var url = CFG_API_URL + "/api/v1/datapoints?filter%5Bga%5D=" + ga
+    var url = CFG_API_URL + CFG_API_BASE + "/datapoints?filter%5Bga%5D=" + ga
     cl.begin(url)
     cl.add_header("Authorization", "Bearer " + token)
     var code = cl.GET()
@@ -121,7 +122,7 @@ def fetch_dp_by_ga(ga, token)
     }
 end
 
-# ── Subscription Management ────────────────────────────────────────────────────
+# ── Subscription Management ───────────────────────────────────────────────────
 
 def create_subscription(dp_uuid, callback_url, token)
     var body = {
@@ -140,7 +141,7 @@ def create_subscription(dp_uuid, callback_url, token)
         },
     }
     var cl = webclient()
-    cl.begin(CFG_API_URL + "/api/v1/subscriptions")
+    cl.begin(CFG_API_URL + CFG_API_BASE + "/subscriptions")
     cl.add_header("Authorization", "Bearer " + token)
     cl.add_header("Content-Type", "application/json")
     var code = cl.POST(json.dump(body))
@@ -167,7 +168,7 @@ def renew_subscription()
         },
     }
     var cl = webclient()
-    cl.begin(CFG_API_URL + "/api/v1/subscriptions/" + _subscription_id)
+    cl.begin(CFG_API_URL + CFG_API_BASE + "/subscriptions/" + _subscription_id)
     cl.add_header("Authorization", "Bearer " + _manage_token)
     cl.add_header("Content-Type", "application/json")
     var code = cl.PATCH(json.dump(body))
@@ -187,7 +188,7 @@ def delete_subscription()
     var sid = _subscription_id
     _subscription_id = nil
     var cl = webclient()
-    cl.begin(CFG_API_URL + "/api/v1/subscriptions/" + sid)
+    cl.begin(CFG_API_URL + CFG_API_BASE + "/subscriptions/" + sid)
     cl.add_header("Authorization", "Bearer " + _manage_token)
     var code = cl.DELETE()
     if code == 200 || code == 204 || code == 404
@@ -198,7 +199,7 @@ def delete_subscription()
     cl.close()
 end
 
-# ── Notification Handler ───────────────────────────────────────────────────────
+# ── Notification Handler ──────────────────────────────────────────────────────
 
 # Called by the httpserver handler with the parsed JSON body.
 def handle_notification(body)
@@ -234,7 +235,7 @@ def handle_notification(body)
     end
 end
 
-# ── webserver Endpoint ─────────────────────────────────────────────────────────
+# ── webserver Endpoint ────────────────────────────────────────────────────────
 
 def register_callback_endpoint()
     httpserver.on(CFG_CALLBACK_PATH,
@@ -262,7 +263,7 @@ def register_callback_endpoint()
     print(f"[{ts()}] HTTP callback registered: POST http://{CFG_CALLBACK_HOST}:{CFG_CALLBACK_PORT}{CFG_CALLBACK_PATH}")
 end
 
-# ── Stop ───────────────────────────────────────────────────────────────────────
+# ── Stop ──────────────────────────────────────────────────────────────────────
 
 def stop_knx_subscription()
     print(f"[{ts()}] Stopping KNX subscription...")
@@ -271,7 +272,7 @@ def stop_knx_subscription()
     print(f"[{ts()}] Done.")
 end
 
-# ── Inactivity Check ───────────────────────────────────────────────────────────
+# ── Inactivity Check ──────────────────────────────────────────────────────────
 
 def check_inactivity()
     if _inactivity_ms == 0 return end  # not yet started
@@ -284,7 +285,7 @@ def check_inactivity()
     tasmota.set_timer(5000, check_inactivity)
 end
 
-# ── Start ──────────────────────────────────────────────────────────────────────
+# ── Start ─────────────────────────────────────────────────────────────────────
 
 def start_knx_subscription()
     print("── Starting KNX Subscription ─────────────────────────")
@@ -335,7 +336,7 @@ def start_knx_subscription()
     tasmota.set_timer(interval_ms, renew_subscription)
 end
 
-# ── Autostart ──────────────────────────────────────────────────────────────────
+# ── Autostart ─────────────────────────────────────────────────────────────────
 # Starts automatically on load.
 # Manual start : start_knx_subscription()
 # Manual stop  : stop_knx_subscription()
