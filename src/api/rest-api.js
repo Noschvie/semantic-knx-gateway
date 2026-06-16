@@ -25,6 +25,7 @@ import { MessagingWebSocketServer } from './routes/messaging-websocket-server.js
 
 // ── KNX IoT Spec §Errors – JSON:API error shape (./schemas/Errors.json) ──────
 const KNX_SCHEMA_LINK = 'https://schema.knx.org/2020/api';
+const API_BASE = '/api/v2';
 
 /**
  * Build a spec-compliant JSON:API error body.
@@ -71,7 +72,7 @@ function wellKnownKnxHandler() {
         res.json({
             api: {
                 version: '2.1.0',
-                base:    '/api/v1',
+                base: API_BASE,
             },
             supportedversions: [],
             links: [
@@ -165,9 +166,10 @@ export class RestAPI {
 
                 const allowJsonFallbackForDatapointValues =
                     req.method === 'PUT' &&
-                    req.path === '/api/v1/datapoints/values';
+                    req.path === `${API_BASE}/datapoints/values`;
+
                 const allowJsonFallbackForSubscriptions =
-                    req.path.startsWith('/api/v1/subscriptions') &&
+                    req.path.startsWith(`${API_BASE}/subscriptions`) &&
                     (req.method === 'POST' || req.method === 'PATCH');
 
                 const allowJsonFallback =
@@ -185,8 +187,8 @@ export class RestAPI {
                             415,
                             'Unsupported Media Type',
                             'Content-Type must be application/vnd.api+json ' +
-                            '(fallback application/json allowed for PUT /api/v1/datapoints/values ' +
-                            'and POST/PATCH /api/v1/subscriptions*).'
+                            `(fallback application/json allowed for PUT ${API_BASE}/datapoints/values ` +
+                            `and POST/PATCH ${API_BASE}/subscriptions*).`
                         )
                     );
                 }
@@ -263,9 +265,7 @@ export class RestAPI {
         this.app.use('/oauth', oauthRouter());
 
         // /.well-known/knx - KNX IoT discovery endpoint (required by spec)
-        this.app.get('/.well-known/knx', wellKnownKnxHandler());
-
-        this.app.get('/api/v1/.well-known/knx/idevid', async (req, res) => {
+        this.app.get(`${API_BASE}/.well-known/knx/idevid`, async (req, res) => {
             const certPath = process.env.IDEVID_CERT_PATH;
             if (!certPath) {
                 return res.status(501)
@@ -279,7 +279,7 @@ export class RestAPI {
                 .send(cert);
         });
 
-        this.app.get('/api/v1/.well-known/knx/ldevid', certificateNotConfigured('lDevID'));
+        this.app.get(`${API_BASE}/.well-known/knx/ldevid`, certificateNotConfigured('lDevID'));
 
         // ── Health check ──────────────────────────────────────────────────────
         this.app.get('/health', (req, res) => {
@@ -303,31 +303,32 @@ export class RestAPI {
                     semanticLayer: this.semanticEngine !== null,
                     timescaleDB: true,
                     restAPI: true,
-                    websocket: true
+                    websocket: true,
                 },
                 endpoints: {
-                    stats: '/api/v1/stats',
-                    datapoints: '/api/v1/datapoints',
-                    events: '/api/v1/events',
-                    devices: '/api/v1/devices',
-                    semantic: '/api/v1/semantic',
-                    messagingWebSocket: '/messaging/ws'
-                }
+                    stats: `${API_BASE}/stats`,
+                    datapoints: `${API_BASE}/datapoints`,
+                    events: `${API_BASE}/events`,
+                    devices: `${API_BASE}/devices`,
+                    semantic: `${API_BASE}/semantic`,
+                    messagingWebSocket: '/messaging/ws',
+                },
             });
         });
 
-        this.app.use('/api/v1/stats', statsRouter(this.stateEngine, this.db));
-        this.app.use('/api/v1/events', eventsRouter(this.stateEngine, this.db));
-        this.app.use('/api/v1/semantic', semanticRouter(this.semanticEngine));
-        // API v1 KNX IoT routes
-        this.app.use('/api/v1/datapoints', datapointsRouter(this.stateEngine, this.tunnelManager));
-        this.app.use('/api/v1/functions', functionsRouter(this.semanticEngine));
-        this.app.use('/api/v1/devices', devicesRouter(this.semanticEngine));
-        this.app.use('/api/v1/locations', locationsRouter(this.semanticEngine));
-        this.app.use('/api/v1/installations', installationsRouter());
-        this.app.use('/api/v1/node', nodeRouter(this.stateEngine));
-        this.app.use('/api/v1/sites', sitesRouter(this.semanticEngine));
-        this.app.use('/api/v1/subscriptions', subscriptionsRouter(this.subscriptionStore, this.stateEngine));
+        // ── API v2 KNX IoT routes ─────────────────────────────────────────────
+        this.app.use(`${API_BASE}/datapoints`, datapointsRouter(this.stateEngine, this.tunnelManager));
+        this.app.use(`${API_BASE}/functions`, functionsRouter(this.semanticEngine));
+        this.app.use(`${API_BASE}/devices`, devicesRouter(this.semanticEngine));
+        this.app.use(`${API_BASE}/locations`, locationsRouter(this.semanticEngine));
+        this.app.use(`${API_BASE}/installations`, installationsRouter());
+        this.app.use(`${API_BASE}/node`, nodeRouter(this.stateEngine));
+        this.app.use(`${API_BASE}/sites`, sitesRouter(this.semanticEngine));
+        this.app.use(`${API_BASE}/subscriptions`, subscriptionsRouter(this.subscriptionStore, this.stateEngine));
+
+        this.app.use(`${API_BASE}/stats`, statsRouter(this.stateEngine, this.db));
+        this.app.use(`${API_BASE}/events`, eventsRouter(this.stateEngine, this.db));
+        this.app.use(`${API_BASE}/semantic`, semanticRouter(this.semanticEngine));
 
         // ── 404 handler ───────────────────────────────────────────────────────
         this.app.use((req, res) => {

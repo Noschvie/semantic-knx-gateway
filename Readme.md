@@ -121,7 +121,7 @@ The API will be available at `http://localhost:3000`.
 
 All configuration is done via the `.env` file:
 
-```env
+```ini
 # KNX/IP Interface
 KNX_IP=192.168.1.100        # IP address of your KNX/IP interface
 KNX_PORT=3671               # KNX/IP tunneling port (default: 3671)
@@ -147,26 +147,28 @@ LOG_LEVEL=info
 
 The engine implements the **KNX IoT 3rd Party API v2.1.0**. Key endpoints:
 
-```http
-GET /api/v1/devices
-GET /api/v1/datapoints
-GET /api/v1/locations
-GET /api/v1/functions
-GET /api/v1/timeseries
+```
+GET /api/v2/devices
+GET /api/v2/datapoints
+GET /api/v2/locations
+GET /api/v2/functions
+GET /api/v2/timeseries
 ```
 
-Full OpenAPI specification is served at `/api/v1/openapi.json`.
+Full OpenAPI specification is served at `/api/v2/openapi.json`.
 
 ---
 
 ## Real-time APIs
 
 **WebSocket** — subscribe to live datapoint events:
+
 ```
-ws://localhost:3000/ws
+ws://localhost:3000/messaging/ws
 ```
 
 **MQTT** — semantic topics for datapoint state:
+
 ```
 knx/location/{location-id}/{function}/state
 knx/datapoint/{datapoint-id}/state
@@ -210,15 +212,15 @@ src/
 
 ## Roadmap
 
-| Phase | Description | Status |
-|-------|-------------|--------|
-| 1 | Core Runtime — KNX tunnel, telegram processing, DPT decoding | 🔄 In Progress |
-| 2 | Semantic Engine — TTL parsing, Resource Graph, Digital Twin | 🔄 In Progress |
-| 3 | State Engine — live state cache, event processing | 🔄 In Progress |
-| 4 | TimescaleDB — event & state persistence, historization | 🔄 In Progress |
-| 5 | KNX IoT REST API — OpenAPI-compliant endpoints | 🔄 In Progress |
-| 6 | Realtime & Integration — WebSocket, Subscription API | 🔄 In Progress |
-| 7 | Extensions — Matter Bridge, CoAP, KNX IoT Point API, OAuth2 | ⏳ Future |
+| Phase | Description                                                  | Status        |
+| ----- | ------------------------------------------------------------ | ------------- |
+| 1     | Core Runtime — KNX tunnel, telegram processing, DPT decoding | 🔄 In Progress |
+| 2     | Semantic Engine — TTL parsing, Resource Graph, Digital Twin  | 🔄 In Progress |
+| 3     | State Engine — live state cache, event processing            | 🔄 In Progress |
+| 4     | TimescaleDB — event & state persistence, historization       | 🔄 In Progress |
+| 5     | KNX IoT REST API — OpenAPI-compliant endpoints               | 🔄 In Progress |
+| 6     | Realtime & Integration — WebSocket, Subscription API         | 🔄 In Progress |
+| 7     | Extensions — Matter Bridge, CoAP, KNX IoT Point API, OAuth2  | ⏳ Future      |
 
 ---
 
