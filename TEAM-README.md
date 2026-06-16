@@ -7,6 +7,7 @@ consistent developer experience across platforms.
 Checklist
 - [ ] Read the sections below on line endings and Git configuration
 - [ ] Run the recommended commands once after cloning
+- [ ] Follow the release workflow below when publishing from `development` to `main`
 
 1) Line endings (.gitattributes)
 --------------------------------
@@ -71,6 +72,78 @@ git commit -m "Add .gitattributes and normalize line endings"
   `git diff` to inspect. If necessary, re-run the renormalized steps above.
 - Ask on the team's chat or open an issue in this repository with the
   exact `git status` / `git diff` output.
+
+7) Release workflow (development -> main + tag)
+------------------------------------------------
+Use this flow when preparing a release from `development` and creating a
+version tag (example: `v2026.06.16`).
+
+PowerShell (Windows):
+```powershell
+# in repository root
+git fetch origin
+git switch development
+git pull --ff-only origin development
+
+# create/update local main and merge development
+git switch main
+git pull --ff-only origin main
+git merge --no-ff development -m "Merge branch 'development' into main"
+
+# create annotated release tag
+git tag -a vYYYY.MM.DD -m "Release vYYYY.MM.DD"
+
+# publish branch and tag
+git push origin main
+git push origin vYYYY.MM.DD
+```
+
+Quick verification:
+```bash
+git --no-pager log --oneline --decorate -n 5
+git tag
+git ls-remote --heads origin main
+git ls-remote --tags origin vYYYY.MM.DD
+```
+
+Notes:
+- If your working tree is not clean (`git status`), commit or stash first.
+- If your team requires PR-only merges, open a PR from `development` to `main`
+  and create the release tag on the resulting merge commit.
+
+8) Release template (copy/paste)
+--------------------------------
+Use this template for each release to keep communication and documentation
+consistent.
+
+Release checklist:
+- [ ] `development` is up to date and green
+- [ ] PR/Merge from `development` to `main` completed
+- [ ] Annotated tag created (`vYYYY.MM.DD`)
+- [ ] `main` and tag pushed to `origin`
+- [ ] `CHANGELOG.md` updated
+- [ ] Release notes published
+
+Release notes template:
+```markdown
+## vYYYY.MM.DD
+
+### Highlights
+- ...
+
+### Fixes
+- ...
+
+### Internal changes
+- ...
+
+### Breaking changes
+- None
+
+### Verification
+- `main` updated
+- tag `vYYYY.MM.DD` points to the release commit
+```
 
 IntelliJ IDEA (Windows) — recommended project settings
 ------------------------------------------------------
