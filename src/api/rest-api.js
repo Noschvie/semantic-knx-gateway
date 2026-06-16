@@ -65,10 +65,10 @@ const HTTP_TITLES = {
 // ── GET /.well-known/knx Handler ──────────────────────────────────────────────
 //
 // Spec §/.well-known/knx:
-//  - NO JSON:API format - own schema: api / supportedversions / links / context
-//  - Content-Type: application/json (not application/vnd.api+json)
-//  - security: [] - no bearer token required
-//  - URL must NOT include an API base path (so /.well-known/knx, not /api/v1/...)
+//   - NO JSON:API format - own schema: api / supportedversions / links / context
+//   - Content-Type: application/json (not application/vnd.api+json)
+//   - security: [] - no bearer token required
+//   - URL must NOT include an API base path (so /.well-known/knx, not /api/v2/...)
 //
 function wellKnownKnxHandler() {
     return async (req, res) => {
@@ -228,7 +228,6 @@ export class RestAPI {
             if (req.method === 'OPTIONS') {
                 return res.sendStatus(200);
             }
-
             next();
         });
 
@@ -240,18 +239,16 @@ export class RestAPI {
                 const ms = Date.now() - start;
                 const status = res.statusCode;
                 const level = status >= 500 ? 'error'
-                            : status >= 400 ? 'warn'
-                            : 'debug';
-
+                    : status >= 400 ? 'warn'
+                        : 'debug';
                 this.logger[level]({
-                    msg:    `${req.method} ${req.path} → ${status} (${ms}ms)`,
+                    msg: `${req.method} ${req.path} → ${status} (${ms}ms)`,
                     method: req.method,
-                    path:   req.path,
+                    path: req.path,
                     status,
                     ms,
                 });
             });
-
             next();
         });
     }
@@ -342,9 +339,9 @@ export class RestAPI {
         // ── 404 handler ───────────────────────────────────────────────────────
         this.app.use((req, res) => {
             this.logger.warn({
-                msg:    `${req.method} ${req.path} → 404 Not Found`,
+                msg: `${req.method} ${req.path} → 404 Not Found`,
                 method: req.method,
-                path:   req.path,
+                path: req.path,
             });
             res.status(404).json(
                 knxError(404, 'Not Found', `Endpoint ${req.path} does not exist.`)
