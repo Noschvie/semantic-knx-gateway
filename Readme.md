@@ -1,4 +1,4 @@
-﻿# Semantic KNX Runtime Engine
+# Semantic KNX Runtime Engine
 
 > ⚠️ **Status: Work in Progress — v0.1 pre-alpha**
 
@@ -227,6 +227,17 @@ src/
 - **KNX bus communication** — [KNXUltimate](https://github.com/Supergiovane/KNXUltimate) by [@Supergiovane](https://github.com/Supergiovane), a full-featured KNX/IP tunneling library for Node.js with KNX Secure support
 - **Runtime** — [Node.js](https://nodejs.org/)
 - **Time-series storage** — [TimescaleDB](https://www.timescale.com/), built on PostgreSQL
+
+---
+
+## References
+
+### KNX IoT 3rd Party API
+
+- **[KNX IoT API Server – Implementation example for KNX PoC 2.x](https://support.knx.org/hc/en-us/articles/23995369446162-KNX-IoT-API-Server-development-Implementation-example-for-KNX-PoC-2-x-version)**  
+  Official KNX Association article covering the development of a KNX IoT API Server according to KNX Standard v3.0.0 (chapter 3_10_4 KNX IoT 3rd Party API).  
+  Topics include: core concepts of the KNX IoT API Server, prerequisites for client communication (REST & WebSocket), OAuth2 authentication, and concrete Python implementation examples for REST calls and WebSocket datapoint subscriptions.  
+  Reference implementation: [KNX IoT PoC (Docker)](https://gitlab.knx.org/knxiot/kitooling/-/wikis/index/KNX-IoT-3rd-Party-API-Demos/KNX-IoT-3rd-Party-API-Local-Environment) · API spec: [Swagger v2.1.0](https://schema.knx.org/2020/api/2.1.0?visualisation=swagger)
 
 ---
 
