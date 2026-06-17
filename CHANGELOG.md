@@ -8,6 +8,29 @@ contributors and users to follow meaningful changes over time.
 Unreleased
 ----------
 
+### Added
+- `meta.hasCurrentState` flag in datapoint resources to distinguish online
+  (runtime state exists) from offline (semantic/TTL-only) datapoints.
+- Semantic datapoint mappings are now exposed via `/datapoints` collection endpoint
+  even before first KNX telegram arrives, enabling clients to discover full
+  datapoint inventory (including group addresses) without waiting for bus activity.
+
+### Changed
+- **`GET /api/v2/datapoints`** – now returns union of semantic (ETS/TTL-defined)
+  and runtime datapoints instead of runtime-only. Offline datapoints appear with
+  `value: null`, `timestamp: null`, and `hasCurrentState: false`.
+- **`GET /api/v2/datapoints/{id}`** – now searches semantic + runtime union,
+  so offline/semantic-only datapoints return data instead of 404.
+- **`GET /api/v2/datapoints/{id}/timeseries`** – now searches semantic + runtime
+  union; offline datapoints return empty history list (not 404). Only datapoints
+  with `hasCurrentState: true` generate history entries.
+- **Filter behavior** (`filter[ga]`, `filter[datapointId]`, `filter[locationId]`,
+  `filter[deviceId]`) now matches semantic datapoints as well, enabling discovery
+  of offline sensors by group address or location.
+- Datapoints without runtime state display `attributes.value: null`,
+  `attributes.timestamp: null` per spec-compliance; spec-enabled clients can
+  distinguish via `meta.hasCurrentState: false`.
+
 2026-06-16
 ----------
 
