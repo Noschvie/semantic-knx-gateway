@@ -4,6 +4,7 @@
 
 import { Router } from 'express';
 import { bearer } from '../middleware/oauth-bearer.js';
+import { DPT_NAME_MAP } from '../../utils/dpt-map.js';
 import { paginate, stableUuid } from './helpers/knx-iot-uuid.js';
 import { toDatapointResource } from './helpers/knx-iot-transform.js';
 import { decodeValueForKnx, toSpecValue } from './helpers/knx-iot-dpt.js';
@@ -125,6 +126,12 @@ function applyTimeFilters(entries, filters) {
 
 // ── KNX Datapoint Helper ──────────────────────────────────────────────────────────
 
+function normalizeDpt(inputDpt) {
+    if (!inputDpt) return null;
+    if (/^\d+\.\d+$/.test(inputDpt)) return inputDpt; // already numeric
+    return DPT_NAME_MAP[inputDpt] || null;
+}
+
 function getDatapointUnionKey(item) {
     const datapointId = item?.datapointId ?? item?.datapoint_id;
     if (datapointId) return `id:${datapointId}`;
@@ -226,9 +233,20 @@ async function writeDatapointValue(uuid, value, stateEngine, tunnelManager) {
         };
     }
 
+    const resolvedDpt = normalizeDpt(dpt);
+    if (!resolvedDpt) {
+        return res.status(400).json({
+            errors: [{
+                title: 'Bad Request',
+                status: '400',
+                detail: `Unknown or unsupported DPT: ${dpt}`
+            }]
+        });
+    }
+
     let nativeValue;
     try {
-        nativeValue = decodeValueForKnx(valueStr, dpt);
+        nativeValue = decodeValueForKnx(valueStr, resolvedDpt);
     } catch (err) {
         return {
             error: {
@@ -248,7 +266,7 @@ async function writeDatapointValue(uuid, value, stateEngine, tunnelManager) {
     }
 
     try {
-        await tunnelManager.write(ga, nativeValue, dpt);
+        await tunnelManager.write(ga, nativeValue, resolvedDpt);
     } catch (err) {
         return {
             error: {
