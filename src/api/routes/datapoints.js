@@ -149,6 +149,11 @@ async function getDatapointMappings(stateEngine) {
     }
 }
 
+async function getDatapointMappingByUuid(uuid, stateEngine) {
+    const mappings = await getDatapointMappings(stateEngine);
+    return mappings.find(m => stableUuid(m.datapointId) === uuid) ?? null;
+}
+
 function toDatapointResourceWithStateMeta(state) {
     const resource = toDatapointResource(state);
 
@@ -181,57 +186,101 @@ async function writeDatapointValue(uuid, value, stateEngine, tunnelManager) {
     const valueStr = normalizeIncomingValue(value);
 
     const allStates = await stateEngine.getAllStates().catch(() => []);
-    const state = allStates.find(s => stableUuid(s.datapointId) === uuid);
+    const currentState = allStates.find(s => stableUuid(s.datapointId) === uuid) ?? null;
+    const mapping = await getDatapointMappingByUuid(uuid, stateEngine);
 
-    if (!state) {
-        return { error: { status: 404, payload: knxError(404, 'Not Found', `Datapoint with id "${uuid}" not found`) } };
+    // If neither a current state nor a mapping exists, > a true 404 error
+    if (!currentState && !mapping) {
+        return {
+            error: {
+                status: 404,
+                payload: knxError(404, 'Not Found', `Datapoint with id "${uuid}" not found`),
+            },
+        };
     }
 
-    if (state.writable === false) {
-        return { error: { status: 403, payload: knxError(403, 'Forbidden', `Datapoint "${state.name ?? state.ga}" is not writable`) } };
+    // Assemble writing context from state + mapping
+    const datapointId = currentState?.datapointId ?? mapping?.datapointId;
+    const ga = currentState?.ga ?? mapping?.ga;
+    const dpt = currentState?.dpt ?? mapping?.dpt;
+    const name = currentState?.name ?? mapping?.name ?? ga;
+
+    // Only strictly prohibit writable if explicitly false.
+    const writable = currentState?.writable;
+    if (writable === false) {
+        return {
+            error: {
+                status: 403,
+                payload: knxError(403, 'Forbidden', `Datapoint "${name}" is not writable`),
+            },
+        };
+    }
+
+    // KNX write is not possible without GA/DPT
+    if (!ga || !dpt || !datapointId) {
+        return {
+            error: {
+                status: 422,
+                payload: knxError(422, 'Unprocessable Entity', `Missing datapoint metadata for "${uuid}" (ga/dpt/datapointId)`),
+            },
+        };
     }
 
     let nativeValue;
     try {
-        nativeValue = decodeValueForKnx(valueStr, state.dpt);
+        nativeValue = decodeValueForKnx(valueStr, dpt);
     } catch (err) {
-        return { error: { status: 422, payload: knxError(422, 'Unprocessable Entity', err.message) } };
+        return {
+            error: {
+                status: 422,
+                payload: knxError(422, 'Unprocessable Entity', err.message),
+            },
+        };
     }
 
     if (!tunnelManager) {
-        return { error: { status: 503, payload: knxError(503, 'Service Unavailable', 'No KNX connection') } };
+        return {
+            error: {
+                status: 503,
+                payload: knxError(503, 'Service Unavailable', 'No KNX connection'),
+            },
+        };
     }
 
     try {
-        await tunnelManager.write(state.ga, nativeValue, state.dpt);
+        await tunnelManager.write(ga, nativeValue, dpt);
     } catch (err) {
-        return { error: { status: 502, payload: knxError(502, 'Bad Gateway', err.message) } };
+        return {
+            error: {
+                status: 502,
+                payload: knxError(502, 'Bad Gateway', err.message),
+            },
+        };
     }
 
     const timestamp = new Date();
     try {
-        await stateEngine.updateState(state.datapointId, {
-            ga:        state.ga,
-            value:     nativeValue,
-            dpt:       state.dpt,
-            source:    'api',
+        await stateEngine.updateState(datapointId, {
+            ga,
+            value: nativeValue,
+            dpt,
+            source: 'api',
             timestamp,
         });
     } catch (err) {
-        // Non-critical: KNX bus write already succeeded.
-        console.warn(`[knx-iot] State update after PUT failed for ${state.ga}: ${err.message}`);
+        console.warn(`[knx-iot] State update after PUT failed for ${ga}: ${err.message}`);
     }
 
     return {
         data: {
-            id:   uuid,
+            id: uuid,
             type: 'datapoint',
             attributes: {
-                value:     valueStr,
+                value: valueStr,
                 valueType: 'string',
                 timestamp: timestamp.toISOString(),
             },
-            meta: { datapointId: state.datapointId, ga: state.ga, dpt: state.dpt },
+            meta: { datapointId, ga, dpt },
         },
     };
 }
