@@ -5,7 +5,7 @@
 import { Router } from 'express';
 import { bearer } from '../middleware/oauth-bearer.js';
 import { paginate, stableUuid } from './helpers/knx-iot-uuid.js';
-import { getAllLocations, toDatapointResource } from './helpers/knx-iot-transform.js';
+import { toDatapointResource } from './helpers/knx-iot-transform.js';
 import { decodeValueForKnx, toSpecValue } from './helpers/knx-iot-dpt.js';
 import { parseFilters } from './helpers/knx-iot-filters.js';
 
