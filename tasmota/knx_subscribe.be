@@ -26,7 +26,7 @@ import json
 import string
 
 # ── Configuration ─────────────────────────────────────────────────────────────
-var CFG_API_URL        = "http://knx-runtime-engine.example.org
+var CFG_API_URL        = "http://knx-runtime-engine.example.org"
 var CFG_API_BASE       = "/api/v2"
 var CFG_OAUTH_ID       = "knx-default-client"
 var CFG_OAUTH_SECRET   = "change-me-in-production"
