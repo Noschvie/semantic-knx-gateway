@@ -224,6 +224,15 @@ src/
 
 ---
 
+## Related Example Applications (Reference)
+
+For practical usage scenarios around this ecosystem, I also maintain two small reference projects:
+
+- **KNX Garage + WLED**: https://github.com/Noschvie/knx-garage-wled
+- **Tasmota KNX IoT bridge**: https://github.com/Noschvie/tasmota-knx-iot
+
+---
+
 ## Acknowledgements
 
 - **KNX bus communication** — [KNXUltimate](https://github.com/Supergiovane/KNXUltimate) by [@Supergiovane](https://github.com/Supergiovane), a full-featured KNX/IP tunneling library for Node.js with KNX Secure support
