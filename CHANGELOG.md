@@ -14,6 +14,7 @@ Unreleased
 - Semantic datapoint mappings are now exposed via `/datapoints` collection endpoint
   even before the first KNX telegram arrives, enabling clients to discover full
   datapoint inventory (including group addresses) without waiting for bus activity.
+- Add platform notes for Raspberry Pi regarding TimescaleDB auto-tuning
 
 ### Changed
 - **`GET /api/v2/datapoints`** – now returns union of semantic (ETS/TTL-defined)

@@ -210,6 +210,52 @@ src/
 
 ---
 
+## Platform Notes
+
+### Raspberry Pi (RPi 4 / RPi 5)
+
+On Raspberry Pi OS, memory cgroups are not enabled by default. This causes the
+TimescaleDB auto-tuning script to fail with a cryptic `unary operator expected`
+error on startup.
+
+The default `docker-compose.yml` therefore ships with:
+
+```env
+NO_TS_TUNE=true
+```
+
+This disables automatic tuning and makes the setup work out-of-the-box on all
+Raspberry Pi models without any additional configuration.
+
+#### Optional: Enable auto-tuning on RPi
+
+If you want TimescaleDB to auto-tune itself based on available memory, enable
+memory cgroups first:
+
+```bash
+sudo nano /boot/firmware/cmdline.txt
+```
+
+Append the following to the **end of the single line** (do not add a new line):
+
+```
+cgroup_memory=1 cgroup_enable=memory
+```
+
+Then reboot:
+
+```bash
+sudo reboot
+```
+
+Afterward, set in your `.env`:
+
+```env
+NO_TS_TUNE=false
+```
+
+---
+
 ## Roadmap
 
 | Phase | Description                                                  | Status        |
