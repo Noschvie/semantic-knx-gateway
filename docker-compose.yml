@@ -4,9 +4,7 @@ services:
   semantic-knx-runtime:
     build:
       context: .
-      args:
-        USER_ID: ${USER_ID:-1000}
-        GROUP_ID: ${GROUP_ID:-1000}
+    user: "${USER_ID:-1000}:${GROUP_ID:-1000}"
     container_name: semantic-knx-runtime
     restart: unless-stopped
     env_file:

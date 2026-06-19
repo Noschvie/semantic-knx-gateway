@@ -30,19 +30,12 @@ WORKDIR /app
 
 ENV NODE_ENV=production
 
-ARG USER_ID=1000
-ARG GROUP_ID=1000
-
 # Install production dependencies only (no devDependencies)
 COPY package*.json ./
 RUN --mount=type=cache,target=/root/.npm npm ci --omit=dev
 
 # Copy bundled code (no src/ needed at runtime)
 COPY --from=builder /app/dist/server.js ./server.js
-
-RUN chown -R ${USER_ID}:${GROUP_ID} /app
-
-USER ${USER_ID}:${GROUP_ID}
 
 EXPOSE 3000
 
