@@ -78,7 +78,7 @@ Location
 
 - [Docker](https://www.docker.com/) and Docker Compose
 - A KNX/IP interface reachable on the network (tunnelling mode)
-- An ETS KNX IoT TTL export of your installation
+- An ETS KNX TTL export of your installation
 
 ---
 
@@ -101,7 +101,7 @@ cp .env.example .env
 
 **3. Place your TTL export**
 
-Copy your ETS KNX IoT export to the config directory:
+Copy your ETS KNX export to the config directory:
 
 ```bash
 cp your-installation.ttl config/project-prod.ttl
