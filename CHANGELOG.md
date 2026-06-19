@@ -12,7 +12,7 @@ Unreleased
 - `meta.hasCurrentState` flag in datapoint resources to distinguish online
   (runtime state exists) from offline (semantic/TTL-only) datapoints.
 - Semantic datapoint mappings are now exposed via `/datapoints` collection endpoint
-  even before first KNX telegram arrives, enabling clients to discover full
+  even before the first KNX telegram arrives, enabling clients to discover full
   datapoint inventory (including group addresses) without waiting for bus activity.
 
 ### Changed
