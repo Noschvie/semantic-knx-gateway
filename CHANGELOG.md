@@ -33,6 +33,7 @@ Unreleased
 - Docker runtime image cleaned up: removed `curl`, set `NODE_ENV=production`,
   and moved `USER_ID`/`GROUP_ID` defaults to `docker-compose.yml` to avoid
   duplicated build-time defaults.
+- Renamed `POSTGRES_USER` environment variable to `POSTGRES_USERNAME` for naming consistency.
 
 2026-06-16
 ----------
