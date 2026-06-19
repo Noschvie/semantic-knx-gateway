@@ -30,7 +30,9 @@ Unreleased
 - Datapoints without runtime state display `attributes.value: null`,
   `attributes.timestamp: null` per spec-compliance; spec-enabled clients can
   distinguish via `meta.hasCurrentState: false`.
-- Docker runtime image cleaned up: removed `curl`, set `NODE_ENV=production`, and moved `USER_ID`/`GROUP_ID` defaults to `docker-compose.yml` to avoid duplicated build-time defaults.
+- Docker runtime image cleaned up: removed `curl`, set `NODE_ENV=production`,
+  and moved `USER_ID`/`GROUP_ID` defaults to `docker-compose.yml` to avoid
+  duplicated build-time defaults.
 
 2026-06-16
 ----------
