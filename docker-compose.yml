@@ -1,12 +1,13 @@
 ﻿# docker-compose.yml
+# Base configuration – shared by all environments.
+# Do NOT use directly. Always combine with an environment overlay:
+#   Development : docker compose -f docker-compose.yml -f docker-compose.dev.yml  up -d
+#   Production  : docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
 
 services:
   semantic-knx-runtime:
-    build:
-      context: .
     user: "${USER_ID:-1000}:${GROUP_ID:-1000}"
     container_name: semantic-knx-runtime
-    restart: unless-stopped
     env_file:
       - .env
     environment:
@@ -23,7 +24,6 @@ services:
       - "3000:3000"
     volumes:
       - ./logs:/app/logs
-      - ./config/project-prod.ttl:/app/config/project.ttl:ro
     depends_on:
       timescaledb:
         condition: service_healthy
@@ -31,7 +31,6 @@ services:
   timescaledb:
     image: timescale/timescaledb:latest-pg18
     container_name: timescaledb
-    restart: unless-stopped
     environment:
       - TIMESCALEDB_TELEMETRY=off
       - POSTGRES_USER=${POSTGRES_USERNAME}
@@ -50,3 +49,11 @@ services:
       timeout: 5s
       retries: 5
       start_period: 60s
+    logging:
+      options:
+        max-size: "10m"
+        max-file: "3"
+    deploy:
+      resources:
+        limits:
+          memory: 1g

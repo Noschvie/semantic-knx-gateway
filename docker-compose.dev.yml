@@ -1,0 +1,29 @@
+# docker-compose.dev.yml
+# Development overlay – builds image locally from source.
+# Usage: docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d
+
+services:
+  semantic-knx-runtime:
+    build:
+      context: .
+    # No restart policy in dev – crashes should be visible immediately
+    restart: "no"
+    environment:
+      - TIMESCALEDB_ENABLED=${TIMESCALEDB_ENABLED:-false}
+    volumes:
+      # Mount dev project file
+      - ./config/project-dev.ttl:/app/config/project.ttl:ro
+    logging:
+      driver: json-file
+      options:
+        max-size: "5m"
+        max-file: "2"
+
+  timescaledb:
+    # No resource limits in dev – use whatever the machine has
+    restart: "no"
+    logging:
+      driver: json-file
+      options:
+        max-size: "5m"
+        max-file: "2"
