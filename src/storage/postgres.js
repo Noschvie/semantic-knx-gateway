@@ -18,7 +18,7 @@ export class PostgresClient {
             host: process.env.POSTGRES_HOST || 'localhost',
             port: parseInt(process.env.POSTGRES_PORT || '5432'),
             database: process.env.POSTGRES_DB || 'knx',
-            user: process.env.POSTGRES_USER || 'knx',
+            user: process.env.POSTGRES_USERNAME || 'knx',
             password: process.env.POSTGRES_PASSWORD || 'knx',
             max: 20,
             idleTimeoutMillis: 30000,
