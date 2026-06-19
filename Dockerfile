@@ -30,8 +30,8 @@ WORKDIR /app
 
 ENV NODE_ENV=production
 
-ARG USER_ID
-ARG GROUP_ID
+ARG USER_ID=1000
+ARG GROUP_ID=1000
 
 # Install production dependencies only (no devDependencies)
 COPY package*.json ./
