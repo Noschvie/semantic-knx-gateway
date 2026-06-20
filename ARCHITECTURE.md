@@ -346,27 +346,41 @@ Event Bus
 
 ### Write Path — API → KNX Bus
 
-What happens when a client writes a datapoint value via the REST API:
+Three write endpoints are available, all implemented via the shared `writeDatapointValue()` helper in `src/api/routes/datapoints.js`:
+
+| Endpoint | Description |
+|----------|-------------|
+| `PUT /api/v1/datapoints/values` | Spec-compliant bulk write, responds `204 No Content` |
+| `PUT /api/v1/datapoints/` | Vendor extension: single datapoint write via JSON:API body |
+| `PUT /api/v1/datapoints/by-ga` | Vendor extension: write by group address (used e.g. by Tasmota Berry scripts) |
 
 ```
-PUT /api/v1/datapoints/values
+PUT /api/v1/datapoints/values  (or /by-ga or /)
   │
   ▼
-REST API Route Handler
-  │  validates request body (datapoint id + value)
+Route Handler (src/api/routes/datapoints.js)
+  │  validates request body (datapoint id / GA + value)
   ▼
-Semantic Mapper
-  │  resolves datapointId → { ga, dpt }
-  ▼
-DPT Encoder (telegram-writer.js)
-  │  encodes typed value → raw KNX payload according to DPT
-  ▼
-Tunnel Manager (KNXUltimate)
-  │  sends GroupValue_Write telegram to GA via KNXnet/IP tunnel
-  └──▶ KNX/IP Interface → KNX TP bus
+writeDatapointValue()
+  │
+  ├── stateEngine.getAllStates()         — resolves UUID → { datapointId, ga, dpt }
+  │   + getDatapointMappingByUuid()       falls back to datapoint_mappings if no live state
+  │
+  ├── writable check                     — rejects if explicitly writable=false
+  │
+  ├── normalizeDpt()                     — resolves DPT name to numeric form (via dpt-map.js)
+  │
+  ├── decodeValueForKnx()               — encodes string value → native JS value for KNXUltimate
+  │   (src/api/routes/helpers/knx-iot-dpt.js)
+  │
+  ├── tunnelManager.write(ga, value, dpt) — dispatches GroupValue_Write via KNXUltimate
+  │   └──▶ KNX/IP Interface → KNX TP bus
+  │
+  └── stateEngine.updateState()          — optimistic state update (source: 'api')
+        updates current_state immediately without waiting for bus echo
 ```
 
-> The write path does **not** directly update `current_state`. The state update happens when the bus echoes the telegram back through the read path — this ensures the stored state always reflects what was actually transmitted on the bus, not just what was requested.
+> **Note on state update strategy:** Unlike a pure bus-echo approach, the write path performs an **optimistic state update** immediately after a successful `tunnelManager.write()`. This ensures the REST API reflects the new value without delay. If the bus subsequently echoes the telegram, the state is updated again via the normal read path — which is idempotent in practice.
 
 ---
 
@@ -392,8 +406,7 @@ src/
 ├── knx/                  # KNX Runtime Layer
 │   ├── tunnel-manager.js
 │   ├── telegram-decoder.js
-│   ├── dpt-decoder.js
-│   └── telegram-writer.js
+│   └── dpt-decoder.js
 ├── semantic/             # Semantic Layer
 │   ├── ttl-loader.js
 │   ├── graph-builder.js
