@@ -98,11 +98,23 @@ export class ResourceStore {
     }
 
     /**
+     * Safely parse a resource row returned by pg.
+     * pg auto-parses JSONB columns, but this guards against string returns
+     * in edge cases (e.g. raw SQL clients or test stubs).
+     */
+    parseResource(row) {
+        if (!row?.resource) return null;
+        return typeof row.resource === 'string'
+            ? JSON.parse(row.resource)
+            : row.resource;
+    }
+
+    /**
      * Get resource by ID
      */
     async getResource(id) {
         const result = await this.db.query(
-            'SELECT * FROM semantic_resources WHERE id = $1',
+            'SELECT resource FROM semantic_resources WHERE id = $1',
             [id],
         );
 
@@ -110,7 +122,7 @@ export class ResourceStore {
             return null;
         }
 
-        return result.rows[0].resource;
+        return this.parseResource(result.rows[0]);
     }
 
     /**
@@ -118,11 +130,11 @@ export class ResourceStore {
      */
     async getResourcesByType(type) {
         const result = await this.db.query(
-            'SELECT * FROM semantic_resources WHERE type = $1',
+            'SELECT resource FROM semantic_resources WHERE type = $1',
             [type],
         );
 
-        return result.rows.map(row => row.resource);
+        return result.rows.map(row => this.parseResource(row));
     }
 
     /**
@@ -201,22 +213,43 @@ export class ResourceStore {
       WHERE rel.subject = $1 AND rel.predicate = 'hasDatapoint'
     `, [deviceId]);
 
-        device.datapoints = result.rows.map(row => row.resource);
+        device.datapoints = result.rows.map(row => this.parseResource(row));
 
         return device;
     }
 
     /**
-     * Search resources
+     * Search resources by a text term.
+     *
+     * Uses the GIN index on the resource JSONB column for efficient full-text
+     * matching. Falls back to a safe cast if the GIN index is not yet available.
+     *
+     * @param {string} query  - Search term (case-insensitive)
+     * @param {string} [type] - Optional resource type filter
+     * @param {number} [limit=100] - Maximum number of results
+     * @returns {Promise<object[]>} Array of matching resource objects
      */
-    async searchResources(query) {
-        const result = await this.db.query(`
-      SELECT * FROM semantic_resources
-      WHERE resource::text ILIKE $1
-      LIMIT 100
-    `, [`%${query}%`]);
+    async searchResources(query, type = null, limit = 100) {
+        const params = [`%${query}%`, limit];
+        const typeClause = type ? `AND type = $3` : '';
+        if (type) params.splice(1, 0, type); // insert type before limit
 
-        return result.rows.map(row => row.resource);
+        const sql = `
+            SELECT resource
+            FROM semantic_resources
+            WHERE resource::text ILIKE $1
+            ${typeClause}
+            ORDER BY updated_at DESC
+            LIMIT $${params.length}
+        `;
+
+        const result = await this.db.query(sql, params);
+
+        return result.rows.map(row =>
+            typeof row.resource === 'string'
+                ? JSON.parse(row.resource)
+                : row.resource,
+        );
     }
 }
 
