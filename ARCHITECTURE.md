@@ -257,23 +257,19 @@ Index on `(subscription_id, ts DESC)`.
 
 ---
 
-#### `semantic_relationships` — View (planned)
+#### `semantic_relationships`
 
-> ⚠️ This view is not yet defined in `initializeSchema()` but is referenced in `StateStore.getAllStates()` for location-based filtering. It is expected to be a view over `semantic_resources` that unfolds RDF-style triples stored in the `resource` JSONB column, making them queryable by subject, predicate, and object.
+A flat RDF triple store. Created by `ResourceStore.storeRelationships()` in `src/semantic/resource-store.js` on first TTL load — not part of `initializeSchema()` but created inline via `CREATE TABLE IF NOT EXISTS` during graph persistence.
 
-Anticipated definition:
+| Column | Type | Description |
+|--------|------|-------------|
+| `subject` | `TEXT` | Subject resource URI or ID |
+| `predicate` | `TEXT` | Relationship predicate |
+| `object` | `TEXT` | Object resource URI or ID |
 
-```sql
-CREATE VIEW semantic_relationships AS
-SELECT
-  resource->>'subject'   AS subject,
-  resource->>'predicate' AS predicate,
-  resource->>'object'    AS object
-FROM semantic_resources
-WHERE type = 'relationship';
-```
+Primary key: `(subject, predicate, object)` — inserts use `ON CONFLICT DO NOTHING`.
 
-Predicates in use: `containsDevice`, `linkedToDevice`.
+Known predicates include `hasGroupAddress`, `hasDatapoint`, `containsDevice`, and `linkedToDevice`. The full set of predicates is determined by the KNX TTL export content and the Graph Builder's mapping logic.
 
 ---
 
