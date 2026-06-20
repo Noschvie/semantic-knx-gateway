@@ -259,7 +259,7 @@ Index on `(subscription_id, ts DESC)`.
 
 #### `semantic_relationships`
 
-A flat RDF triple store. Created by `ResourceStore.storeRelationships()` in `src/semantic/resource-store.js` on first TTL load — not part of `initializeSchema()` but created inline via `CREATE TABLE IF NOT EXISTS` during graph persistence.
+A flat RDF triple store populated by `ResourceStore.storeRelationships()` in `src/semantic/resource-store.js` during TTL load. The table itself is created as part of `initializeSchema()` alongside all other tables.
 
 | Column | Type | Description |
 |--------|------|-------------|
@@ -268,6 +268,8 @@ A flat RDF triple store. Created by `ResourceStore.storeRelationships()` in `src
 | `object` | `TEXT` | Object resource URI or ID |
 
 Primary key: `(subject, predicate, object)` — inserts use `ON CONFLICT DO NOTHING`.
+
+Indexes on `(subject, predicate)` and `(object, predicate)`.
 
 Known predicates include `hasGroupAddress`, `hasDatapoint`, `containsDevice`, and `linkedToDevice`. The full set of predicates is determined by the KNX TTL export content and the Graph Builder's mapping logic.
 
