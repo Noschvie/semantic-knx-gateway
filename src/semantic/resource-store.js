@@ -221,11 +221,11 @@ export class ResourceStore {
     /**
      * Search resources by a text term.
      *
-     * Uses the GIN index on the resource JSONB column for efficient full-text
-     * matching. Falls back to a safe cast if the GIN index is not yet available.
+     * Uses a pg_trgm GIN index on resource::text for efficient
+     * case-insensitive ILIKE '%...%' matching.
      *
-     * @param {string} query  - Search term (case-insensitive)
-     * @param {string} [type] - Optional resource type filter
+     * @param {string} query       - Search term (case-insensitive)
+     * @param {string} [type]      - Optional resource type filter
      * @param {number} [limit=100] - Maximum number of results
      * @returns {Promise<object[]>} Array of matching resource objects
      */

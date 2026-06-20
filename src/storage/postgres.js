@@ -52,6 +52,11 @@ export class PostgresClient {
         try {
             await client.query('BEGIN');
 
+            // Enable pg_trgm extension for ILIKE index support
+            await client.query(`
+                CREATE EXTENSION IF NOT EXISTS pg_trgm;
+            `);
+
             // Enable TimescaleDB extension
             await client.query(`
             CREATE EXTENSION IF NOT EXISTS timescaledb CASCADE;
@@ -234,8 +239,8 @@ export class PostgresClient {
             CREATE INDEX IF NOT EXISTS idx_events_ga ON knx_events(ga, ts DESC);
             CREATE INDEX IF NOT EXISTS idx_events_datapoint ON knx_events(datapoint_id, ts DESC);
             CREATE INDEX IF NOT EXISTS idx_resources_type ON semantic_resources(type);
-            CREATE INDEX IF NOT EXISTS idx_resources_gin
-                ON semantic_resources USING GIN (resource);
+            CREATE INDEX IF NOT EXISTS idx_resources_trgm
+                ON semantic_resources USING GIN ((resource::text) gin_trgm_ops);
             CREATE INDEX IF NOT EXISTS idx_mappings_ga ON datapoint_mappings(ga);
             CREATE INDEX IF NOT EXISTS idx_subscriptions_expires_at
               ON subscriptions (expires_at) WHERE expires_at IS NOT NULL AND active = TRUE;
