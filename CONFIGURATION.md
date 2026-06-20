@@ -8,6 +8,20 @@ cp .env.example .env
 
 ---
 
+## ETS TTL Export
+
+The engine requires a KNX TTL export of your ETS project placed in the `config/` directory. According to the KNX Association documentation:
+
+> "A Semantic export can be triggered via the menu item 'Export' and then save the project as 'Turtle File Export (.ttl)' or 'Json Linked Data (.jsonld)'."
+>
+> Source: KNX Association, [Semantic export](https://support.knx.org/hc/en-us/articles/13991390217362-Semantic-export)
+
+```bash
+cp your-installation.ttl config/project-prod.ttl
+```
+
+---
+
 ## KNX/IP Interface
 
 | Variable | Default | Description |
