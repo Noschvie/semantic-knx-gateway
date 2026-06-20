@@ -24,6 +24,12 @@ services:
       - "3000:3000"
     volumes:
       - ./logs:/app/logs
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://127.0.0.1:3000/.well-known/knx || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
     depends_on:
       timescaledb:
         condition: service_healthy
@@ -45,7 +51,7 @@ services:
       - ./volumes/timescaledb/data:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USERNAME} -d ${POSTGRES_DB}"]
-      interval: 10s
+      interval: 30s
       timeout: 5s
       retries: 5
       start_period: 60s
