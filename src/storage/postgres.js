@@ -107,6 +107,23 @@ export class PostgresClient {
             );
           `);
 
+            // Table: semantic_relationships
+            await client.query(`
+                CREATE TABLE IF NOT EXISTS semantic_relationships (
+                    subject   TEXT NOT NULL,
+                    predicate TEXT NOT NULL,
+                    object    TEXT NOT NULL,
+                    PRIMARY KEY (subject, predicate, object)
+                );
+            `);
+
+            await client.query(`
+                CREATE INDEX IF NOT EXISTS idx_relationships_subject
+                  ON semantic_relationships (subject, predicate);
+                CREATE INDEX IF NOT EXISTS idx_relationships_object
+                  ON semantic_relationships (object, predicate);
+            `);
+
             // Table: datapoint_mappings
             await client.query(`
             CREATE TABLE IF NOT EXISTS datapoint_mappings (

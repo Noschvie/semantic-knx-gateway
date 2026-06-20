@@ -86,22 +86,12 @@ export class ResourceStore {
      * Store relationships
      */
     async storeRelationships(client, relationships) {
-        const query = `
-      CREATE TABLE IF NOT EXISTS semantic_relationships (
-        subject TEXT NOT NULL,
-        predicate TEXT NOT NULL,
-        object TEXT NOT NULL,
-        PRIMARY KEY (subject, predicate, object)
-      )
-    `;
-        await client.query(query);
-
         for (const rel of relationships) {
             const insertQuery = `
-        INSERT INTO semantic_relationships (subject, predicate, object)
-        VALUES ($1, $2, $3)
-        ON CONFLICT DO NOTHING
-      `;
+                INSERT INTO semantic_relationships (subject, predicate, object)
+                VALUES ($1, $2, $3)
+                ON CONFLICT DO NOTHING
+              `;
 
             await client.query(insertQuery, [rel.subject, rel.predicate, rel.object]);
         }
