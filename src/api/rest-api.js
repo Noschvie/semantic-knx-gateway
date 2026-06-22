@@ -326,7 +326,7 @@ export class RestAPI {
                 // File is located at project root: knxiot_api_openapi.yaml
                 // We serve it as JSON to match README endpoint expectation.
                 const yamlModule = await import('yaml');
-                const specPath = new URL('../../knxiot_api_openapi.yaml', import.meta.url);
+                const specPath = new URL('./knxiot_api_openapi.yaml', import.meta.url);
                 const raw = await fsReadFile(specPath, 'utf8');
                 const parsed = yamlModule.parse(raw);
 
