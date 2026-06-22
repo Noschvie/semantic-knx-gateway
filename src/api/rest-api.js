@@ -148,18 +148,34 @@ export class RestAPI {
 
             // ── ACCEPT HEADER VALIDATION ──────────────────────────────────────
             const accept = req.headers.accept;
-            const isOpenApiSpecEndpoint = req.path === `${API_BASE}/openapi.json`;
-            const acceptsJsonApi = accept?.includes('application/vnd.api+json');
-            const acceptsJson = accept?.includes('application/json');
 
-            if (
-                accept &&
-                accept !== '*/*' &&
-                !acceptsJsonApi &&
-                !(isOpenApiSpecEndpoint && acceptsJson)
-            ) {
+            const isOpenApiSpecEndpoint =
+                req.method === 'GET' &&
+                (req.path === `${API_BASE}/openapi.json` || req.path === `${API_BASE}/openapi`);
+
+            const acceptsJsonApi =
+                !accept ||
+                accept === '*/*' ||
+                accept.includes('application/vnd.api+json');
+
+            const acceptsJson =
+                !accept ||
+                accept === '*/*' ||
+                accept.includes('application/json');
+
+            if (!isOpenApiSpecEndpoint && !acceptsJsonApi) {
                 return res.status(406).json(
                     knxError(406, 'Not Acceptable', 'Only application/vnd.api+json is supported in Accept header.'),
+                );
+            }
+
+            if (isOpenApiSpecEndpoint && !(acceptsJsonApi || acceptsJson)) {
+                return res.status(406).json(
+                    knxError(
+                        406,
+                        'Not Acceptable',
+                        'OpenAPI endpoint supports Accept: application/json or application/vnd.api+json.',
+                    ),
                 );
             }
 
@@ -350,7 +366,7 @@ export class RestAPI {
 
         // Optional alias
         this.app.get(`${API_BASE}/openapi`, (req, res) => {
-            res.redirect(302, `${API_BASE}/openapi.json`);
+            res.redirect(308, `${API_BASE}/openapi.json`);
         });
 
         // ── API v2 KNX IoT routes ─────────────────────────────────────────────

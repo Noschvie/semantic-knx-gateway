@@ -40,6 +40,9 @@ Unreleased
   and moved `USER_ID`/`GROUP_ID` defaults to `docker-compose.yml` to avoid
   duplicated build-time defaults.
 - Renamed `POSTGRES_USER` environment variable to `POSTGRES_USERNAME` for naming consistency.
+- Accept-header validation now allows `application/json` for `GET /api/v2/openapi.json`
+  (and `/api/v2/openapi`) so the OpenAPI document can be opened directly in browsers,
+  while all other API endpoints remain strict JSON:API (`application/vnd.api+json`).
 
 2026-06-16
 ----------
