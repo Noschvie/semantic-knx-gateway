@@ -15,11 +15,11 @@ Unreleased
   even before the first KNX telegram arrives, enabling clients to discover full
   datapoint inventory (including group addresses) without waiting for bus activity.
 - Add platform notes for Raspberry Pi regarding TimescaleDB auto-tuning
-- **`GET /api/v2/openapi.yaml`** — new endpoint serving the OpenAPI specification
-  as JSON (parsed from `knxiot_api_openapi.yaml` at runtime). Requires
-  `Accept: application/yaml` header. `knxiot_api_openapi.yaml` added to
-  Docker runtime image via `Dockerfile` `COPY` instruction. Requires `yaml`
-  package as production dependency.
+- **`GET /api/v2/openapi.yaml`** — new endpoint serving the raw OpenAPI specification
+  (from `knxiot_api_openapi.yaml` at runtime); browser-compatible, no strict Accept header required.
+  `knxiot_api_openapi.yaml` added to Docker runtime image via `Dockerfile` `COPY` instruction.
+- **`GET /docs`** — Swagger UI integrated via `swagger-ui-express`, loads spec from
+  `/api/v2/openapi.yaml`; interactive API exploration available in the browser.
 
 ### Changed
 - **`GET /api/v2/datapoints`** – now returns union of semantic (ETS/TTL-defined)
@@ -40,9 +40,9 @@ Unreleased
   and moved `USER_ID`/`GROUP_ID` defaults to `docker-compose.yml` to avoid
   duplicated build-time defaults.
 - Renamed `POSTGRES_USER` environment variable to `POSTGRES_USERNAME` for naming consistency.
-- Accept-header validation now allows `application/json` for `GET /api/v2/openapi.json`
-  (and `/api/v2/openapi`) so the OpenAPI document can be opened directly in browsers,
-  while all other API endpoints remain strict JSON:API (`application/vnd.api+json`).
+- Accept-header validation now exempts OpenAPI spec endpoints (`/api/v2/openapi.yaml`,
+  `/api/v2/openapi.json`, `/api/v2/openapi`) and Swagger UI (`/docs`) from strict
+  JSON:API `Accept` enforcement, enabling direct browser access.
 
 2026-06-16
 ----------

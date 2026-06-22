@@ -4,6 +4,7 @@
 
 import express from 'express';
 import { readFile as fsReadFile } from 'node:fs/promises';
+import swaggerUi from 'swagger-ui-express';
 
 import { createLogger } from '../utils/logger.js';
 import { formatTimestamp } from '../utils/timezone.js';
@@ -143,6 +144,9 @@ export class RestAPI {
             // .well-known endpoints return specific MIME types (e.g. PKCS#7 for iDevID)
             if (req.path.includes('/.well-known')) return next();
 
+            // Swagger UI static assets serve their own content types
+            if (req.path.startsWith('/docs')) return next();
+
             // ── ACCEPT HEADER VALIDATION ──────────────────────────────────────
             const accept = req.headers.accept;
 
@@ -275,6 +279,17 @@ export class RestAPI {
 
         // OAuth2 token endpoint (KNX IoT spec §/oauth/access)
         this.app.use('/oauth', oauthRouter());
+
+        // Swagger UI
+        this.app.use(
+            '/docs',
+            swaggerUi.serve,
+            swaggerUi.setup(null, {
+                swaggerOptions: {
+                    url: `${API_BASE}/openapi.yaml`,
+                },
+            }),
+        );
 
         // /.well-known/knx - KNX IoT discovery endpoint (required by spec)
         this.app.get(`${API_BASE}/.well-known/knx/idevid`, async(req, res) => {
