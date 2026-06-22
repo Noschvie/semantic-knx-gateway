@@ -143,9 +143,6 @@ export class RestAPI {
             // .well-known endpoints return specific MIME types (e.g. PKCS#7 for iDevID)
             if (req.path.includes('/.well-known')) return next();
 
-            // JSON:API Response Content-Type
-            res.setHeader('Content-Type', 'application/vnd.api+json');
-
             // ── ACCEPT HEADER VALIDATION ──────────────────────────────────────
             const accept = req.headers.accept;
 
@@ -153,30 +150,20 @@ export class RestAPI {
                 req.method === 'GET' &&
                 (req.path === `${API_BASE}/openapi.json` || req.path === `${API_BASE}/openapi`);
 
-            const acceptsJsonApi =
-                !accept ||
-                accept === '*/*' ||
-                accept.includes('application/vnd.api+json');
+            const acceptsJsonApi = accept?.includes('application/vnd.api+json');
+            const acceptsAny = accept === '*/*';
 
-            const acceptsJson =
-                !accept ||
-                accept === '*/*' ||
-                accept.includes('application/json');
-
-            if (!isOpenApiSpecEndpoint && !acceptsJsonApi) {
+            // Keep strict JSON:API checks for all normal API endpoints
+            if (!isOpenApiSpecEndpoint && accept && !acceptsAny && !acceptsJsonApi) {
                 return res.status(406).json(
                     knxError(406, 'Not Acceptable', 'Only application/vnd.api+json is supported in Accept header.'),
                 );
             }
 
-            if (isOpenApiSpecEndpoint && !(acceptsJsonApi || acceptsJson)) {
-                return res.status(406).json(
-                    knxError(
-                        406,
-                        'Not Acceptable',
-                        'OpenAPI endpoint supports Accept: application/json or application/vnd.api+json.',
-                    ),
-                );
+            // Set default response Content-Type only for JSON:API endpoints
+            // OpenAPI endpoint is exempt from strict Accept enforcement (browser compatibility)
+            if (!isOpenApiSpecEndpoint) {
+                res.setHeader('Content-Type', 'application/vnd.api+json');
             }
 
             // ── CONTENT-TYPE VALIDATION ───────────────────────────────────────
