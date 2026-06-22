@@ -27,7 +27,10 @@ import { MessagingWebSocketServer } from './routes/messaging-websocket-server.js
 
 // ── KNX IoT Spec §Errors – JSON:API error shape (./schemas/Errors.json) ──────
 const KNX_SCHEMA_LINK = 'https://schema.knx.org/2020/api';
-const API_BASE = '/api/v2';
+const OPENAPI_SPEC_PATH = new URL('../../knxiot_api_openapi.yaml', import.meta.url);
+
+export const API_VERSION = 'v2';
+export const API_BASE = `/api/${API_VERSION}`;
 
 /**
  * Build a spec-compliant JSON:API error body.
