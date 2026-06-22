@@ -456,6 +456,8 @@ export class RestAPI {
             this.server = this.app.listen(port, '0.0.0.0', () => {
                 this.logger.info(`✅ REST API listening on http://0.0.0.0:${port}`);
                 this.websocketApi.start(this.server);
+                // Make WebSocket instance accessible to state engine for subscription counting
+                this.stateEngine.messagingWebSocket = this.websocketApi;
                 this.logger.info(`✅ WebSocket listening on ws://0.0.0.0:${port}/messaging/ws (subprotocol gw.knx.org)`);
                 this.dispatcher.start();
                 resolve();
