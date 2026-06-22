@@ -110,6 +110,8 @@ export class RestAPI {
         this.tunnelManager = tunnelManager;
         this.app = express();
         this.server = null;
+        this.openapiYaml = null;
+        this.openapiJson = null;
         this.websocketApi = new MessagingWebSocketServer(this.stateEngine, this.tunnelManager);
 
         // Store before setupRoutes() - used in router and dispatcher
@@ -128,6 +130,21 @@ export class RestAPI {
 
         this.setupMiddleware();
         this.setupRoutes();
+    }
+
+    async preloadOpenApiSpec() {
+        try {
+            const yamlModule = await import('yaml');
+            this.openapiYaml = await fsReadFile(OPENAPI_SPEC_PATH, 'utf8');
+            this.openapiJson = yamlModule.parse(this.openapiYaml);
+        } catch (err) {
+            this.openapiYaml = null;
+            this.openapiJson = null;
+            this.logger.error({
+                msg: `Failed to preload OpenAPI spec: ${err.message}`,
+                error: err.message,
+            });
+        }
     }
 
     // ── GLOBAL JSON:API MIDDLEWARE ────────────────────────────────────────────
@@ -289,7 +306,7 @@ export class RestAPI {
             swaggerUi.serve,
             swaggerUi.setup(null, {
                 swaggerOptions: {
-                    url: `${API_BASE}/openapi.yaml`,
+                    url: `${API_BASE}/openapi.json`,
                 },
             }),
         );
@@ -350,47 +367,29 @@ export class RestAPI {
         });
 
         // ── OpenAPI spec endpoint ────────────────────────────────────────────
-        this.app.get(`${API_BASE}/openapi.json`, async(req, res) => {
-            try {
-                // File is located at project root: knxiot_api_openapi.yaml
-                // We serve it as JSON to match README endpoint expectation.
-                const yamlModule = await import('yaml');
-                const specPath = new URL('./knxiot_api_openapi.yaml', import.meta.url);
-                const raw = await fsReadFile(specPath, 'utf8');
-                const parsed = yamlModule.parse(raw);
-
-                res.status(200)
-                    .set('Content-Type', 'application/json')
-                    .json(parsed);
-            } catch (err) {
-                this.logger.error({
-                    msg: `Failed to serve OpenAPI spec: ${err.message}`,
-                    error: err.message,
-                });
-                res.status(500).json(
+        this.app.get(`${API_BASE}/openapi.json`, (req, res) => {
+            if (!this.openapiJson) {
+                return res.status(500).json(
                     knxError(500, 'Internal Server Error', 'Failed to load OpenAPI specification.'),
                 );
             }
+
+            res.status(200)
+                .set('Content-Type', 'application/json')
+                .json(this.openapiJson);
         });
 
         // ── OpenAPI spec endpoint (YAML) ─────────────────────────────────────
-        this.app.get(`${API_BASE}/openapi.yaml`, async(req, res) => {
-            try {
-                const specPath = new URL('./knxiot_api_openapi.yaml', import.meta.url);
-                const raw = await fsReadFile(specPath, 'utf8');
-
-                res.status(200)
-                    .set('Content-Type', 'application/yaml; charset=utf-8')
-                    .send(raw);
-            } catch (err) {
-                this.logger.error({
-                    msg: `Failed to serve OpenAPI YAML spec: ${err.message}`,
-                    error: err.message,
-                });
-                res.status(500).json(
+        this.app.get(`${API_BASE}/openapi.yaml`, (req, res) => {
+            if (!this.openapiYaml) {
+                return res.status(500).json(
                     knxError(500, 'Internal Server Error', 'Failed to load OpenAPI YAML specification.'),
                 );
             }
+
+            res.status(200)
+                .set('Content-Type', 'application/yaml; charset=utf-8')
+                .send(this.openapiYaml);
         });
 
         // Optional alias
@@ -448,6 +447,7 @@ export class RestAPI {
 
     async start() {
         const port = parseInt(process.env.API_PORT || '3000');
+        await this.preloadOpenApiSpec();
 
         return new Promise((resolve) => {
             this.server = this.app.listen(port, '0.0.0.0', () => {
