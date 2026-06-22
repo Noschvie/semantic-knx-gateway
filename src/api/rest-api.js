@@ -27,7 +27,7 @@ import { MessagingWebSocketServer } from './routes/messaging-websocket-server.js
 
 // ── KNX IoT Spec §Errors – JSON:API error shape (./schemas/Errors.json) ──────
 const KNX_SCHEMA_LINK = 'https://schema.knx.org/2020/api';
-const OPENAPI_SPEC_PATH = new URL('../../knxiot_api_openapi.yaml', import.meta.url);
+const OPENAPI_SPEC_PATH = new URL('./knxiot_api_openapi.yaml', import.meta.url);
 
 export const API_VERSION = 'v2';
 export const API_BASE = `/api/${API_VERSION}`;
@@ -135,14 +135,17 @@ export class RestAPI {
     async preloadOpenApiSpec() {
         try {
             const yamlModule = await import('yaml');
-            this.openapiYaml = await fsReadFile(OPENAPI_SPEC_PATH, 'utf8');
+            this.openapiYaml = await fsReadFile(OPENAPI_SPEC_PATH.pathname, 'utf8');
             this.openapiJson = yamlModule.parse(this.openapiYaml);
+            this.logger.info('✅ OpenAPI spec preloaded successfully');
         } catch (err) {
             this.openapiYaml = null;
             this.openapiJson = null;
             this.logger.error({
                 msg: `Failed to preload OpenAPI spec: ${err.message}`,
                 error: err.message,
+                stack: err.stack,
+                specPath: OPENAPI_SPEC_PATH.pathname,
             });
         }
     }
