@@ -148,11 +148,15 @@ export class RestAPI {
 
             // ── ACCEPT HEADER VALIDATION ──────────────────────────────────────
             const accept = req.headers.accept;
+            const isOpenApiSpecEndpoint = req.path === `${API_BASE}/openapi.json`;
+            const acceptsJsonApi = accept?.includes('application/vnd.api+json');
+            const acceptsJson = accept?.includes('application/json');
 
             if (
                 accept &&
                 accept !== '*/*' &&
-                !accept.includes('application/vnd.api+json')
+                !acceptsJsonApi &&
+                !(isOpenApiSpecEndpoint && acceptsJson)
             ) {
                 return res.status(406).json(
                     knxError(406, 'Not Acceptable', 'Only application/vnd.api+json is supported in Accept header.'),
