@@ -148,7 +148,11 @@ export class RestAPI {
 
             const isOpenApiSpecEndpoint =
                 req.method === 'GET' &&
-                (req.path === `${API_BASE}/openapi.json` || req.path === `${API_BASE}/openapi`);
+                (
+                    req.path === `${API_BASE}/openapi.json` ||
+                    req.path === `${API_BASE}/openapi` ||
+                    req.path === `${API_BASE}/openapi.yaml`
+                );
 
             const acceptsJsonApi = accept?.includes('application/vnd.api+json');
             const acceptsAny = accept === '*/*';
@@ -351,9 +355,29 @@ export class RestAPI {
             }
         });
 
+        // ── OpenAPI spec endpoint (YAML) ─────────────────────────────────────
+        this.app.get(`${API_BASE}/openapi.yaml`, async(req, res) => {
+            try {
+                const specPath = new URL('./knxiot_api_openapi.yaml', import.meta.url);
+                const raw = await fsReadFile(specPath, 'utf8');
+
+                res.status(200)
+                    .set('Content-Type', 'application/yaml; charset=utf-8')
+                    .send(raw);
+            } catch (err) {
+                this.logger.error({
+                    msg: `Failed to serve OpenAPI YAML spec: ${err.message}`,
+                    error: err.message,
+                });
+                res.status(500).json(
+                    knxError(500, 'Internal Server Error', 'Failed to load OpenAPI YAML specification.'),
+                );
+            }
+        });
+
         // Optional alias
         this.app.get(`${API_BASE}/openapi`, (req, res) => {
-            res.redirect(308, `${API_BASE}/openapi.json`);
+            res.redirect(308, `${API_BASE}/openapi.yaml`);
         });
 
         // ── API v2 KNX IoT routes ─────────────────────────────────────────────

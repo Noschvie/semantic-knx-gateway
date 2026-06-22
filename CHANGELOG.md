@@ -15,9 +15,9 @@ Unreleased
   even before the first KNX telegram arrives, enabling clients to discover full
   datapoint inventory (including group addresses) without waiting for bus activity.
 - Add platform notes for Raspberry Pi regarding TimescaleDB auto-tuning
-- **`GET /api/v2/openapi.json`** — new endpoint serving the OpenAPI specification
+- **`GET /api/v2/openapi.yaml`** — new endpoint serving the OpenAPI specification
   as JSON (parsed from `knxiot_api_openapi.yaml` at runtime). Requires
-  `Accept: application/vnd.api+json` header. `knxiot_api_openapi.yaml` added to
+  `Accept: application/yaml` header. `knxiot_api_openapi.yaml` added to
   Docker runtime image via `Dockerfile` `COPY` instruction. Requires `yaml`
   package as production dependency.
 
