@@ -320,6 +320,35 @@ export class RestAPI {
             });
         });
 
+        // ── OpenAPI spec endpoint ────────────────────────────────────────────
+        this.app.get(`${API_BASE}/openapi.json`, async(req, res) => {
+            try {
+                // File is located at project root: knxiot_api_openapi.yaml
+                // We serve it as JSON to match README endpoint expectation.
+                const yamlModule = await import('yaml');
+                const specPath = new URL('../../knxiot_api_openapi.yaml', import.meta.url);
+                const raw = await fsReadFile(specPath, 'utf8');
+                const parsed = yamlModule.parse(raw);
+
+                res.status(200)
+                    .set('Content-Type', 'application/json')
+                    .json(parsed);
+            } catch (err) {
+                this.logger.error({
+                    msg: `Failed to serve OpenAPI spec: ${err.message}`,
+                    error: err.message,
+                });
+                res.status(500).json(
+                    knxError(500, 'Internal Server Error', 'Failed to load OpenAPI specification.'),
+                );
+            }
+        });
+
+        // Optional alias
+        this.app.get(`${API_BASE}/openapi`, (req, res) => {
+            res.redirect(302, `${API_BASE}/openapi.json`);
+        });
+
         // ── API v2 KNX IoT routes ─────────────────────────────────────────────
         this.app.use(`${API_BASE}/datapoints`, datapointsRouter(this.stateEngine, this.tunnelManager));
         this.app.use(`${API_BASE}/functions`, functionsRouter(this.semanticEngine));
