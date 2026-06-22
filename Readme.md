@@ -32,10 +32,10 @@ cd semantic-knx-gateway
 **2. Configure the environment**
 
 ```bash
-cp .env.example .env
+cp env.example .env
 ```
 
-Adjust at minimum:
+Adjust to a minimum:
 
 ```ini
 KNX_IP=192.168.1.100       # IP address of your KNX/IP interface
@@ -51,7 +51,21 @@ cp your-installation.ttl config/project-prod.ttl
 **4. Start the stack**
 
 ```bash
-docker compose up -d
+# Start stack with production overlay
+docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+
+# Check container status (both must be "Up (healthy)")
+docker compose -f docker-compose.yml -f docker-compose.prod.yml ps
+
+# Expected result:
+# timescaledb          Up (healthy)
+# semantic-knx-runtime Up (healthy)
+
+# Inspect health status in detail
+docker inspect semantic-knx-runtime --format='{{json .State.Health}}' | python3 -m json.tool
+
+# Follow logs
+docker compose -f docker-compose.yml -f docker-compose.prod.yml logs -f --tail=50
 ```
 
 The API will be available at `http://localhost:3000`.
