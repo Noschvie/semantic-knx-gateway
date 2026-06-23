@@ -2,10 +2,10 @@
 
 ## Dokumentationszweck
 
-Dieses Dokument beschreibt das **aktuelle OAuth2-Setup** der KNX IoT Gateway API (`/oauth/access`).  
+Dieses Dokument beschreibt das **aktuelle OAuth2-Setup** der KNX IoT 3rd-Party API (`/oauth/access`).  
 Es erklärt, warum kein Refresh-Token verfügbar ist und welche Konsequenzen das für Clients hat.
 
-**Hinweis:** Der separaten Keycloak-Guide (`keycloak-refresh-test.md`) dient nur zum lokalen Testen eines User-basierten Refresh-Token-Flows als Referenz-Implementierung. Es ist nicht Teil des aktuellen KNX IoT setups.
+**Hinweis:** Der separaten Keycloak-Guide (`keycloak-refresh-test.md`) dient nur zum lokalen Testen eines User-basierten Refresh-Token-Flows als Referenz-Implementierung. Es ist nicht Teil des aktuellen KNX IoT API setups.
 
 ---
 
