@@ -169,4 +169,5 @@ Refresh-Token rotiert? → neuen speichern
 ## Verwandte Dokumente
 
 - `current-api-auth.md` – Das aktuelle KNX IoT Setup (client_credentials)
-- `keycloak-refresh-test.md` – Referenz-Testanleitung für User-Flow mit Keycloak
+- `authorization-code-pkce-explained.md` – Detaillierte Erklärung des `authorization_code` + PKCE Flows
+- `keycloak-refresh-test.md` – Vergleich aller OAuth-Flow-Varianten

@@ -145,6 +145,7 @@ Falls es Fragen zum OAuth-Provider gibt:
 
 ## Verwandte Dokumente
 
+- `authorization-code-pkce-explained.md` – Detaillierte Erklärung, was `authorization_code` + PKCE bedeutet
 - `keycloak-refresh-test.md` – Referenz-Testanleitung für User-basierten Flow (Keycloak lokal)
 - `overview.md` – Vergleichsmatrix aller OAuth-Flows
 - API-TESTING.md – Praktische Testbeispiele

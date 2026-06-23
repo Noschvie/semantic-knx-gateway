@@ -270,4 +270,5 @@ curl -sS "$USERINFO_ENDPOINT" \
 ## Verwandte Dokumente
 
 - `current-api-auth.md` – Das aktuelle KNX IoT Setup (client_credentials)
-- `overview.md` – Vergleich aller OAuth-Flow-Varianten
+- `authorization-code-pkce-explained.md` – Detaillierte Erklärung des `authorization_code` + PKCE Flows
+- `overview.md` – Überblick und Vergleich aller OAuth-Flow-Varianten
