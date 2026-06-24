@@ -20,6 +20,14 @@ Unreleased
   `knxiot_api_openapi.yaml` added to Docker runtime image via `Dockerfile` `COPY` instruction.
 - **`GET /docs`** — Swagger UI integrated via `swagger-ui-express`, loads spec from
   `/api/v2/openapi.yaml`; interactive API exploration available in the browser.
+- **`GET /api/v2/node` – currentSubscriptions metric** now aggregates both persistent
+  (database) and runtime (WebSocket) subscriptions:
+  - `SubscriptionStore.countActive({ includeExpired })` — new method to efficiently count
+    non-expired active subscriptions from the database.
+  - `MessagingWebSocketServer.getActiveSubscriptionCount()` — new method to report the
+    number of currently connected WebSocket clients.
+  - `/node` endpoint now sums DB subscriptions (valid/non-expired) and active WS clients
+    to report `currentSubscriptions`, providing a complete real-time view of all subscription types.
 
 ### Changed
 - **`GET /api/v2/datapoints`** – now returns union of semantic (ETS/TTL-defined)

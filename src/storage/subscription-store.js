@@ -182,6 +182,26 @@ export class SubscriptionStore {
     }
 
     /**
+     * Count active subscriptions, optionally filtering out expired ones.
+     * Used by /node endpoint to report currentSubscriptions.
+     *
+     * @param {object} options
+     * @param {boolean} [options.includeExpired=false] If false, exclude subscriptions where expires_at <= NOW()
+     * @returns {Promise<number>} Count of subscriptions matching criteria
+     */
+    async countActive({ includeExpired = false } = {}) {
+        const query = includeExpired
+            ? `SELECT COUNT(*)::int AS count FROM subscriptions WHERE active = TRUE`
+            : `SELECT COUNT(*)::int AS count
+               FROM subscriptions
+               WHERE active = TRUE
+                 AND (expires_at IS NULL OR expires_at > NOW())`;
+
+        const result = await this.db.query(query);
+        return result.rows[0]?.count ?? 0;
+    }
+
+    /**
      * Single subscription by ID.
      * Returns null if not found or inactive.
      */

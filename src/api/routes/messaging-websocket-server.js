@@ -20,6 +20,14 @@ export class MessagingWebSocketServer {
         this.boundUpgradeHandler = null;
     }
 
+    /**
+     * Returns the count of currently connected WebSocket clients with subscriptions.
+     * Used by /node endpoint to report active runtime subscriptions.
+     */
+    getActiveSubscriptionCount() {
+        return this.wsClients.size;
+    }
+
     resolveDatapointId(identifier, allStates) {
         const state = allStates.find((entry) =>
             entry.datapointId === identifier || stableUuid(entry.datapointId) === identifier,

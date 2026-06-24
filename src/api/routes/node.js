@@ -24,11 +24,27 @@ export function nodeRouter(stateEngine) {
             const nowIso = new Date().toISOString();
             const nodeId = stableUuid('knx-node-default');
 
-            let currentSubscriptions = 0;
+            // Count subscriptions from both persistent (DB) and runtime (WebSocket) sources
+            let dbSubscriptions = 0;
+            let wsSubscriptions = 0;
+
+            // 1. Count valid (non-expired) subscriptions from DB
             try {
-                const subs = await stateEngine?.subscriptionStore?.getAll?.() ?? [];
-                currentSubscriptions = subs.length;
-            } catch { /* non-critical */ }
+                dbSubscriptions = await stateEngine?.subscriptionStore?.countActive?.({ includeExpired: false }) ?? 0;
+            } catch (error) {
+                // Log error but don't fail the endpoint
+                console.warn('Failed to count DB subscriptions:', error.message);
+            }
+
+            // 2. Count active WebSocket client subscriptions from runtime
+            try {
+                wsSubscriptions = stateEngine?.messagingWebSocket?.getActiveSubscriptionCount?.() ?? 0;
+            } catch (error) {
+                // Log error but don't fail the endpoint
+                console.warn('Failed to count WS subscriptions:', error.message);
+            }
+
+            const currentSubscriptions = dbSubscriptions + wsSubscriptions;
 
             res.json({
                 data: {

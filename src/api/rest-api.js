@@ -27,7 +27,10 @@ import { MessagingWebSocketServer } from './routes/messaging-websocket-server.js
 
 // ── KNX IoT Spec §Errors – JSON:API error shape (./schemas/Errors.json) ──────
 const KNX_SCHEMA_LINK = 'https://schema.knx.org/2020/api';
-const API_BASE = '/api/v2';
+const OPENAPI_SPEC_PATH = new URL('./knxiot_api_openapi.yaml', import.meta.url);
+
+export const API_VERSION = 'v2';
+export const API_BASE = `/api/${API_VERSION}`;
 
 /**
  * Build a spec-compliant JSON:API error body.
@@ -107,6 +110,8 @@ export class RestAPI {
         this.tunnelManager = tunnelManager;
         this.app = express();
         this.server = null;
+        this.openapiYaml = null;
+        this.openapiJson = null;
         this.websocketApi = new MessagingWebSocketServer(this.stateEngine, this.tunnelManager);
 
         // Store before setupRoutes() - used in router and dispatcher
@@ -125,6 +130,24 @@ export class RestAPI {
 
         this.setupMiddleware();
         this.setupRoutes();
+    }
+
+    async preloadOpenApiSpec() {
+        try {
+            const yamlModule = await import('yaml');
+            this.openapiYaml = await fsReadFile(OPENAPI_SPEC_PATH.pathname, 'utf8');
+            this.openapiJson = yamlModule.parse(this.openapiYaml);
+            this.logger.info('✅ OpenAPI spec preloaded successfully');
+        } catch (err) {
+            this.openapiYaml = null;
+            this.openapiJson = null;
+            this.logger.error({
+                msg: `Failed to preload OpenAPI spec: ${err.message}`,
+                error: err.message,
+                stack: err.stack,
+                specPath: OPENAPI_SPEC_PATH.pathname,
+            });
+        }
     }
 
     // ── GLOBAL JSON:API MIDDLEWARE ────────────────────────────────────────────
@@ -286,7 +309,7 @@ export class RestAPI {
             swaggerUi.serve,
             swaggerUi.setup(null, {
                 swaggerOptions: {
-                    url: `${API_BASE}/openapi.yaml`,
+                    url: `${API_BASE}/openapi.json`,
                 },
             }),
         );
@@ -347,47 +370,29 @@ export class RestAPI {
         });
 
         // ── OpenAPI spec endpoint ────────────────────────────────────────────
-        this.app.get(`${API_BASE}/openapi.json`, async(req, res) => {
-            try {
-                // File is located at project root: knxiot_api_openapi.yaml
-                // We serve it as JSON to match README endpoint expectation.
-                const yamlModule = await import('yaml');
-                const specPath = new URL('./knxiot_api_openapi.yaml', import.meta.url);
-                const raw = await fsReadFile(specPath, 'utf8');
-                const parsed = yamlModule.parse(raw);
-
-                res.status(200)
-                    .set('Content-Type', 'application/json')
-                    .json(parsed);
-            } catch (err) {
-                this.logger.error({
-                    msg: `Failed to serve OpenAPI spec: ${err.message}`,
-                    error: err.message,
-                });
-                res.status(500).json(
+        this.app.get(`${API_BASE}/openapi.json`, (req, res) => {
+            if (!this.openapiJson) {
+                return res.status(500).json(
                     knxError(500, 'Internal Server Error', 'Failed to load OpenAPI specification.'),
                 );
             }
+
+            res.status(200)
+                .set('Content-Type', 'application/json')
+                .json(this.openapiJson);
         });
 
         // ── OpenAPI spec endpoint (YAML) ─────────────────────────────────────
-        this.app.get(`${API_BASE}/openapi.yaml`, async(req, res) => {
-            try {
-                const specPath = new URL('./knxiot_api_openapi.yaml', import.meta.url);
-                const raw = await fsReadFile(specPath, 'utf8');
-
-                res.status(200)
-                    .set('Content-Type', 'application/yaml; charset=utf-8')
-                    .send(raw);
-            } catch (err) {
-                this.logger.error({
-                    msg: `Failed to serve OpenAPI YAML spec: ${err.message}`,
-                    error: err.message,
-                });
-                res.status(500).json(
+        this.app.get(`${API_BASE}/openapi.yaml`, (req, res) => {
+            if (!this.openapiYaml) {
+                return res.status(500).json(
                     knxError(500, 'Internal Server Error', 'Failed to load OpenAPI YAML specification.'),
                 );
             }
+
+            res.status(200)
+                .set('Content-Type', 'application/yaml; charset=utf-8')
+                .send(this.openapiYaml);
         });
 
         // Optional alias
@@ -445,11 +450,14 @@ export class RestAPI {
 
     async start() {
         const port = parseInt(process.env.API_PORT || '3000');
+        await this.preloadOpenApiSpec();
 
         return new Promise((resolve) => {
             this.server = this.app.listen(port, '0.0.0.0', () => {
                 this.logger.info(`✅ REST API listening on http://0.0.0.0:${port}`);
                 this.websocketApi.start(this.server);
+                // Make WebSocket instance accessible to state engine for subscription counting
+                this.stateEngine.messagingWebSocket = this.websocketApi;
                 this.logger.info(`✅ WebSocket listening on ws://0.0.0.0:${port}/messaging/ws (subprotocol gw.knx.org)`);
                 this.dispatcher.start();
                 resolve();
