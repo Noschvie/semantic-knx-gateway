@@ -686,29 +686,18 @@ export function datapointsRouter(stateEngine, tunnelManager) {
                 );
             }
 
+            if (item.type !== 'datapoint') {
+                return res.status(400).json(
+                    knxError(400, 'Bad Request', `Each data item must have type "datapoint", got "${item.type}"`),
+                );
+            }
+
             const result = await writeDatapointValue(item.id, item.attributes.value, stateEngine, tunnelManager);
             if (result.error) return res.status(result.error.status).json(result.error.payload);
         }
 
         // Spec §/datapoints/values: 204 No Content for synchronous processing
         return res.status(204).end();
-    });
-
-    // ── PUT /api/v2/datapoints ────────────────────────────────────────────
-    // Vendor extension: single datapoint write via JSON:API body
-    router.put('/', bearer('write'), async(req, res) => {
-        const body = req.body;
-
-        if (!body?.data?.id || body?.data?.attributes?.value === undefined) {
-            return res.status(400).json(
-                knxError(400, 'Bad Request', 'Body must contain data.id and data.attributes.value'),
-            );
-        }
-
-        const result = await writeDatapointValue(body.data.id, body.data.attributes.value, stateEngine, tunnelManager);
-        if (result.error) return res.status(result.error.status).json(result.error.payload);
-
-        return res.status(200).json({ data: result.data });
     });
 
     return router;
