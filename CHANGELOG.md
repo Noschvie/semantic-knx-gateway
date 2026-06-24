@@ -8,6 +8,9 @@ contributors and users to follow meaningful changes over time.
 Unreleased
 ----------
 
+2026-06-24
+----------
+
 ### Added
 - `meta.hasCurrentState` flag in datapoint resources to distinguish online
   (runtime state exists) from offline (semantic/TTL-only) datapoints.
