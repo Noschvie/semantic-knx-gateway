@@ -78,6 +78,17 @@ git commit -m "Add .gitattributes and normalize line endings"
 Use this flow when preparing a release from `development` and creating a
 version tag (example: `v2026.06.16`).
 
+**Step 1: Update CHANGELOG.md (on development branch)**
+```powershell
+# Move all entries from "Unreleased" section to a new dated section (e.g., "2026-06-24")
+# Commit this change on development before proceeding
+git add CHANGELOG.md
+git commit -m "chore: update CHANGELOG.md for v2026.06.24"
+git push origin development
+```
+
+**Step 2: Merge development into main and create release tag**
+
 PowerShell (Windows):
 ```powershell
 # in repository root
@@ -116,12 +127,12 @@ Notes:
 Use this template for each release to keep communication and documentation
 consistent.
 
-Release checklist:
+Release checklist (execute in order):
+- [ ] `CHANGELOG.md` updated and committed on `development`
 - [ ] `development` is up to date and green
 - [ ] PR/Merge from `development` to `main` completed
 - [ ] Annotated tag created (`vYYYY.MM.DD`)
 - [ ] `main` and tag pushed to `origin`
-- [ ] `CHANGELOG.md` updated
 - [ ] Release notes published
 
 Release notes template:
