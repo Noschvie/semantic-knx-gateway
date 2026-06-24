@@ -235,13 +235,12 @@ async function writeDatapointValue(uuid, value, stateEngine, tunnelManager) {
 
     const resolvedDpt = normalizeDpt(dpt);
     if (!resolvedDpt) {
-        return res.status(400).json({
-            errors: [{
-                title: 'Bad Request',
-                status: '400',
-                detail: `Unknown or unsupported DPT: ${dpt}`
-            }]
-        });
+        return {
+            error: {
+                status: 400,
+                payload: knxError(400, 'Bad Request', `Unknown or unsupported DPT: ${dpt}`),
+            },
+        };
     }
 
     let nativeValue;
@@ -457,6 +456,12 @@ export function datapointsRouter(stateEngine, tunnelManager) {
         if (value === undefined) {
             return res.status(400).json(
                 knxError(400, 'Bad Request', 'Body must contain data.attributes.value'),
+            );
+        }
+
+        if (body?.data?.type !== 'datapoint') {
+            return res.status(400).json(
+                knxError(400, 'Bad Request', `data.type must be "datapoint", got "${body?.data?.type}"`),
             );
         }
 
