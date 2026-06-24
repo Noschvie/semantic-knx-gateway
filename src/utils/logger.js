@@ -13,8 +13,8 @@ import pino from 'pino';
  *
  * Environment configuration:
  * - LOG_LEVEL: (string) log verbosity, defaults to 'info'
- * - NODE_ENV: when != 'production', enables a human-friendly pretty
- *   transport (pino-pretty) for development consoles.
+ * - PRETTY_LOGS: (boolean) when 'true', enables a human-friendly pretty
+ *   transport (pino-pretty) for readable console output.
  */
 
 /**
@@ -23,14 +23,15 @@ import pino from 'pino';
 const logLevel = process.env.LOG_LEVEL || 'info';
 
 /**
- * Configure optional pretty transport for non-production environments.
- * In production, we keep the default (fast) pino JSON output for performance
- * and structured logging. During development `pino-pretty` is enabled to
- * provide coloured, readable logs with formatted timestamps.
+ * Configure optional pretty transport for readable console output.
+ * In production, you can still enable this by setting PRETTY_LOGS=true.
+ * By default, (PRETTY_LOGS=true), we provide colored, readable logs with
+ * formatted timestamps for better console readability.
  */
-const transport = process.env.NODE_ENV === 'production'
-    ? undefined
-    : {
+const usePrettyLogs = process.env.PRETTY_LOGS !== 'false';
+
+const transport = usePrettyLogs
+    ? {
         target: 'pino-pretty',
         options: {
             colorize: true,
@@ -39,13 +40,15 @@ const transport = process.env.NODE_ENV === 'production'
             /** Hide pid and hostname to reduce noise in console output */
             ignore: 'pid,hostname',
         },
-    };
+    }
+    : undefined;
 
 /**
- * Base logger instance used throughout the app. The `transport` option is
- * omitted in production for best performance.
+ * Base logger instance used throughout the app. The `transport` option
+ * depends on the PRETTY_LOGS environment variable.
  */
 const baseLogger = pino({
+    timestamp: pino.stdTimeFunctions.isoTime,
     level: logLevel,
     transport,
 });

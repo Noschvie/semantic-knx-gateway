@@ -145,6 +145,7 @@ POSTGRES_PASSWORD=change-me
 
 # Logging
 LOG_LEVEL=info
+PRETTY_LOGS=true
 
 # TimescaleDB tuning (set explicitly on Raspberry Pi)
 # TS_TUNE_MEMORY=2GB
