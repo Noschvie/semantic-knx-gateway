@@ -289,7 +289,74 @@ SHA256(abcdef123456_abcdef123456_abcdef123456_)
 
 ---
 
-## Warum PKCE notwendig ist
+## Scopes verstehen – Die richtige Formatierung
+
+### Was sind Scopes?
+
+**Scopes** definieren, **welche Berechtigungen** die App vom Benutzer anfordert. Sie sind **Leerzeichen-getrennt**:
+
+```
+Scopes: read, write, offline_access
+  ↓
+OAuth-Parameter: read write offline_access
+  ↓
+In URL-Form: read%20write%20offline_access
+```
+
+### Scopes in verschiedenen Formaten
+
+| Kontext | Format | Beispiel |
+|---------|--------|----------|
+| **Abstrakt** | Leerzeichen-getrennt | `read write offline_access` |
+| **URL-Parameter** | %20 encoded | `scope=read%20write%20offline_access` |
+| **URL-Parameter (alt)** | + statt Leerzeichen | `scope=read+write+offline_access` |
+| **HTTP POST Body** | Leerzeichen oder encoded | `scope=read%20write%20offline_access` |
+| **curl --data-urlencode** | Leerzeichen (auto-encoded) | `--data-urlencode "scope=read write offline_access"` |
+| **PowerShell/JavaScript** | Leerzeichen (Framework encodet) | `scope: "read write offline_access"` |
+
+### Praktische Beispiele
+
+**❌ Falsch (unencoded in URL):**
+```
+https://oauth.example.com/authorize?scope=read write offline_access
+                                            ↑ Leerzeichen ungültig!
+```
+
+**✅ Richtig (URL-encoded):**
+```
+https://oauth.example.com/authorize?scope=read%20write%20offline_access
+                                            ↑ %20 = Leerzeichen
+```
+
+**✅ Richtig (mit curl):**
+```bash
+curl -X POST "$TOKEN_ENDPOINT" \
+  -d "grant_type=authorization_code" \
+  -d "client_id=$CLIENT_ID" \
+  --data-urlencode "scope=read write offline_access"
+  # ↑ curl macht %20-Encoding automatisch
+```
+
+**✅ Richtig (mit jq URL-Encoding):**
+```bash
+curl "$AUTH_ENDPOINT?scope=$(jq -rn --arg v 'read write offline_access' '$v|@uri')"
+  # ↑ jq encodet: read%20write%20offline_access
+```
+
+### Sicherheits-Hinweis: Scope-Validation
+
+Achte darauf, dass die **angeforderten Scopes gültig** sind:
+
+| Scope | Bedeutung | Typisch für |
+|-------|-----------|------------|
+| `read` | Lesezugriff auf Daten | Alle APIs |
+| `write` | Schreibzugriff | APIs mit Änderungen |
+| `manage` | Volle Verwaltung | Admin-Funktionen |
+| `offline_access` | Refresh-Token erlaubt | Long-lived Sessions |
+| `openid` | OpenID Connect (Identity) | User-basierte Flows |
+| `profile` | Benutzerprofil-Daten | User-basierte Flows |
+
+---
 
 | Szenario | Ohne PKCE | Mit PKCE |
 |----------|-----------|----------|
@@ -319,16 +386,25 @@ SHA256(abcdef123456_abcdef123456_abcdef123456_)
 ## Was bedeutet das für KNX IoT?
 
 ### Heute (client_credentials):
-```javascript
-// Backend ruft OAuth-Endpoint auf
+```bash
 POST /oauth/access
-  grant_type=client_credentials
-  client_id=knx-service-xyz
-  client_secret=geheim
-  scope=read write manage
 
-// Antwort: { access_token, expires_in }
-// Kein refresh_token!
+grant_type=client_credentials
+client_id=knx-service-xyz
+client_secret=geheim
+scope=read%20write%20manage
+
+# Antwort: { access_token, expires_in }
+# Kein refresh_token!
+```
+
+**Oder mit curl (automatisches URL-Encoding):**
+```bash
+curl -X POST https://oauth-provider.com/oauth/access \
+  -d "grant_type=client_credentials" \
+  -d "client_id=knx-service-xyz" \
+  -d "client_secret=geheim" \
+  -d "scope=read write manage"
 ```
 
 ### Zukünftig, wenn User-Auth eingeführt wird (authorization_code + PKCE):
