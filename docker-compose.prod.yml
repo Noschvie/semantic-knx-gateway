@@ -17,10 +17,6 @@ services:
       options:
         max-size: "10m"
         max-file: "5"
-    deploy:
-      resources:
-        limits:
-          memory: 512m
 
   timescaledb:
     restart: unless-stopped
@@ -29,7 +25,3 @@ services:
       options:
         max-size: "10m"
         max-file: "3"
-    deploy:
-      resources:
-        limits:
-          memory: 1g
