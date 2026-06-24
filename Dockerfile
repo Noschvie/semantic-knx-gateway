@@ -34,7 +34,7 @@ ENV NODE_ENV=production
 COPY package*.json ./
 
 # Copy OpenAPI source file used by /api/v2/openapi.json endpoint
-COPY knxiot_api_openapi.yaml ./knxiot_api_openapi.yaml
+COPY docs/knxiot_api_openapi.yaml ./knxiot_api_openapi.yaml
 
 RUN --mount=type=cache,target=/root/.npm npm ci --omit=dev
 
