@@ -51,6 +51,18 @@ Unreleased
 - Accept-header validation now exempts OpenAPI spec endpoints (`/api/v2/openapi.yaml`,
   `/api/v2/openapi.json`, `/api/v2/openapi`) and Swagger UI (`/docs`) from strict
   JSON:API `Accept` enforcement, enabling direct browser access.
+- **`PUT /api/v2/datapoints/values`** – `type` field in each `data[]` item is now
+  validated; requests with `type !== "datapoint"` are rejected with HTTP 400.
+- **`PUT /api/v2/datapoints/by-ga`** – same `type` validation added for consistency.
+- **`PUT /api/v2/datapoints/values`** – fixed a latent `ReferenceError` in
+  `writeDatapointValue()`: invalid DPT now correctly returns
+  `{ error: { status: 400, … } }` instead of calling `res.status()` which is not
+  available in that helper context.
+
+### Removed
+- **`PUT /api/v2/datapoints`** – vendor-extension single-write endpoint removed;
+  use `PUT /api/v2/datapoints/values` (spec-compliant bulk write, responds 204)
+  or `PUT /api/v2/datapoints/by-ga` (write by group address) instead.
 
 2026-06-16
 ----------
