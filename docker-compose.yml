@@ -1,14 +1,13 @@
 ﻿# docker-compose.yml
+# Base configuration – shared by all environments.
+# Do NOT use directly. Always combine with an environment overlay:
+#   Development : docker compose -f docker-compose.yml -f docker-compose.dev.yml  up -d
+#   Production  : docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
 
 services:
   semantic-knx-runtime:
-    build:
-      context: .
-      args:
-        USER_ID: ${USER_ID:-1000}
-        GROUP_ID: ${GROUP_ID:-1000}
+    user: "${USER_ID:-1000}:${GROUP_ID:-1000}"
     container_name: semantic-knx-runtime
-    restart: unless-stopped
     env_file:
       - .env
     environment:
@@ -25,7 +24,12 @@ services:
       - "3000:3000"
     volumes:
       - ./logs:/app/logs
-      - ./config/project-prod.ttl:/app/config/project.ttl:ro
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://127.0.0.1:3000/.well-known/knx || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
     depends_on:
       timescaledb:
         condition: service_healthy
@@ -33,29 +37,25 @@ services:
   timescaledb:
     image: timescale/timescaledb:latest-pg18
     container_name: timescaledb
-    restart: unless-stopped
     environment:
-      - TIMESCALEDB_TELEMETRY="off"
+      - TIMESCALEDB_TELEMETRY=off
       - POSTGRES_USER=${POSTGRES_USERNAME}
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
       - POSTGRES_DB=${POSTGRES_DB}
       - PGDATA=/var/lib/postgresql/data/pgdata
+      - TS_TUNE_MEMORY=${TS_TUNE_MEMORY:-}
+      - TS_TUNE_NUM_CPUS=${TS_TUNE_NUM_CPUS:-}
     ports:
       - "5432:5432"
     volumes:
       - ./volumes/timescaledb/data:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USERNAME} -d ${POSTGRES_DB}"]
-      interval: 10s
+      interval: 30s
       timeout: 5s
       retries: 5
+      start_period: 60s
     logging:
       options:
         max-size: "10m"
         max-file: "3"
-    deploy:
-      resources:
-        limits:
-          memory: 1g
-
-

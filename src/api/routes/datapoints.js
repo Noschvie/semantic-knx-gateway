@@ -4,8 +4,9 @@
 
 import { Router } from 'express';
 import { bearer } from '../middleware/oauth-bearer.js';
+import { DPT_NAME_MAP } from '../../utils/dpt-map.js';
 import { paginate, stableUuid } from './helpers/knx-iot-uuid.js';
-import { getAllLocations, toDatapointResource } from './helpers/knx-iot-transform.js';
+import { toDatapointResource } from './helpers/knx-iot-transform.js';
 import { decodeValueForKnx, toSpecValue } from './helpers/knx-iot-dpt.js';
 import { parseFilters } from './helpers/knx-iot-filters.js';
 
@@ -123,6 +124,63 @@ function applyTimeFilters(entries, filters) {
     });
 }
 
+// ── KNX Datapoint Helper ──────────────────────────────────────────────────────────
+
+function normalizeDpt(inputDpt) {
+    if (!inputDpt) return null;
+    if (/^\d+\.\d+$/.test(inputDpt)) return inputDpt; // already numeric
+    return DPT_NAME_MAP[inputDpt] || null;
+}
+
+function getDatapointUnionKey(item) {
+    const datapointId = item?.datapointId ?? item?.datapoint_id;
+    if (datapointId) return `id:${datapointId}`;
+    if (item?.ga) return `ga:${item.ga}`;
+    return null;
+}
+
+async function getDatapointMappings(stateEngine) {
+    try {
+        const result = await stateEngine.db.query(`
+            SELECT datapoint_id AS "datapointId",
+                   ga,
+                   dpt,
+                   name,
+                   location_id  AS "locationId",
+                   device_id    AS "deviceId"
+            FROM datapoint_mappings
+        `);
+        return result.rows ?? [];
+    } catch {
+        return [];
+    }
+}
+
+async function getDatapointMappingByUuid(uuid, stateEngine) {
+    const mappings = await getDatapointMappings(stateEngine);
+    return mappings.find(m => stableUuid(m.datapointId) === uuid) ?? null;
+}
+
+function toDatapointResourceWithStateMeta(state) {
+    const resource = toDatapointResource(state);
+
+    resource.meta = {
+        ...(resource.meta ?? {}),
+        hasCurrentState: state.hasCurrentState === true,
+    };
+
+    if (state.hasCurrentState !== true) {
+        resource.attributes = {
+            ...(resource.attributes ?? {}),
+            value: null,
+            valueType: 'string',
+            timestamp: null,
+        };
+    }
+
+    return resource;
+}
+
 // ── KNX Write Helper ──────────────────────────────────────────────────────────
 
 function normalizeIncomingValue(value) {
@@ -135,57 +193,111 @@ async function writeDatapointValue(uuid, value, stateEngine, tunnelManager) {
     const valueStr = normalizeIncomingValue(value);
 
     const allStates = await stateEngine.getAllStates().catch(() => []);
-    const state = allStates.find(s => stableUuid(s.datapointId) === uuid);
+    const currentState = allStates.find(s => stableUuid(s.datapointId) === uuid) ?? null;
+    const mapping = await getDatapointMappingByUuid(uuid, stateEngine);
 
-    if (!state) {
-        return { error: { status: 404, payload: knxError(404, 'Not Found', `Datapoint with id "${uuid}" not found`) } };
+    // If neither a current state nor a mapping exists, > a true 404 error
+    if (!currentState && !mapping) {
+        return {
+            error: {
+                status: 404,
+                payload: knxError(404, 'Not Found', `Datapoint with id "${uuid}" not found`),
+            },
+        };
     }
 
-    if (state.writable === false) {
-        return { error: { status: 403, payload: knxError(403, 'Forbidden', `Datapoint "${state.name ?? state.ga}" is not writable`) } };
+    // Assemble writing context from state + mapping
+    const datapointId = currentState?.datapointId ?? mapping?.datapointId;
+    const ga = currentState?.ga ?? mapping?.ga;
+    const dpt = currentState?.dpt ?? mapping?.dpt;
+    const name = currentState?.name ?? mapping?.name ?? ga;
+
+    // Only strictly prohibit writable if explicitly false.
+    const writable = currentState?.writable;
+    if (writable === false) {
+        return {
+            error: {
+                status: 403,
+                payload: knxError(403, 'Forbidden', `Datapoint "${name}" is not writable`),
+            },
+        };
+    }
+
+    // KNX write is not possible without GA/DPT
+    if (!ga || !dpt || !datapointId) {
+        return {
+            error: {
+                status: 422,
+                payload: knxError(422, 'Unprocessable Entity', `Missing datapoint metadata for "${uuid}" (ga/dpt/datapointId)`),
+            },
+        };
+    }
+
+    const resolvedDpt = normalizeDpt(dpt);
+    if (!resolvedDpt) {
+        return {
+            error: {
+                status: 400,
+                payload: knxError(400, 'Bad Request', `Unknown or unsupported DPT: ${dpt}`),
+            },
+        };
     }
 
     let nativeValue;
     try {
-        nativeValue = decodeValueForKnx(valueStr, state.dpt);
+        nativeValue = decodeValueForKnx(valueStr, resolvedDpt);
     } catch (err) {
-        return { error: { status: 422, payload: knxError(422, 'Unprocessable Entity', err.message) } };
+        return {
+            error: {
+                status: 422,
+                payload: knxError(422, 'Unprocessable Entity', err.message),
+            },
+        };
     }
 
     if (!tunnelManager) {
-        return { error: { status: 503, payload: knxError(503, 'Service Unavailable', 'No KNX connection') } };
+        return {
+            error: {
+                status: 503,
+                payload: knxError(503, 'Service Unavailable', 'No KNX connection'),
+            },
+        };
     }
 
     try {
-        await tunnelManager.write(state.ga, nativeValue, state.dpt);
+        await tunnelManager.write(ga, nativeValue, resolvedDpt);
     } catch (err) {
-        return { error: { status: 502, payload: knxError(502, 'Bad Gateway', err.message) } };
+        return {
+            error: {
+                status: 502,
+                payload: knxError(502, 'Bad Gateway', err.message),
+            },
+        };
     }
 
     const timestamp = new Date();
     try {
-        await stateEngine.updateState(state.datapointId, {
-            ga:        state.ga,
-            value:     nativeValue,
-            dpt:       state.dpt,
-            source:    'api',
+        await stateEngine.updateState(datapointId, {
+            ga,
+            value: nativeValue,
+            dpt,
+            source: 'api',
             timestamp,
         });
     } catch (err) {
-        // Non-critical: KNX bus write already succeeded.
-        console.warn(`[knx-iot] State update after PUT failed for ${state.ga}: ${err.message}`);
+        console.warn(`[knx-iot] State update after PUT failed for ${ga}: ${err.message}`);
     }
 
     return {
         data: {
-            id:   uuid,
+            id: uuid,
             type: 'datapoint',
             attributes: {
-                value:     valueStr,
+                value: valueStr,
                 valueType: 'string',
                 timestamp: timestamp.toISOString(),
             },
-            meta: { datapointId: state.datapointId, ga: state.ga, dpt: state.dpt },
+            meta: { datapointId, ga, dpt },
         },
     };
 }
@@ -205,55 +317,89 @@ export function datapointsRouter(stateEngine, tunnelManager) {
             const rawNumber = req.query['page[number]'] ?? req.query.page?.number;
             const rawSize   = req.query['page[size]']   ?? req.query.page?.size;
 
-            // Vendor filters: applied before resource mapping on raw states
             const filterDeviceId    = req.query['filter[deviceId]']    ?? req.query.filter?.deviceId;
             const filterLocationId  = req.query['filter[locationId]']  ?? req.query.filter?.locationId;
             const filterGa          = req.query['filter[ga]']          ?? req.query.filter?.ga;
             const filterDatapointId = req.query['filter[datapointId]'] ?? req.query.filter?.datapointId;
 
-            // filter[locationId] → resolve internal location ID
-            let resolvedLocationId = null;
-            if (filterLocationId) {
-                const allLocations = await getAllLocations(stateEngine);
-                const loc = allLocations.find(
-                    l => stableUuid(l.id ?? l.uri ?? '') === filterLocationId,
-                );
-                if (!loc) {
-                    return res.json({ meta: { collection: { number: 0, size: 0, total: 0 } }, data: [] });
-                }
-                resolvedLocationId = loc.id;
+            const [allStates, datapointMappings] = await Promise.all([
+                stateEngine.getAllStates(),
+                getDatapointMappings(stateEngine),
+            ]);
+
+            const mappingByDatapointId = new Map();
+            const mappingByGa = new Map();
+            const unionByKey = new Map();
+
+            for (const mapping of datapointMappings) {
+                if (mapping.datapointId) mappingByDatapointId.set(mapping.datapointId, mapping);
+                if (mapping.ga) mappingByGa.set(mapping.ga, mapping);
+
+                const key = getDatapointUnionKey(mapping);
+                if (!key) continue;
+
+                unionByKey.set(key, {
+                    ...mapping,
+                    value: null,
+                    updatedAt: null,
+                    hasCurrentState: false,
+                });
             }
 
-            let allStates = await stateEngine.getAllStates(
-                resolvedLocationId ? { locationId: resolvedLocationId } : {},
-            );
+            for (const state of allStates) {
+                const mapping = mappingByDatapointId.get(state.datapointId)
+                    ?? mappingByGa.get(state.ga)
+                    ?? null;
 
-            // Apply vendor filters on raw states
-            if (filterGa)          allStates = allStates.filter(s => s.ga === filterGa);
-            if (filterDatapointId) allStates = allStates.filter(s => s.datapointId === filterDatapointId);
+                const merged = {
+                    ...mapping,
+                    ...state,
+                    datapointId: state.datapointId ?? mapping?.datapointId,
+                    ga: state.ga ?? mapping?.ga,
+                    dpt: state.dpt ?? mapping?.dpt,
+                    name: state.name ?? mapping?.name,
+                    locationId: state.locationId ?? mapping?.locationId ?? null,
+                    deviceId: mapping?.deviceId ?? null,
+                    hasCurrentState: true,
+                };
+
+                const key = getDatapointUnionKey(merged);
+                if (!key) continue;
+
+                unionByKey.set(key, merged);
+            }
+
+            let unionDatapoints = Array.from(unionByKey.values());
+
+            if (filterGa) {
+                unionDatapoints = unionDatapoints.filter((s) => s.ga === filterGa);
+            }
+
+            if (filterDatapointId) {
+                unionDatapoints = unionDatapoints.filter((s) =>
+                    s.datapointId === filterDatapointId || stableUuid(s.datapointId ?? '') === filterDatapointId,
+                );
+            }
+
+            if (filterLocationId) {
+                unionDatapoints = unionDatapoints.filter(
+                    (s) => s.locationId && stableUuid(s.locationId) === filterLocationId,
+                );
+            }
 
             if (filterDeviceId) {
-                const allDevices  = await stateEngine.semanticEngine?.getAllDevices() ?? [];
-                const device = allDevices.find(
-                    d => stableUuid(d.id ?? d.uri ?? '') === filterDeviceId,
+                unionDatapoints = unionDatapoints.filter(
+                    (s) => s.deviceId && stableUuid(s.deviceId) === filterDeviceId,
                 );
-                if (!device) {
-                    return res.json({ meta: { collection: { number: 0, size: 0, total: 0 } }, data: [] });
-                }
-                const deviceGas = stateEngine.getGasByDevice?.(device.id ?? device.uri) ?? new Set();
-                allStates = allStates.filter(s => deviceGas.has(s.ga));
             }
 
-            // Build JSON:API resources
-            const resources = allStates.map(toDatapointResource);
+            const resources = unionDatapoints.map(toDatapointResourceWithStateMeta);
 
-            // Spec-compliant filters (typeFilter / tagFilter / attributeFilter / timeFilter)
-            // filter[timestamp] is applied on resources (attributes.timestamp)
-            const filters          = parseFilters(req.query);
-            const specFilters      = filters.filter(f => f.key !== 'deviceId' &&
-                                                         f.key !== 'locationId' &&
-                                                         f.key !== 'ga' &&
-                                                         f.key !== 'datapointId');
+            const filters = parseFilters(req.query);
+            const specFilters = filters.filter(f => f.key !== 'deviceId' &&
+                f.key !== 'locationId' &&
+                f.key !== 'ga' &&
+                f.key !== 'datapointId');
             const filteredResources = applyAllFilters(resources, specFilters);
 
             const { items, total, number, size } = paginate(filteredResources, rawNumber, rawSize);
@@ -313,6 +459,12 @@ export function datapointsRouter(stateEngine, tunnelManager) {
             );
         }
 
+        if (body?.data?.type !== 'datapoint') {
+            return res.status(400).json(
+                knxError(400, 'Bad Request', `data.type must be "datapoint", got "${body?.data?.type}"`),
+            );
+        }
+
         // Resolve GA → state
         const allStates = await stateEngine.getAllStates().catch(() => []);
         const state = allStates.find(s => s.ga === ga);
@@ -339,17 +491,71 @@ export function datapointsRouter(stateEngine, tunnelManager) {
             const rawNumber = req.query['page[number]'] ?? req.query.page?.number;
             const rawSize   = req.query['page[size]']   ?? req.query.page?.size;
 
-            const allStates = await stateEngine.getAllStates();
-            const state = allStates.find(
-                s => stableUuid(s.datapointId) === id || s.datapointId === id,
+            const [allStates, datapointMappings] = await Promise.all([
+                stateEngine.getAllStates(),
+                getDatapointMappings(stateEngine),
+            ]);
+
+            const mappingByDatapointId = new Map();
+            const mappingByGa = new Map();
+            const unionByKey = new Map();
+
+            for (const mapping of datapointMappings) {
+                if (mapping.datapointId) mappingByDatapointId.set(mapping.datapointId, mapping);
+                if (mapping.ga) mappingByGa.set(mapping.ga, mapping);
+
+                const key = getDatapointUnionKey(mapping);
+                if (!key) continue;
+
+                unionByKey.set(key, {
+                    ...mapping,
+                    value: null,
+                    updatedAt: null,
+                    hasCurrentState: false,
+                });
+            }
+
+            for (const state of allStates) {
+                const mapping = mappingByDatapointId.get(state.datapointId)
+                    ?? mappingByGa.get(state.ga)
+                    ?? null;
+
+                const merged = {
+                    ...mapping,
+                    ...state,
+                    datapointId: state.datapointId ?? mapping?.datapointId,
+                    ga: state.ga ?? mapping?.ga,
+                    dpt: state.dpt ?? mapping?.dpt,
+                    name: state.name ?? mapping?.name,
+                    locationId: state.locationId ?? mapping?.locationId ?? null,
+                    deviceId: mapping?.deviceId ?? null,
+                    hasCurrentState: true,
+                };
+
+                const key = getDatapointUnionKey(merged);
+                if (!key) continue;
+
+                unionByKey.set(key, merged);
+            }
+
+            const unionDatapoints = Array.from(unionByKey.values());
+
+            const datapoint = unionDatapoints.find(
+                (dp) => stableUuid(dp.datapointId ?? '') === id
+                    || dp.datapointId === id
+                    || dp.ga === id
+                    || stableUuid(dp.ga ?? '') === id,
             );
 
-            if (!state) {
+            if (!datapoint) {
                 return res.status(404).json(knxError(404, 'Not Found', `Datapoint ${id} not found`));
             }
 
-            // Load all history entries (without pre-filter – we filter ourselves)
-            const history = await stateEngine.getHistory(state.datapointId, { limit: 100_000 });
+            // Load history only if datapoint has current state; offline datapoints have no history
+            let history = [];
+            if (datapoint.hasCurrentState === true) {
+                history = await stateEngine.getHistory(datapoint.datapointId, { limit: 100_000 });
+            }
 
             // Apply filter[timestamp][ge/le/gt/lt] (RFC 3339)
             const filters        = parseFilters(req.query);
@@ -361,7 +567,7 @@ export function datapointsRouter(stateEngine, tunnelManager) {
             res.json({
                 meta: { collection: { number, size, total } },
                 data: items.map(event => ({
-                    id:         stableUuid(`${state.datapointId}-${event.timestamp}`),
+                    id:         stableUuid(`${datapoint.datapointId}-${event.timestamp}`),
                     type:       'datapoint',
                     attributes: {
                         timestamp: event.timestamp,
@@ -379,16 +585,67 @@ export function datapointsRouter(stateEngine, tunnelManager) {
         try {
             const { id } = req.params;
 
-            const allStates = await stateEngine.getAllStates();
-            const state = allStates.find(
-                s => stableUuid(s.datapointId) === id || s.datapointId === id,
+            const [allStates, datapointMappings] = await Promise.all([
+                stateEngine.getAllStates(),
+                getDatapointMappings(stateEngine),
+            ]);
+
+            const mappingByDatapointId = new Map();
+            const mappingByGa = new Map();
+            const unionByKey = new Map();
+
+            for (const mapping of datapointMappings) {
+                if (mapping.datapointId) mappingByDatapointId.set(mapping.datapointId, mapping);
+                if (mapping.ga) mappingByGa.set(mapping.ga, mapping);
+
+                const key = getDatapointUnionKey(mapping);
+                if (!key) continue;
+
+                unionByKey.set(key, {
+                    ...mapping,
+                    value: null,
+                    updatedAt: null,
+                    hasCurrentState: false,
+                });
+            }
+
+            for (const state of allStates) {
+                const mapping = mappingByDatapointId.get(state.datapointId)
+                    ?? mappingByGa.get(state.ga)
+                    ?? null;
+
+                const merged = {
+                    ...mapping,
+                    ...state,
+                    datapointId: state.datapointId ?? mapping?.datapointId,
+                    ga: state.ga ?? mapping?.ga,
+                    dpt: state.dpt ?? mapping?.dpt,
+                    name: state.name ?? mapping?.name,
+                    locationId: state.locationId ?? mapping?.locationId ?? null,
+                    deviceId: mapping?.deviceId ?? null,
+                    hasCurrentState: true,
+                };
+
+                const key = getDatapointUnionKey(merged);
+                if (!key) continue;
+
+                unionByKey.set(key, merged);
+            }
+
+            const unionDatapoints = Array.from(unionByKey.values());
+
+            const datapoint = unionDatapoints.find(
+                (dp) => stableUuid(dp.datapointId ?? '') === id
+                    || dp.datapointId === id
+                    || dp.ga === id
+                    || stableUuid(dp.ga ?? '') === id,
             );
 
-            if (!state) {
+            if (!datapoint) {
                 return res.status(404).json(knxError(404, 'Not Found', `Datapoint ${id} not found`));
             }
 
-            res.json({ data: toDatapointResource(state) });
+            res.json({ data: toDatapointResourceWithStateMeta(datapoint) });
         } catch (error) {
             res.status(500).json(knxError(500, 'Internal Server Error', error.message));
         }
@@ -434,29 +691,18 @@ export function datapointsRouter(stateEngine, tunnelManager) {
                 );
             }
 
+            if (item.type !== 'datapoint') {
+                return res.status(400).json(
+                    knxError(400, 'Bad Request', `Each data item must have type "datapoint", got "${item.type}"`),
+                );
+            }
+
             const result = await writeDatapointValue(item.id, item.attributes.value, stateEngine, tunnelManager);
             if (result.error) return res.status(result.error.status).json(result.error.payload);
         }
 
         // Spec §/datapoints/values: 204 No Content for synchronous processing
         return res.status(204).end();
-    });
-
-    // ── PUT /api/v2/datapoints ────────────────────────────────────────────
-    // Vendor extension: single datapoint write via JSON:API body
-    router.put('/', bearer('write'), async(req, res) => {
-        const body = req.body;
-
-        if (!body?.data?.id || body?.data?.attributes?.value === undefined) {
-            return res.status(400).json(
-                knxError(400, 'Bad Request', 'Body must contain data.id and data.attributes.value'),
-            );
-        }
-
-        const result = await writeDatapointValue(body.data.id, body.data.attributes.value, stateEngine, tunnelManager);
-        if (result.error) return res.status(result.error.status).json(result.error.payload);
-
-        return res.status(200).json({ data: result.data });
     });
 
     return router;

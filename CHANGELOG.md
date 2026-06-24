@@ -8,6 +8,65 @@ contributors and users to follow meaningful changes over time.
 Unreleased
 ----------
 
+2026-06-24
+----------
+
+### Added
+- `meta.hasCurrentState` flag in datapoint resources to distinguish online
+  (runtime state exists) from offline (semantic/TTL-only) datapoints.
+- Semantic datapoint mappings are now exposed via `/datapoints` collection endpoint
+  even before the first KNX telegram arrives, enabling clients to discover full
+  datapoint inventory (including group addresses) without waiting for bus activity.
+- Add platform notes for Raspberry Pi regarding TimescaleDB auto-tuning
+- **`GET /api/v2/openapi.yaml`** — new endpoint serving the raw OpenAPI specification
+  (from `knxiot_api_openapi.yaml` at runtime); browser-compatible, no strict Accept header required.
+  `knxiot_api_openapi.yaml` added to Docker runtime image via `Dockerfile` `COPY` instruction.
+- **`GET /docs`** — Swagger UI integrated via `swagger-ui-express`, loads spec from
+  `/api/v2/openapi.yaml`; interactive API exploration available in the browser.
+- **`GET /api/v2/node` – currentSubscriptions metric** now aggregates both persistent
+  (database) and runtime (WebSocket) subscriptions:
+  - `SubscriptionStore.countActive({ includeExpired })` — new method to efficiently count
+    non-expired active subscriptions from the database.
+  - `MessagingWebSocketServer.getActiveSubscriptionCount()` — new method to report the
+    number of currently connected WebSocket clients.
+  - `/node` endpoint now sums DB subscriptions (valid/non-expired) and active WS clients
+    to report `currentSubscriptions`, providing a complete real-time view of all subscription types.
+
+### Changed
+- **`GET /api/v2/datapoints`** – now returns union of semantic (ETS/TTL-defined)
+  and runtime datapoints instead of runtime-only. Offline datapoints appear with
+  `value: null`, `timestamp: null`, and `hasCurrentState: false`.
+- **`GET /api/v2/datapoints/{id}`** – now searches semantic + runtime union,
+  so offline/semantic-only datapoints return data instead of 404.
+- **`GET /api/v2/datapoints/{id}/timeseries`** – now searches semantic + runtime
+  union; offline datapoints return empty history list (not 404). Only datapoints
+  with `hasCurrentState: true` generate history entries.
+- **Filter behavior** (`filter[ga]`, `filter[datapointId]`, `filter[locationId]`,
+  `filter[deviceId]`) now matches semantic datapoints as well, enabling discovery
+  of offline sensors by group address or location.
+- Datapoints without runtime state display `attributes.value: null`,
+  `attributes.timestamp: null` per spec-compliance; spec-enabled clients can
+  distinguish via `meta.hasCurrentState: false`.
+- Docker runtime image cleaned up: removed `curl`, set `NODE_ENV=production`,
+  and moved `USER_ID`/`GROUP_ID` defaults to `docker-compose.yml` to avoid
+  duplicated build-time defaults.
+- Renamed `POSTGRES_USER` environment variable to `POSTGRES_USERNAME` for naming consistency.
+- Accept-header validation now exempts OpenAPI spec endpoints (`/api/v2/openapi.yaml`,
+  `/api/v2/openapi.json`, `/api/v2/openapi`) and Swagger UI (`/docs`) from strict
+  JSON:API `Accept` enforcement, enabling direct browser access.
+- **`PUT /api/v2/datapoints/values`** – `type` field in each `data[]` item is now
+  validated; requests with `type !== "datapoint"` are rejected with HTTP 400.
+- **`PUT /api/v2/datapoints/by-ga`** – same `type` validation added for consistency.
+- **`PUT /api/v2/datapoints/values`** – fixed a latent `ReferenceError` in
+  `writeDatapointValue()`: invalid DPT now correctly returns
+  `{ error: { status: 400, … } }` instead of calling `res.status()` which is not
+  available in that helper context.
+
+### Removed
+- **`PUT /api/v2/datapoints`** – vendor-extension single-write endpoint removed;
+  use `PUT /api/v2/datapoints/values` (spec-compliant bulk write, responds 204)
+  or `PUT /api/v2/datapoints/by-ga` (write by group address) instead.
+
 2026-06-16
 ----------
 

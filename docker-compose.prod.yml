@@ -1,0 +1,27 @@
+# docker-compose.prod.yml
+# Production overlay – pulls pre-built image from GHCR.
+# Usage: docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+# Tested on: Raspberry Pi 4/5 (arm64), Linux x86_64
+
+services:
+  semantic-knx-runtime:
+    image: ghcr.io/noschvie/semantic-knx-gateway:development
+    restart: unless-stopped
+    environment:
+      - TIMESCALEDB_ENABLED=${TIMESCALEDB_ENABLED:-true}
+    volumes:
+      # Mount production project file
+      - ./config/project-prod.ttl:/app/config/project.ttl:ro
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
+
+  timescaledb:
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"

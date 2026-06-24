@@ -4,6 +4,7 @@
 
 import express from 'express';
 import { readFile as fsReadFile } from 'node:fs/promises';
+import swaggerUi from 'swagger-ui-express';
 
 import { createLogger } from '../utils/logger.js';
 import { formatTimestamp } from '../utils/timezone.js';
@@ -26,7 +27,10 @@ import { MessagingWebSocketServer } from './routes/messaging-websocket-server.js
 
 // ── KNX IoT Spec §Errors – JSON:API error shape (./schemas/Errors.json) ──────
 const KNX_SCHEMA_LINK = 'https://schema.knx.org/2020/api';
-const API_BASE = '/api/v2';
+const OPENAPI_SPEC_PATH = new URL('./knxiot_api_openapi.yaml', import.meta.url);
+
+export const API_VERSION = 'v2';
+export const API_BASE = `/api/${API_VERSION}`;
 
 /**
  * Build a spec-compliant JSON:API error body.
@@ -106,6 +110,8 @@ export class RestAPI {
         this.tunnelManager = tunnelManager;
         this.app = express();
         this.server = null;
+        this.openapiYaml = null;
+        this.openapiJson = null;
         this.websocketApi = new MessagingWebSocketServer(this.stateEngine, this.tunnelManager);
 
         // Store before setupRoutes() - used in router and dispatcher
@@ -126,6 +132,24 @@ export class RestAPI {
         this.setupRoutes();
     }
 
+    async preloadOpenApiSpec() {
+        try {
+            const yamlModule = await import('yaml');
+            this.openapiYaml = await fsReadFile(OPENAPI_SPEC_PATH.pathname, 'utf8');
+            this.openapiJson = yamlModule.parse(this.openapiYaml);
+            this.logger.info('✅ OpenAPI spec preloaded successfully');
+        } catch (err) {
+            this.openapiYaml = null;
+            this.openapiJson = null;
+            this.logger.error({
+                msg: `Failed to preload OpenAPI spec: ${err.message}`,
+                error: err.message,
+                stack: err.stack,
+                specPath: OPENAPI_SPEC_PATH.pathname,
+            });
+        }
+    }
+
     // ── GLOBAL JSON:API MIDDLEWARE ────────────────────────────────────────────
     setupMiddleware() {
         // ── JSON Parser ───────────────────────────────────────────────────────
@@ -143,20 +167,34 @@ export class RestAPI {
             // .well-known endpoints return specific MIME types (e.g. PKCS#7 for iDevID)
             if (req.path.includes('/.well-known')) return next();
 
-            // JSON:API Response Content-Type
-            res.setHeader('Content-Type', 'application/vnd.api+json');
+            // Swagger UI static assets serve their own content types
+            if (req.path.startsWith('/docs')) return next();
 
             // ── ACCEPT HEADER VALIDATION ──────────────────────────────────────
             const accept = req.headers.accept;
 
-            if (
-                accept &&
-                accept !== '*/*' &&
-                !accept.includes('application/vnd.api+json')
-            ) {
+            const isOpenApiSpecEndpoint =
+                req.method === 'GET' &&
+                (
+                    req.path === `${API_BASE}/openapi.json` ||
+                    req.path === `${API_BASE}/openapi` ||
+                    req.path === `${API_BASE}/openapi.yaml`
+                );
+
+            const acceptsJsonApi = accept?.includes('application/vnd.api+json');
+            const acceptsAny = accept === '*/*';
+
+            // Keep strict JSON:API checks for all normal API endpoints
+            if (!isOpenApiSpecEndpoint && accept && !acceptsAny && !acceptsJsonApi) {
                 return res.status(406).json(
                     knxError(406, 'Not Acceptable', 'Only application/vnd.api+json is supported in Accept header.'),
                 );
+            }
+
+            // Set default response Content-Type only for JSON:API endpoints
+            // OpenAPI endpoint is exempt from strict Accept enforcement (browser compatibility)
+            if (!isOpenApiSpecEndpoint) {
+                res.setHeader('Content-Type', 'application/vnd.api+json');
             }
 
             // ── CONTENT-TYPE VALIDATION ───────────────────────────────────────
@@ -265,6 +303,17 @@ export class RestAPI {
         // OAuth2 token endpoint (KNX IoT spec §/oauth/access)
         this.app.use('/oauth', oauthRouter());
 
+        // Swagger UI
+        this.app.use(
+            '/docs',
+            swaggerUi.serve,
+            swaggerUi.setup(null, {
+                swaggerOptions: {
+                    url: `${API_BASE}/openapi.json`,
+                },
+            }),
+        );
+
         // /.well-known/knx - KNX IoT discovery endpoint (required by spec)
         this.app.get(`${API_BASE}/.well-known/knx/idevid`, async(req, res) => {
             const certPath = process.env.IDEVID_CERT_PATH;
@@ -320,6 +369,37 @@ export class RestAPI {
             });
         });
 
+        // ── OpenAPI spec endpoint ────────────────────────────────────────────
+        this.app.get(`${API_BASE}/openapi.json`, (req, res) => {
+            if (!this.openapiJson) {
+                return res.status(500).json(
+                    knxError(500, 'Internal Server Error', 'Failed to load OpenAPI specification.'),
+                );
+            }
+
+            res.status(200)
+                .set('Content-Type', 'application/json')
+                .json(this.openapiJson);
+        });
+
+        // ── OpenAPI spec endpoint (YAML) ─────────────────────────────────────
+        this.app.get(`${API_BASE}/openapi.yaml`, (req, res) => {
+            if (!this.openapiYaml) {
+                return res.status(500).json(
+                    knxError(500, 'Internal Server Error', 'Failed to load OpenAPI YAML specification.'),
+                );
+            }
+
+            res.status(200)
+                .set('Content-Type', 'application/yaml; charset=utf-8')
+                .send(this.openapiYaml);
+        });
+
+        // Optional alias
+        this.app.get(`${API_BASE}/openapi`, (req, res) => {
+            res.redirect(308, `${API_BASE}/openapi.yaml`);
+        });
+
         // ── API v2 KNX IoT routes ─────────────────────────────────────────────
         this.app.use(`${API_BASE}/datapoints`, datapointsRouter(this.stateEngine, this.tunnelManager));
         this.app.use(`${API_BASE}/functions`, functionsRouter(this.semanticEngine));
@@ -370,11 +450,14 @@ export class RestAPI {
 
     async start() {
         const port = parseInt(process.env.API_PORT || '3000');
+        await this.preloadOpenApiSpec();
 
         return new Promise((resolve) => {
             this.server = this.app.listen(port, '0.0.0.0', () => {
                 this.logger.info(`✅ REST API listening on http://0.0.0.0:${port}`);
                 this.websocketApi.start(this.server);
+                // Make WebSocket instance accessible to state engine for subscription counting
+                this.stateEngine.messagingWebSocket = this.websocketApi;
                 this.logger.info(`✅ WebSocket listening on ws://0.0.0.0:${port}/messaging/ws (subprotocol gw.knx.org)`);
                 this.dispatcher.start();
                 resolve();

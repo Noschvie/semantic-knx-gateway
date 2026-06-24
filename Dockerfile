@@ -1,12 +1,14 @@
+# syntax=docker/dockerfile:1.7
+
 # ─────────────────────────────────────────────
 # Stage 1: Build (esbuild – bundle src/ only)
 # ─────────────────────────────────────────────
-FROM node:24-alpine AS builder
+FROM --platform=$BUILDPLATFORM node:24-alpine AS builder
 
 WORKDIR /app
 
 COPY package*.json ./
-RUN npm ci
+RUN --mount=type=cache,target=/root/.npm npm ci
 
 COPY src ./src
 
@@ -26,21 +28,18 @@ FROM node:24-alpine
 
 WORKDIR /app
 
-ARG USER_ID=1000
-ARG GROUP_ID=1000
-
-RUN apk add --no-cache curl
+ENV NODE_ENV=production
 
 # Install production dependencies only (no devDependencies)
 COPY package*.json ./
-RUN npm ci --omit=dev
+
+# Copy OpenAPI source file used by /api/v2/openapi.json endpoint
+COPY docs/knxiot_api_openapi.yaml ./knxiot_api_openapi.yaml
+
+RUN --mount=type=cache,target=/root/.npm npm ci --omit=dev
 
 # Copy bundled code (no src/ needed at runtime)
 COPY --from=builder /app/dist/server.js ./server.js
-
-RUN chown -R ${USER_ID}:${GROUP_ID} /app
-
-USER ${USER_ID}:${GROUP_ID}
 
 EXPOSE 3000
 

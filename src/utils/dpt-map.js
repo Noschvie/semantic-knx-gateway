@@ -77,6 +77,7 @@ export const DPT_NAME_MAP = {
     'valueTemp':        '9.001',
     'valueLux':         '9.004',
     'valueHumidity':    '9.007',
+    'valueAirQuality':  '9.008',
     'valuePpm':         '9.008',
     'valueWsp':         '9.005',
     'valueVolt':        '9.020',

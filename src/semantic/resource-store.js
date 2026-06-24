@@ -86,25 +86,27 @@ export class ResourceStore {
      * Store relationships
      */
     async storeRelationships(client, relationships) {
-        const query = `
-      CREATE TABLE IF NOT EXISTS semantic_relationships (
-        subject TEXT NOT NULL,
-        predicate TEXT NOT NULL,
-        object TEXT NOT NULL,
-        PRIMARY KEY (subject, predicate, object)
-      )
-    `;
-        await client.query(query);
-
         for (const rel of relationships) {
             const insertQuery = `
-        INSERT INTO semantic_relationships (subject, predicate, object)
-        VALUES ($1, $2, $3)
-        ON CONFLICT DO NOTHING
-      `;
+                INSERT INTO semantic_relationships (subject, predicate, object)
+                VALUES ($1, $2, $3)
+                ON CONFLICT DO NOTHING
+              `;
 
             await client.query(insertQuery, [rel.subject, rel.predicate, rel.object]);
         }
+    }
+
+    /**
+     * Safely parse a resource row returned by pg.
+     * pg auto-parses JSONB columns, but this guards against string returns
+     * in edge cases (e.g. raw SQL clients or test stubs).
+     */
+    parseResource(row) {
+        if (!row?.resource) return null;
+        return typeof row.resource === 'string'
+            ? JSON.parse(row.resource)
+            : row.resource;
     }
 
     /**
@@ -112,7 +114,7 @@ export class ResourceStore {
      */
     async getResource(id) {
         const result = await this.db.query(
-            'SELECT * FROM semantic_resources WHERE id = $1',
+            'SELECT resource FROM semantic_resources WHERE id = $1',
             [id],
         );
 
@@ -120,7 +122,7 @@ export class ResourceStore {
             return null;
         }
 
-        return result.rows[0].resource;
+        return this.parseResource(result.rows[0]);
     }
 
     /**
@@ -128,11 +130,11 @@ export class ResourceStore {
      */
     async getResourcesByType(type) {
         const result = await this.db.query(
-            'SELECT * FROM semantic_resources WHERE type = $1',
+            'SELECT resource FROM semantic_resources WHERE type = $1',
             [type],
         );
 
-        return result.rows.map(row => row.resource);
+        return result.rows.map(row => this.parseResource(row));
     }
 
     /**
@@ -211,22 +213,43 @@ export class ResourceStore {
       WHERE rel.subject = $1 AND rel.predicate = 'hasDatapoint'
     `, [deviceId]);
 
-        device.datapoints = result.rows.map(row => row.resource);
+        device.datapoints = result.rows.map(row => this.parseResource(row));
 
         return device;
     }
 
     /**
-     * Search resources
+     * Search resources by a text term.
+     *
+     * Uses a pg_trgm GIN index on resource::text for efficient
+     * case-insensitive ILIKE '%...%' matching.
+     *
+     * @param {string} query       - Search term (case-insensitive)
+     * @param {string} [type]      - Optional resource type filter
+     * @param {number} [limit=100] - Maximum number of results
+     * @returns {Promise<object[]>} Array of matching resource objects
      */
-    async searchResources(query) {
-        const result = await this.db.query(`
-      SELECT * FROM semantic_resources
-      WHERE resource::text ILIKE $1
-      LIMIT 100
-    `, [`%${query}%`]);
+    async searchResources(query, type = null, limit = 100) {
+        const params = [`%${query}%`, limit];
+        const typeClause = type ? `AND type = $3` : '';
+        if (type) params.splice(1, 0, type); // insert type before limit
 
-        return result.rows.map(row => row.resource);
+        const sql = `
+            SELECT resource
+            FROM semantic_resources
+            WHERE resource::text ILIKE $1
+            ${typeClause}
+            ORDER BY updated_at DESC
+            LIMIT $${params.length}
+        `;
+
+        const result = await this.db.query(sql, params);
+
+        return result.rows.map(row =>
+            typeof row.resource === 'string'
+                ? JSON.parse(row.resource)
+                : row.resource,
+        );
     }
 }
 

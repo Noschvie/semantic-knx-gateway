@@ -18,7 +18,7 @@ export class PostgresClient {
             host: process.env.POSTGRES_HOST || 'localhost',
             port: parseInt(process.env.POSTGRES_PORT || '5432'),
             database: process.env.POSTGRES_DB || 'knx',
-            user: process.env.POSTGRES_USER || 'knx',
+            user: process.env.POSTGRES_USERNAME || 'knx',
             password: process.env.POSTGRES_PASSWORD || 'knx',
             max: 20,
             idleTimeoutMillis: 30000,
@@ -51,6 +51,11 @@ export class PostgresClient {
 
         try {
             await client.query('BEGIN');
+
+            // Enable pg_trgm extension for ILIKE index support
+            await client.query(`
+                CREATE EXTENSION IF NOT EXISTS pg_trgm;
+            `);
 
             // Enable TimescaleDB extension
             await client.query(`
@@ -106,6 +111,23 @@ export class PostgresClient {
               updated_at TIMESTAMPTZ DEFAULT NOW()
             );
           `);
+
+            // Table: semantic_relationships
+            await client.query(`
+                CREATE TABLE IF NOT EXISTS semantic_relationships (
+                    subject   TEXT NOT NULL,
+                    predicate TEXT NOT NULL,
+                    object    TEXT NOT NULL,
+                    PRIMARY KEY (subject, predicate, object)
+                );
+            `);
+
+            await client.query(`
+                CREATE INDEX IF NOT EXISTS idx_relationships_subject
+                  ON semantic_relationships (subject, predicate);
+                CREATE INDEX IF NOT EXISTS idx_relationships_object
+                  ON semantic_relationships (object, predicate);
+            `);
 
             // Table: datapoint_mappings
             await client.query(`
@@ -217,6 +239,8 @@ export class PostgresClient {
             CREATE INDEX IF NOT EXISTS idx_events_ga ON knx_events(ga, ts DESC);
             CREATE INDEX IF NOT EXISTS idx_events_datapoint ON knx_events(datapoint_id, ts DESC);
             CREATE INDEX IF NOT EXISTS idx_resources_type ON semantic_resources(type);
+            CREATE INDEX IF NOT EXISTS idx_resources_trgm
+                ON semantic_resources USING GIN ((resource::text) gin_trgm_ops);
             CREATE INDEX IF NOT EXISTS idx_mappings_ga ON datapoint_mappings(ga);
             CREATE INDEX IF NOT EXISTS idx_subscriptions_expires_at
               ON subscriptions (expires_at) WHERE expires_at IS NOT NULL AND active = TRUE;
