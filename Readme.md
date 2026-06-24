@@ -69,7 +69,10 @@ docker compose -f docker-compose.yml -f docker-compose.prod.yml logs -f --tail=5
 ```
 
 The API will be available at `http://localhost:3000`.
-Full OpenAPI specification at `/api/v2/openapi.json`.
+
+**API Documentation:**
+- **Interactive Swagger UI:** `http://localhost:3000/docs`
+- **Raw OpenAPI Specification:** `http://localhost:3000/api/v2/openapi.json`
 
 ---
 
@@ -92,13 +95,16 @@ To enable full auto-tuning instead, add `cgroup_memory=1 cgroup_enable=memory` t
 
 | Phase | Description                                                   | Status         |
 |-------|---------------------------------------------------------------|----------------|
-| 1     | Core Runtime — KNX tunnel, telegram processing, DPT decoding  | 🔄 In Progress |
-| 2     | Semantic Engine — TTL parsing, Resource Graph, Digital Twin   | 🔄 In Progress |
-| 3     | State Engine — live state cache, event processing             | 🔄 In Progress |
-| 4     | TimescaleDB — event & state persistence, historization        | 🔄 In Progress |
-| 5     | KNX IoT REST API — OpenAPI-compliant endpoints                | 🔄 In Progress |
-| 6     | Realtime & Integration — WebSocket, Subscription API          | 🔄 In Progress |
-| 7     | Extensions — Matter Bridge, CoAP, KNX IoT Point API, OAuth2  | ⏳ Future      |
+| 1     | Core Runtime — KNX tunnel, telegram processing, DPT decoding  | ✅ Completed   |
+| 2     | Semantic Engine — TTL parsing, Resource Graph, Digital Twin   | ✅ Completed   |
+| 3     | State Engine — live state cache, event processing             | ✅ Completed   |
+| 4     | TimescaleDB — event & state persistence, historization        | ✅ Completed   |
+| 5     | KNX IoT REST API — OpenAPI-compliant endpoints                | ✅ Completed   |
+| 6     | Realtime & Integration — WebSocket, Subscription API          | ✅ Completed   |
+| 7     | OAuth2 Authentication & Authorization                         | ✅ Completed   |
+| 8     | CoAP Integration                                              | 🔄 Design Phase |
+| 9     | KNX IoT Point API — OSCORE Security                           | 🔄 Design Phase |
+| 10    | Matter Bridge                                                 | ⏳ Future      |
 
 ---
 
