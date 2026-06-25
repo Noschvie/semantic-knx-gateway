@@ -1,7 +1,5 @@
 # Semantic KNX Runtime Engine
 
-> ⚠️ **Status: Work in Progress — v0.1 pre-alpha**
-
 A containerized KNX backend that connects classic KNX TP installations to a semantic Digital Twin — exposing live state, historical data, and a standards-compliant REST API.
 
 This is **not** a KNX logger or a simple group address proxy.
