@@ -77,9 +77,9 @@ Set these explicitly if auto-detection fails (see [Raspberry Pi](#raspberry-pi) 
 
 ## Platform Notes
 
-### Raspberry Pi (RPi 4 / RPi 5)
+### Raspberry Pi
 
-Memory cgroups are not enabled by default on Raspberry Pi OS. This causes the TimescaleDB auto-tuning script to fail with a cryptic `unary operator expected` error at startup.
+Memory cgroups are not enabled by default on Raspberry Pi OS. This guide covers RPi 4 and RPi 5. This causes the TimescaleDB auto-tuning script to fail with a cryptic `unary operator expected` error at startup.
 
 **Workaround — set tuning values explicitly:**
 
@@ -145,6 +145,7 @@ POSTGRES_PASSWORD=change-me
 
 # Logging
 LOG_LEVEL=info
+PRETTY_LOGS=true
 
 # TimescaleDB tuning (set explicitly on Raspberry Pi)
 # TS_TUNE_MEMORY=2GB

@@ -8,6 +8,10 @@ contributors and users to follow meaningful changes over time.
 Unreleased
 ----------
 
+### Added
+- `PRETTY_LOGS` environment variable to enable/disable pretty-formatted console logs
+  independently of `NODE_ENV` (defaults to `true` for better readability)
+
 2026-06-24
 ----------
 
@@ -146,34 +150,11 @@ Unreleased
   consistency (unified section headers, streamlined logger usage, object
   literal style).
 
-### Details (recent commits)
-- 3b7f447 — Refactor `tunnel-manager.js`: use `get()` for srcAddress/dstAddress
-- 8124811 — Refactor multiple modules for consistent object formatting
-- fb94b54 — ESLint: enforce rules for unused variables and private underscore members
-- 9aa24f6 — Refactor `dpt-decoder.js`: improved formatting and enhanced DPT 19 decoding
-- f3d065e — Update `.gitignore`: add `.idea/` for JetBrains IDE files
-- f7677ba — Add KNX IoT discovery endpoint to REST API
-- ebe7fcd — Migrate REST API to `/api/v2`
-- 181315 — Migrate ESLint configuration to flat `eslint.config.js`
-- 3c6375 — Add `eslint`, `prettier`, and related scripts
-- afafbe5 — Enhance KNX IoT function transformation: add `functionLocation` relationship
-- e405a2e — Rename `node` to `nodeRouter` for clarity
-- 7335382 — Refactor KNX IoT routes into dedicated modules
-- 186a5eb — Enrich application functions with linked group address URIs
-- ddfce1c — Skip ontology-level class definitions without function points
-
 2026-06-14
 ----------
 
 ### Added
 - Initial changelog file (this file).
-
-### Details (recent commits)
-- a65979c — Normalize remaining CR characters to LF in source files
-- d6b4298 — Normalize line endings to LF for source files
-- f4a6524 — Add TEAM-README.md to outline repository conventions and commands
-- 6ae44a4 — Add .gitattributes to normalize end-of-line handling across platforms
-- 3f7d2ea — Add .gitattributes and normalize line endings
 
 Guidelines
 ----------
