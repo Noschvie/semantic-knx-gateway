@@ -163,8 +163,14 @@ export class SemanticEngine {
      * @returns {Map<string, Set<string>>}
      */
     _buildDeviceToGaMap(groupAddresses) {
+        if (!Array.isArray(groupAddresses)) {
+            this.logger.warn('Invalid groupAddresses: expected array');
+            return new Map();
+        }
+
         const map = new Map();
         for (const ga of groupAddresses) {
+            if (!ga?.address) continue;
             for (const cd of ga.connectedDevices ?? []) {
                 const devId = cd.deviceId ?? cd.uri;
                 if (!devId) continue;
