@@ -42,11 +42,11 @@ class SemanticKNXRuntime {
             await this.stateEngine.initialize();
 
             // Phase 3: Semantic Engine (optional)
-            const ttlPath = process.env.KNX_TTL_PATH;
-            if (ttlPath) {
+            const ttlFilePath = process.env.KNX_TTL_PATH;
+            if (ttlFilePath) {
                 this.logger.info('Phase 3: Initializing Semantic Engine...');
                 this.semanticEngine = new SemanticEngine(this.db, this.stateEngine);
-                await this.semanticEngine.initialize(ttlPath);
+                await this.semanticEngine.initialize(ttlFilePath);
             } else {
                 this.logger.info('Phase 3: Skipping Semantic Engine (no TTL file)');
             }
@@ -72,8 +72,8 @@ class SemanticKNXRuntime {
             this.logger.info(`🌐 REST API: http://0.0.0.0:${process.env.API_PORT}`);
             this.logger.info(`💾 Database: ${process.env.POSTGRES_HOST}:${process.env.POSTGRES_PORT}`);
 
-            if (ttlPath) {
-                this.logger.info(`🧠 Semantic Layer: Enabled (${ttlPath})`);
+            if (ttlFilePath) {
+                this.logger.info(`🧠 Semantic Layer: Enabled (${ttlFilePath})`);
             }
 
             this.logger.info('=====================================');
