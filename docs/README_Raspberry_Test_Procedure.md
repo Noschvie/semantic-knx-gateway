@@ -57,36 +57,36 @@ mkdir -p config volumes/timescaledb/data
 cat > .env << 'ENVEOF'
 # API Configuration
 API_PORT=3000
-KNX_TTL_PATH=/app/config/project.ttl
 POSTGRES_HOST=timescaledb
 POSTGRES_PORT=5432
 POSTGRES_USERNAME=knxuser
 POSTGRES_PASSWORD=knxpassword
 POSTGRES_DB=knxdb
 TIMESCALEDB_ENABLED=true
-# ── OAuth2 Configuration ────────────────────────────────────────────────────
-OAUTH_DISABLED=false
+# Semantic Layer Configuration
+# Set to the TTL filename from the ./config directory
+KNX_TTL_FILE=project-prod.ttl
+# KNX IP Configuration
 KNX_GATEWAY_IP=192.168.1.x        # ← adjust
 KNX_GATEWAY_PORT=3671
 KNX_GATEWAY_PHYS_ADDR=1.1.255
 TZ=Europe/Vienna
 USER_ID=1000
 GROUP_ID=1000
-KNX_TTL_PATH=/app/config/project.ttl
+# OAuth2 Configuration
+OAUTH_DISABLED=false
 OAUTH_CLIENTS={"knx-default-client":{"secret":"change-me-in-production","allowedGrantTypes":["client_credentials"],"allowedScopes":["read","write","manage"]}}
 ENVEOF
 
-# Place project file – REQUIRED!
-# Without a valid TTL file, the API responds with HTTP 503.
+# Place project file – REQUIRED for semantic layer!
+# Without a valid TTL file, semantic endpoints respond with HTTP 503.
 # An empty file (touch) is NOT sufficient – use a real TTL file:
 cp /path/to/actual/project.ttl config/project-prod.ttl
 ```
 
-> **Note:** The volume mount in `docker-compose.prod.yml` binds
-> `./config/project-prod.ttl` as `/app/config/project.ttl`.
-> The variable `KNX_TTL_PATH` must point to this container path.
-> `KNX_PROJECT_TTL_FILE` is **not** required and must not be present in the `.env`
-> file (it causes confusion because it is redundant).
+> **Note:** The entire `./config` directory is mounted into the container at `/app/config`.
+> The `KNX_TTL_FILE` variable should contain only the filename (e.g., `project-prod.ttl`),
+> not the full path. Multiple TTL files can coexist in the `./config` directory.
 
 ---
 
@@ -256,7 +256,7 @@ docker rmi ghcr.io/noschvie/semantic-knx-gateway:development
 | timescaledb does not start | `docker compose logs timescaledb` – permissions: `sudo chown -R 1000:1000 volumes/` |
 | `403 Forbidden` during OAuth | Client ID / secret do not match `OAUTH_CLIENTS` in `.env` |
 | API does not respond on port 3000 | `docker compose ps` – firewall on Pi: `sudo ufw allow 3000` |
-| `/.well-known/knx` returns HTTP 503 | TTL file missing or invalid – check `docker logs semantic-knx-runtime \| grep "Phase 3"`; `config/project-prod.ttl` must be a valid TTL file, not an empty dummy |
+| `/.well-known/knx` returns HTTP 503 | TTL file missing or invalid – check `docker logs semantic-knx-runtime \| grep "Phase 3"`; verify that `config/project-prod.ttl` exists and is a valid TTL file (not empty) |
 | `semantic-knx-runtime` remains in `starting` | Consequence of the 503 issue above – health check switches to `healthy` only after successful TTL loading |
 | timescaledb image not available for arm64 | Fallback: `image: postgres:18-alpine` + `TIMESCALEDB_ENABLED=false` in `.env` |
-| `KNX_PROJECT_TTL_FILE` present in `.env` | Remove it – the variable is a legacy artifact and not required; `KNX_TTL_PATH` is authoritative |
+| `EISDIR` error when starting container | Old deployment configuration detected – update `.env` to use `KNX_TTL_FILE=filename.ttl` instead of `KNX_TTL_PATH=/full/path` |

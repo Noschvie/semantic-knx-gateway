@@ -10,15 +10,39 @@ cp .env.example .env
 
 ## ETS TTL Export
 
-The engine requires a KNX TTL export of your ETS project placed in the `config/` directory. According to the KNX Association documentation:
+The engine optionally loads a KNX TTL export of your ETS project to enable semantic enrichment. According to the KNX Association documentation:
 
 > "A Semantic export can be triggered via the menu item 'Export' and then save the project as 'Turtle File Export (.ttl)' or 'Json Linked Data (.jsonld)'."
 >
 > Source: KNX Association, [Semantic export](https://support.knx.org/hc/en-us/articles/13991390217362-Semantic-export)
 
+Place your TTL files in the `./config/` directory:
+
 ```bash
-cp your-installation.ttl config/project-prod.ttl
+mkdir -p config
+cp your-installation.ttl config/your-project.ttl
+cp another-project.ttl config/another-project.ttl
 ```
+
+---
+
+## Semantic Layer Configuration (Optional)
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `KNX_TTL_FILE` | *(none)* | Filename of the TTL file in the `./config` directory. Leave empty to disable semantic layer. |
+
+**Examples:**
+
+```env
+# Enable semantic layer with a specific TTL file
+KNX_TTL_FILE=my-installation.ttl
+
+# Disable semantic layer (leave empty)
+KNX_TTL_FILE=
+```
+
+If `KNX_TTL_FILE` is not set, the API will start without semantic enrichment and respond with HTTP 503 to semantic endpoints. This is useful for deployments where you only need raw KNX telegram processing.
 
 ---
 
@@ -26,9 +50,9 @@ cp your-installation.ttl config/project-prod.ttl
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `KNX_IP` | — | IP address of your KNX/IP interface (tunnelling mode) |
-| `KNX_PORT` | `3671` | KNXnet/IP tunnelling port |
-| `KNX_PHYS_ADDR` | `1.1.200` | Physical address used by the tunnel connection |
+| `KNX_GATEWAY_IP` | — | IP address of your KNX/IP interface (tunnelling mode) |
+| `KNX_GATEWAY_PORT` | `3671` | KNXnet/IP tunnelling port |
+| `KNX_GATEWAY_PHYS_ADDR` | `1.1.200` | Physical address used by the tunnel connection |
 
 > The engine uses KNXnet/IP Tunnelling exclusively. The KNX/IP interface must be reachable on the network and must have a free tunnelling slot available.
 
@@ -114,11 +138,14 @@ The absolute minimum configuration to get started:
 
 ```ini
 # KNX/IP Interface
-KNX_IP=192.168.1.100
-KNX_PHYS_ADDR=1.1.200
+KNX_GATEWAY_IP=192.168.1.100
+KNX_GATEWAY_PHYS_ADDR=1.1.200
 
 # Database
 POSTGRES_PASSWORD=change-me
+
+# Semantic Layer (optional)
+KNX_TTL_FILE=my-installation.ttl
 ```
 
 All other values fall back to their defaults.
@@ -129,9 +156,9 @@ All other values fall back to their defaults.
 
 ```ini
 # KNX/IP Interface
-KNX_IP=192.168.1.100
-KNX_PORT=3671
-KNX_PHYS_ADDR=1.1.200
+KNX_GATEWAY_IP=192.168.1.100
+KNX_GATEWAY_PORT=3671
+KNX_GATEWAY_PHYS_ADDR=1.1.200
 
 # API
 API_PORT=3000
@@ -142,6 +169,9 @@ POSTGRES_PORT=5432
 POSTGRES_DB=knx
 POSTGRES_USERNAME=knx
 POSTGRES_PASSWORD=change-me
+
+# Semantic Layer (optional)
+KNX_TTL_FILE=my-installation.ttl
 
 # Logging
 LOG_LEVEL=info

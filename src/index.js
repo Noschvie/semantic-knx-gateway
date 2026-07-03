@@ -3,6 +3,8 @@
 // KNX Runtime Engine – https://github.com/Noschvie/semantic-knx-gateway.git
 
 import dotenv from 'dotenv';
+import path from 'path';
+import fs from 'fs';
 import { createLogger } from './utils/logger.js';
 import { TunnelManager } from './knx/tunnel-manager.js';
 import { StateEngine } from './state/state-engine.js';
@@ -13,6 +15,7 @@ import { StatsLogger } from './utils/stats-logger.js';
 
 dotenv.config();
 
+const configDirectory = '/app/config';
 const logger = createLogger('Main');
 
 class SemanticKNXRuntime {
@@ -42,13 +45,44 @@ class SemanticKNXRuntime {
             await this.stateEngine.initialize();
 
             // Phase 3: Semantic Engine (optional)
-            const ttlFilePath = process.env.KNX_TTL_PATH;
-            if (ttlFilePath) {
+            const ttlFileName = process.env.KNX_TTL_FILE;
+            let ttlFilePath = null;
+
+            if (!ttlFileName) {
+                this.logger.warn('⚠️  KNX_TTL_FILE not configured – Semantic Engine disabled');
+                this.logger.warn('To enable the semantic layer, set KNX_TTL_FILE=YourProject.ttl in .env');
+                this.logger.info('Phase 3: Skipping Semantic Engine');
+            } else {
+                ttlFilePath = path.join(configDirectory, ttlFileName);
+
+                // Validate: file exists
+                try {
+                    await fs.promises.access(ttlFilePath, fs.constants.F_OK);
+                } catch {
+                    this.logger.error('❌ TTL file not found: ' + ttlFilePath);
+                    this.logger.error(`Please place the file in the config directory and set KNX_TTL_FILE=${ttlFileName} in .env`);
+                    throw new Error(`TTL file not found: ${ttlFilePath}`);
+                }
+
+                // Validate: is a regular file (not a directory)
+                try {
+                    const stat = await fs.promises.stat(ttlFilePath);
+                    if (!stat.isFile()) {
+                        this.logger.error('❌ TTL path is not a regular file: ' + ttlFilePath);
+                        this.logger.error('Expected a .ttl file, but found a directory or other file type');
+                        throw new Error(`TTL path is not a regular file: ${ttlFilePath}`);
+                    }
+                } catch (error) {
+                    if (error.message.includes('not a regular file')) {
+                        throw error;
+                    }
+                    this.logger.error('❌ Failed to validate TTL file: ' + error.message);
+                    throw error;
+                }
+
                 this.logger.info('Phase 3: Initializing Semantic Engine...');
                 this.semanticEngine = new SemanticEngine(this.db, this.stateEngine);
                 await this.semanticEngine.initialize(ttlFilePath);
-            } else {
-                this.logger.info('Phase 3: Skipping Semantic Engine (no TTL file)');
             }
 
             // Phase 4: KNX Tunnel Manager
@@ -73,7 +107,7 @@ class SemanticKNXRuntime {
             this.logger.info(`💾 Database: ${process.env.POSTGRES_HOST}:${process.env.POSTGRES_PORT}`);
 
             if (ttlFilePath) {
-                this.logger.info(`🧠 Semantic Layer: Enabled (${ttlFilePath})`);
+                this.logger.info(`🧠 Semantic Layer: Enabled (${ttlFileName})`);
             }
 
             this.logger.info('=====================================');

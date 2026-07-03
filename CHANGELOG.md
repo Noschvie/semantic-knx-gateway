@@ -11,6 +11,52 @@ Unreleased
 ### Added
 - `PRETTY_LOGS` environment variable to enable/disable pretty-formatted console logs
   independently of `NODE_ENV` (defaults to `true` for better readability)
+- **New Docker deployment approach for TTL file management:**
+  - Entire `./config` directory is now mounted into the container (instead of single-file bind mount)
+  - New environment variable `KNX_TTL_FILE` (filename only) replaces `KNX_TTL_PATH` (full path)
+  - Multiple TTL files can coexist in the config directory, enabling easier multi-project setups
+  - **Migration required for existing deployments** — see below
+
+### Changed
+- **TTL file configuration (BREAKING CHANGE):**
+  - `KNX_TTL_PATH=/app/config/project.ttl` → `KNX_TTL_FILE=project-prod.ttl`
+  - Environment variable now contains only the filename; the full path is constructed internally
+  - Docker Compose no longer requires modification when switching between projects
+  - Volume configuration simplified: `./config:/app/config:ro` (directory mount instead of file mount)
+
+### Improved
+- **Startup validation for TTL files:**
+  - Clear error messages if `KNX_TTL_FILE` is not set, missing, or points to a directory
+  - Application exits cleanly with descriptive error instead of silent failures
+  - Fixes previous issue where missing source files caused Docker to create directories instead of mounting files (leading to `EISDIR` errors)
+
+### Migration Guide for Existing Deployments
+
+**Before (old approach):**
+```yaml
+# docker-compose.prod.yml
+volumes:
+  - ./config/MyProject.ttl:/app/config/project.ttl:ro
+
+# .env
+KNX_TTL_PATH=/app/config/project.ttl
+```
+
+**After (new approach):**
+```yaml
+# docker-compose.prod.yml (no volume override needed – use base config)
+volumes:
+  - ./config:/app/config:ro
+
+# .env
+KNX_TTL_FILE=MyProject.ttl
+```
+
+**Steps to migrate:**
+1. Update your `.env` file: change `KNX_TTL_PATH=...` to `KNX_TTL_FILE=filename.ttl`
+2. Ensure your TTL file is in the `./config` directory
+3. Update `docker-compose.prod.yml` to remove the single-file volume mount (inherits from base)
+4. Restart the stack: `docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d`
 
 2026-06-24
 ----------

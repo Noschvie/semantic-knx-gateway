@@ -10,9 +10,6 @@ services:
     restart: "no"
     environment:
       - TIMESCALEDB_ENABLED=${TIMESCALEDB_ENABLED:-false}
-    volumes:
-      # Mount dev project file
-      - ./config/project-dev.ttl:/app/config/project.ttl:ro
     logging:
       driver: json-file
       options:

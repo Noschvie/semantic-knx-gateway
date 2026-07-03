@@ -36,15 +36,22 @@ cp env.example .env
 Adjust to a minimum:
 
 ```ini
-KNX_IP=192.168.1.100       # IP address of your KNX/IP interface
-KNX_PHYS_ADDR=1.1.200      # Physical address used by the tunnel
+KNX_GATEWAY_IP=192.168.1.100       # IP address of your KNX/IP interface
+KNX_GATEWAY_PORT=3671              # KNXnet/IP tunneling port
+KNX_GATEWAY_PHYS_ADDR=1.1.200      # Physical address used by the tunnel
+KNX_TTL_FILE=your-project.ttl      # TTL filename from ./config directory
 ```
 
-**3. Place your TTL export**
+**3. Place your TTL export in the config directory**
 
 ```bash
-cp your-installation.ttl config/project-prod.ttl
+mkdir -p config
+cp your-installation.ttl config/your-project.ttl
 ```
+
+Then set `KNX_TTL_FILE=your-project.ttl` in your `.env` file.
+
+> The entire `./config` directory is mounted read-only into the container at `/app/config`. Multiple TTL files can coexist in this directory.
 
 **4. Start the stack**
 
