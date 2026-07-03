@@ -54,30 +54,10 @@ class SemanticKNXRuntime {
                 this.logger.info('Phase 3: Skipping Semantic Engine');
             } else {
                 ttlFilePath = path.join(configDirectory, ttlFileName);
+                const validationError = await this._validateTTLFile(ttlFilePath, ttlFileName);
 
-                // Validate: file exists
-                try {
-                    await fs.promises.access(ttlFilePath, fs.constants.F_OK);
-                } catch {
-                    this.logger.error('❌ TTL file not found: ' + ttlFilePath);
-                    this.logger.error(`Please place the file in the config directory and set KNX_TTL_FILE=${ttlFileName} in .env`);
-                    throw new Error(`TTL file not found: ${ttlFilePath}`);
-                }
-
-                // Validate: is a regular file (not a directory)
-                try {
-                    const stat = await fs.promises.stat(ttlFilePath);
-                    if (!stat.isFile()) {
-                        this.logger.error('❌ TTL path is not a regular file: ' + ttlFilePath);
-                        this.logger.error('Expected a .ttl file, but found a directory or other file type');
-                        throw new Error(`TTL path is not a regular file: ${ttlFilePath}`);
-                    }
-                } catch (error) {
-                    if (error.message.includes('not a regular file')) {
-                        throw error;
-                    }
-                    this.logger.error('❌ Failed to validate TTL file: ' + error.message);
-                    throw error;
+                if (validationError) {
+                    throw validationError;
                 }
 
                 this.logger.info('Phase 3: Initializing Semantic Engine...');
@@ -90,8 +70,8 @@ class SemanticKNXRuntime {
             this.tunnelManager = new TunnelManager(this.stateEngine);
             await this.tunnelManager.connect();
 
-            // Phase 5: Stats Logger (periodic)
-            this.logger.info('Phase 5: Starting Stats Logger...');
+            // Phase 5: Statistics Logger (periodic)
+            this.logger.info('Phase 5: Starting Statistics Logger...');
             this.statsLogger = new StatsLogger(this.db);
             this.statsLogger.start();
 
@@ -127,6 +107,39 @@ class SemanticKNXRuntime {
         if (this.db) await this.db.disconnect();
 
         this.logger.info('✅ Shutdown complete');
+    }
+
+    /**
+     * Validates that the TTL file exists and is a regular file.
+     * Returns an Error object if validation fails, null if successful.
+     * @param {string} ttlFilePath - Full path to TTL file
+     * @param {string} ttlFileName - Filename only (for error messages)
+     * @returns {Promise<Error|null>} Error object or null
+     */
+    async _validateTTLFile(ttlFilePath, ttlFileName) {
+        // Check file exists
+        try {
+            await fs.promises.access(ttlFilePath, fs.constants.F_OK);
+        } catch {
+            this.logger.error('❌ TTL file not found: ' + ttlFilePath);
+            this.logger.error(`Please place the file in the config directory and set KNX_TTL_FILE=${ttlFileName} in .env`);
+            return new Error(`TTL file not found: ${ttlFilePath}`);
+        }
+
+        // Check is a regular file (not directory)
+        try {
+            const stat = await fs.promises.stat(ttlFilePath);
+            if (!stat.isFile()) {
+                this.logger.error('❌ TTL path is not a regular file: ' + ttlFilePath);
+                this.logger.error('Expected a .ttl file, but found a directory or other file type');
+                return new Error(`TTL path is not a regular file: ${ttlFilePath}`);
+            }
+        } catch (error) {
+            this.logger.error('❌ Failed to validate TTL file: ' + error.message);
+            return error;
+        }
+
+        return null;
     }
 }
 
