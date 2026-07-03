@@ -33,22 +33,28 @@ Unreleased
 ### Migration Guide for Existing Deployments
 
 **Before (old approach):**
+
+*docker-compose.prod.yml:*
 ```yaml
-# docker-compose.prod.yml
 volumes:
   - ./config/MyProject.ttl:/app/config/project.ttl:ro
+```
 
-# .env
+*.env:*
+```env
 KNX_TTL_PATH=/app/config/project.ttl
 ```
 
 **After (new approach):**
+
+*docker-compose.prod.yml (no volume override needed – use base config):*
 ```yaml
-# docker-compose.prod.yml (no volume override needed – use base config)
 volumes:
   - ./config:/app/config:ro
+```
 
-# .env
+*.env:*
+```env
 KNX_TTL_FILE=MyProject.ttl
 ```
 
