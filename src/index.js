@@ -30,6 +30,21 @@ class SemanticKNXRuntime {
     }
 
     async start() {
+        // Pre-startup validation (before opening connections)
+        let ttlFileName = process.env.KNX_TTL_FILE;
+        let ttlFilePath = null;
+
+        if (ttlFileName) {
+            ttlFilePath = path.join(configDirectory, ttlFileName);
+            const validationError = await this.#validateTTLFile(ttlFilePath, ttlFileName);
+            if (validationError) {
+                this.logger.error('❌ TTL configuration validation failed: ' + validationError.message);
+                this.logger.warn('Proceeding without semantic layer (treating as if KNX_TTL_FILE was not set)');
+                ttlFileName = null;
+                ttlFilePath = null;
+            }
+        }
+
         try {
             this.logger.info('🚀 Starting Semantic KNX Runtime Engine...');
             this.logger.info('=====================================');
@@ -45,21 +60,11 @@ class SemanticKNXRuntime {
             await this.stateEngine.initialize();
 
             // Phase 3: Semantic Engine (optional)
-            const ttlFileName = process.env.KNX_TTL_FILE;
-            let ttlFilePath = null;
-
             if (!ttlFileName) {
                 this.logger.warn('⚠️  KNX_TTL_FILE not configured – Semantic Engine disabled');
                 this.logger.warn('To enable the semantic layer, set KNX_TTL_FILE=YourProject.ttl in .env');
                 this.logger.info('Phase 3: Skipping Semantic Engine');
             } else {
-                ttlFilePath = path.join(configDirectory, ttlFileName);
-                const validationError = await this._validateTTLFile(ttlFilePath, ttlFileName);
-
-                if (validationError) {
-                    throw validationError;
-                }
-
                 this.logger.info('Phase 3: Initializing Semantic Engine...');
                 this.semanticEngine = new SemanticEngine(this.db, this.stateEngine);
                 await this.semanticEngine.initialize(ttlFilePath);
@@ -116,7 +121,7 @@ class SemanticKNXRuntime {
      * @param {string} ttlFileName - Filename only (for error messages)
      * @returns {Promise<Error|null>} Error object or null
      */
-    async _validateTTLFile(ttlFilePath, ttlFileName) {
+    async #validateTTLFile(ttlFilePath, ttlFileName) {
         // Check file exists
         try {
             await fs.promises.access(ttlFilePath, fs.constants.F_OK);
