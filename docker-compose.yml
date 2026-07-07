@@ -24,6 +24,7 @@ services:
       - "3000:3000"
     volumes:
       - ./logs:/app/logs
+      - ./config:/app/config:ro
     healthcheck:
       test: ["CMD-SHELL", "wget -q --spider http://127.0.0.1:3000/.well-known/knx || exit 1"]
       interval: 30s

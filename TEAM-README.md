@@ -109,11 +109,29 @@ git push origin main
 git push origin vYYYY.MM.DD
 ```
 
-Quick verification:
+**Step 3: Sync main back into development**
+
+After the release is published, merge `main` back into `development` to keep branches in sync:
+
+```powershell
+# in repository root
+git fetch origin
+git switch development
+git pull --ff-only origin development
+
+# merge main back into development (for hotfix preparation)
+git merge --no-ff main -m "Merge tag vYYYY.MM.DD back into development"
+
+# publish
+git push origin development
+```
+
+Quick verification after release:
 ```bash
 git --no-pager log --oneline --decorate -n 5
 git tag
 git ls-remote --heads origin main
+git ls-remote --heads origin development
 git ls-remote --tags origin vYYYY.MM.DD
 ```
 
@@ -133,6 +151,7 @@ Release checklist (execute in order):
 - [ ] PR/Merge from `development` to `main` completed
 - [ ] Annotated tag created (`vYYYY.MM.DD`)
 - [ ] `main` and tag pushed to `origin`
+- [ ] **`main` synced back into `development`** (important for hotfix preparation)
 - [ ] Release notes published
 
 Release notes template:

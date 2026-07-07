@@ -8,6 +8,73 @@ contributors and users to follow meaningful changes over time.
 Unreleased
 ----------
 
+2026-07-07
+----------
+
+### Added
+- **Release Workflow automation** – GitHub Actions workflow (`create-release.yml`) and
+  Node.js script (`update-changelog-for-release.js`) to automate release process:
+  - Manual workflow trigger with version input (e.g., `v2026.07.07`)
+  - Automatic CHANGELOG.md update (Unreleased → dated section)
+  - Automatic merge `development` → `main`
+  - Annotated Git tag creation
+  - Automatic sync `main` → `development` for hotfix preparation
+  - GitHub Release creation with a changelog link
+- `PRETTY_LOGS` environment variable to enable/disable pretty-formatted console logs
+  independently of `NODE_ENV` (defaults to `true` for better readability)
+- **New Docker deployment approach for TTL file management:**
+  - Entire `./config` directory is now mounted into the container (instead of single-file bind mount)
+  - New environment variable `KNX_TTL_FILE` (filename only) replaces `KNX_TTL_PATH` (full path)
+  - Multiple TTL files can coexist in the config directory, enabling easier multi-project setups
+  - **Migration required for existing deployments** — see below
+
+### Changed
+- **TTL file configuration (BREAKING CHANGE):**
+  - `KNX_TTL_PATH=/app/config/project.ttl` → `KNX_TTL_FILE=project-prod.ttl`
+  - Environment variable now contains only the filename; the full path is constructed internally
+  - Docker Compose no longer requires modification when switching between projects
+  - Volume configuration simplified: `./config:/app/config:ro` (directory mount instead of file mount)
+
+### Improved
+- **Startup validation for TTL files:**
+  - Clear error messages if `KNX_TTL_FILE` is not set, missing, or points to a directory
+  - Application exits cleanly with descriptive error instead of silent failures
+  - Fixes previous issue where missing source files caused Docker to create directories instead of mounting files (leading to `EISDIR` errors)
+
+### Migration Guide for Existing Deployments
+
+**Before (old approach):**
+
+*docker-compose.prod.yml:*
+```yaml
+volumes:
+  - ./config/MyProject.ttl:/app/config/project.ttl:ro
+```
+
+*.env:*
+```env
+KNX_TTL_PATH=/app/config/project.ttl
+```
+
+**After (new approach):**
+
+*docker-compose.prod.yml (no volume override needed – use base config):*
+```yaml
+volumes:
+  - ./config:/app/config:ro
+```
+
+*.env:*
+```env
+KNX_TTL_FILE=MyProject.ttl
+```
+
+**Steps to migrate:**
+1. Update your `.env` file: change `KNX_TTL_PATH=...` to `KNX_TTL_FILE=filename.ttl`
+2. Ensure your TTL file is in the `./config` directory
+3. Update `docker-compose.prod.yml` to remove the single-file volume mount (inherits from base)
+4. Restart the stack: `docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d`
+
 2026-06-24
 ----------
 
@@ -146,34 +213,11 @@ Unreleased
   consistency (unified section headers, streamlined logger usage, object
   literal style).
 
-### Details (recent commits)
-- 3b7f447 — Refactor `tunnel-manager.js`: use `get()` for srcAddress/dstAddress
-- 8124811 — Refactor multiple modules for consistent object formatting
-- fb94b54 — ESLint: enforce rules for unused variables and private underscore members
-- 9aa24f6 — Refactor `dpt-decoder.js`: improved formatting and enhanced DPT 19 decoding
-- f3d065e — Update `.gitignore`: add `.idea/` for JetBrains IDE files
-- f7677ba — Add KNX IoT discovery endpoint to REST API
-- ebe7fcd — Migrate REST API to `/api/v2`
-- 181315 — Migrate ESLint configuration to flat `eslint.config.js`
-- 3c6375 — Add `eslint`, `prettier`, and related scripts
-- afafbe5 — Enhance KNX IoT function transformation: add `functionLocation` relationship
-- e405a2e — Rename `node` to `nodeRouter` for clarity
-- 7335382 — Refactor KNX IoT routes into dedicated modules
-- 186a5eb — Enrich application functions with linked group address URIs
-- ddfce1c — Skip ontology-level class definitions without function points
-
 2026-06-14
 ----------
 
 ### Added
 - Initial changelog file (this file).
-
-### Details (recent commits)
-- a65979c — Normalize remaining CR characters to LF in source files
-- d6b4298 — Normalize line endings to LF for source files
-- f4a6524 — Add TEAM-README.md to outline repository conventions and commands
-- 6ae44a4 — Add .gitattributes to normalize end-of-line handling across platforms
-- 3f7d2ea — Add .gitattributes and normalize line endings
 
 Guidelines
 ----------

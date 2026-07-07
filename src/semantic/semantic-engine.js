@@ -2,6 +2,7 @@
 // Copyright (c) 2026 Noschvie
 // KNX Runtime Engine – https://github.com/Noschvie/semantic-knx-gateway.git
 
+import fs from "fs";
 import { createLogger } from '../utils/logger.js';
 import { GraphBuilder } from './graph-builder.js';
 import { ResourceStore } from './resource-store.js';
@@ -27,6 +28,16 @@ export class SemanticEngine {
     async initialize(ttlFilePath) {
         if (!ttlFilePath) {
             this.logger.info('No TTL file provided, skipping semantic layer initialization');
+            return;
+        }
+        try {
+            const stat = await fs.promises.stat(ttlFilePath);
+            if (!stat.isFile()) {
+                this.logger.info(`TTL path is not a file: ${ttlFilePath}`);
+                return;
+            }
+        } catch (error) {
+            this.logger.warn(`TTL file not accessible: ${error.message}`);
             return;
         }
 
@@ -152,8 +163,14 @@ export class SemanticEngine {
      * @returns {Map<string, Set<string>>}
      */
     _buildDeviceToGaMap(groupAddresses) {
+        if (!Array.isArray(groupAddresses)) {
+            this.logger.warn('Invalid groupAddresses: expected array');
+            return new Map();
+        }
+
         const map = new Map();
         for (const ga of groupAddresses) {
+            if (!ga?.address) continue;
             for (const cd of ga.connectedDevices ?? []) {
                 const devId = cd.deviceId ?? cd.uri;
                 if (!devId) continue;
