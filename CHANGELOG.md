@@ -8,6 +8,9 @@ contributors and users to follow meaningful changes over time.
 Unreleased
 ----------
 
+2026-07-07
+----------
+
 ### Added
 - **Release Workflow automation** – GitHub Actions workflow (`create-release.yml`) and
   Node.js script (`update-changelog-for-release.js`) to automate release process:
