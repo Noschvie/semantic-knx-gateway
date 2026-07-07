@@ -9,6 +9,14 @@ Unreleased
 ----------
 
 ### Added
+- **Release Workflow automation** – GitHub Actions workflow (`create-release.yml`) and
+  Node.js script (`update-changelog-for-release.js`) to automate release process:
+  - Manual workflow trigger with version input (e.g., `v2026.07.07`)
+  - Automatic CHANGELOG.md update (Unreleased → dated section)
+  - Automatic merge `development` → `main`
+  - Annotated Git tag creation
+  - Automatic sync `main` → `development` for hotfix preparation
+  - GitHub Release creation with a changelog link
 - `PRETTY_LOGS` environment variable to enable/disable pretty-formatted console logs
   independently of `NODE_ENV` (defaults to `true` for better readability)
 - **New Docker deployment approach for TTL file management:**

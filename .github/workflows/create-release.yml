@@ -1,0 +1,83 @@
+name: Create Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Release version (e.g., v2026.07.07)'
+        required: true
+        type: string
+
+jobs:
+  create-release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: development
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Configure Git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Update CHANGELOG.md
+        run: node scripts/update-changelog-for-release.js ${{ github.event.inputs.version }}
+
+      - name: Verify CHANGELOG changes
+        run: |
+          if git diff --quiet CHANGELOG.md; then
+            echo "❌ Error: CHANGELOG.md was not modified"
+            exit 1
+          fi
+          echo "✅ CHANGELOG.md successfully updated"
+          git diff CHANGELOG.md
+
+      - name: Commit CHANGELOG on development
+        run: |
+          git add CHANGELOG.md
+          git commit -m "chore: update CHANGELOG.md for ${{ github.event.inputs.version }}"
+          git push origin development
+
+      - name: Merge development into main
+        run: |
+          git fetch origin
+          git switch main
+          git pull --ff-only origin main
+          git merge --no-ff development -m "Merge branch 'development' into main"
+          git push origin main
+
+      - name: Create release tag
+        run: |
+          git tag -a ${{ github.event.inputs.version }} -m "Release ${{ github.event.inputs.version }}"
+          git push origin ${{ github.event.inputs.version }}
+
+      - name: Sync main back into development
+        run: |
+          git fetch origin
+          git switch development
+          git pull --ff-only origin development
+          git merge --no-ff main -m "Merge tag ${{ github.event.inputs.version }} back into development"
+          git push origin development
+
+      - name: Create GitHub Release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ github.event.inputs.version }}
+          release_name: Release ${{ github.event.inputs.version }}
+          draft: false
+          prerelease: false
+          body: |
+            See CHANGELOG.md for details: https://github.com/${{ github.repository }}/blob/main/CHANGELOG.md
