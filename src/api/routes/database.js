@@ -10,7 +10,7 @@ import { DatabaseManager } from '../../storage/database-manager.js';
 const logger = createLogger('routes.database');
 
 /**
- * Create database management router
+ * Create a database management router
  *
  * Endpoints:
  * - GET  /info           → Database statistics (Tier 1: Information)
@@ -18,7 +18,7 @@ const logger = createLogger('routes.database');
  * - POST /optimize       → Reclaim disk space (Tier 2: Maintenance)
  * - GET  /cleanup-jobs   → Audit log (Tier 3: Audit)
  *
- * @param {pg.Pool} pool - PostgreSQL connection pool
+ * @param {object} pool - PostgreSQL connection pool
  * @returns {express.Router} Express router
  */
 export function createDatabaseRouter(pool) {
