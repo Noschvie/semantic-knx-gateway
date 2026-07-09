@@ -467,6 +467,33 @@ export class DatabaseManager {
                 'SELECT pg_total_relation_size(\'subscription_events\') as size'
             );
 
+            const rowsAfterKnx = parseInt(afterKnx.rows[0].count);
+            const rowsAfterSub = parseInt(afterSub.rows[0].count);
+            const sizeAfterKnx = parseInt(sizeKnxAfter.rows[0].size);
+            const sizeAfterSub = parseInt(sizeSubAfter.rows[0].size);
+
+            this.logger.info('📊 Row counts and sizes after deletion', {
+                jobId,
+                knx_events: {
+                    rows: rowsAfterKnx,
+                    rows_deleted: knxRowsDeleted,
+                    size_bytes: sizeAfterKnx,
+                    size_pretty: DatabaseManager.formatBytes(sizeAfterKnx),
+                },
+                subscription_events: {
+                    rows: rowsAfterSub,
+                    rows_deleted: subRowsDeleted,
+                    size_bytes: sizeAfterSub,
+                    size_pretty: DatabaseManager.formatBytes(sizeAfterSub),
+                },
+                totals: {
+                    rows_remaining: rowsAfterKnx + rowsAfterSub,
+                    rows_deleted: knxRowsDeleted + subRowsDeleted,
+                    total_size_bytes: sizeAfterKnx + sizeAfterSub,
+                    total_size_pretty: DatabaseManager.formatBytes(sizeAfterKnx + sizeAfterSub),
+                },
+            });
+
             const completedAt = new Date();
             const results = {
                 knx_events: {
