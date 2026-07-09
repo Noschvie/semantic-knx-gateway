@@ -296,6 +296,12 @@ export class DatabaseManager {
      * @returns {Promise<object>} Preview data
      */
     async getPurgePreview(preset, olderThan = null) {
+        // Validate preset before connecting
+        const validPresets = Object.keys(DatabaseManager.PURGE_PRESETS);
+        if (!validPresets.includes(preset)) {
+            throw new Error(`Invalid preset: ${preset}. Valid options: ${validPresets.join(', ')}`);
+        }
+
         const client = await this.pool.connect();
         try {
             let thresholdDate;
@@ -308,8 +314,11 @@ export class DatabaseManager {
                 thresholdDate = DatabaseManager._calculateThresholdDate(preset);
             }
 
+            // This should never happen due to validation above
             if (!thresholdDate) {
-                throw new Error(`Invalid preset: ${preset}`);
+                // noinspection ExceptionCaughtLocallyJS
+                const validPresets = Object.keys(DatabaseManager.PURGE_PRESETS);
+                throw new Error(`Failed to calculate threshold for preset: ${preset}. Valid: ${validPresets.join(', ')}`);
             }
 
             const thresholdISO = thresholdDate.toISOString();
@@ -395,6 +404,12 @@ export class DatabaseManager {
      * @returns {Promise<object>} Execution results
      */
     async executePurge(preset, olderThan = null, executedBy = 'system') {
+        // Validate preset before connecting
+        const validPresets = Object.keys(DatabaseManager.PURGE_PRESETS);
+        if (!validPresets.includes(preset)) {
+            throw new Error(`Invalid preset: ${preset}. Valid options: ${validPresets.join(', ')}`);
+        }
+
         const client = await this.pool.connect();
         const jobId = `purge-job-${Date.now()}-${Math.random().toString(36).substring(7)}`;
 
@@ -410,7 +425,8 @@ export class DatabaseManager {
             }
 
             if (!thresholdDate) {
-                throw new Error(`Invalid preset: ${preset}`);
+                // noinspection ExceptionCaughtLocallyJS
+                throw new Error(`Failed to calculate threshold for preset: ${preset}`);
             }
 
             // Log the job as started
