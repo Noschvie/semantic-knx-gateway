@@ -241,7 +241,7 @@ export function createDatabaseRouter(pool) {
                 const client = await pool.connect();
                 try {
                     // Build query
-                    let whereClause = 'WHERE created_at > NOW() - INTERVAL $1 || \' days\'';
+                    let whereClause = 'WHERE created_at > NOW() - make_interval(days => $1)';
                     const params = [days];
 
                     if (status && ['completed', 'failed', 'simulated'].includes(status)) {
