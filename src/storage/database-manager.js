@@ -431,7 +431,17 @@ export class DatabaseManager {
             const beforeKnx = await client.query('SELECT COUNT(*) as count FROM knx_events');
             const beforeSub = await client.query('SELECT COUNT(*) as count FROM subscription_events');
 
-            // Delete from knx_events
+            const rowsBeforeKnx = parseInt(beforeKnx.rows[0].count);
+            const rowsBeforeSub = parseInt(beforeSub.rows[0].count);
+
+            this.logger.info('📊 Row counts before purge', {
+                jobId,
+                preset,
+                knx_events: rowsBeforeKnx,
+                subscription_events: rowsBeforeSub,
+                total: rowsBeforeKnx + rowsBeforeSub,
+            });
+
             const deleteKnxResult = await client.query(
                 'DELETE FROM knx_events WHERE ts < $1',
                 [thresholdDate]
