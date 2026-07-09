@@ -732,4 +732,91 @@ export class DatabaseManager {
             return 'N/A';
         }
     }
+
+    /**
+     * Get cleanup jobs from the audit log with pagination and filtering
+     *
+     * @param {number} offset - Pagination offset
+     * @param {number} limit - Results per page
+     * @param {string} status - Filter by status (optional)
+     * @param {number} days - Show jobs from last N days
+     * @returns {Promise<object>} { jobs: [], total: number }
+     */
+    async getCleanupJobs(offset = 0, limit = 20, status = null, days = 30) {
+        const client = await this.pool.connect();
+        try {
+            // Build query
+            let whereClause = 'WHERE created_at > NOW() - INTERVAL \'1 day\' * $1';
+            const params = [days];
+
+            if (status && ['completed', 'failed', 'simulated'].includes(status)) {
+                whereClause += ` AND status = $${params.length + 1}`;
+                params.push(status);
+            }
+
+            // Get total count
+            const countResult = await client.query(
+                `SELECT COUNT(*) as total FROM database_maintenance_log ${whereClause}`,
+                params
+            );
+            const total = parseInt(countResult.rows[0].total);
+
+            // Get paginated results
+            const result = await client.query(
+                `SELECT * FROM database_maintenance_log 
+                 ${whereClause}
+                 ORDER BY created_at DESC
+                 LIMIT $${params.length + 1} OFFSET $${params.length + 2}`,
+                [...params, limit, offset]
+            );
+
+            const cleanupJobs = result.rows.map(row => ({
+                id: row.id,
+                type: 'cleanup-job',
+                attributes: {
+                    status: row.status,
+                    strategy: row.operation,  // 'purge' or 'optimize'
+                    preset: row.preset,
+                    params: row.params || {},
+                    dry_run: row.dry_run || false,
+                    executed_by: row.executed_by,
+                    created_at: row.created_at?.toISOString(),
+                    completed_at: row.completed_at?.toISOString(),
+                    duration_seconds: row.completed_at && row.started_at
+                        ? Math.round((row.completed_at - row.started_at) / 1000)
+                        : null,
+                    tables_affected: row.tables_affected || [],
+                    statistics: row.results || {},
+                },
+            }));
+
+            return {
+                jobs: cleanupJobs,
+                total,
+            };
+        } catch (err) {
+            this.logger.error('Failed to get cleanup jobs', { error: err.message, offset, limit, status, days });
+            throw err;
+        } finally {
+            client.release();
+        }
+    }
+
+    /**
+     * Check if the database is responsive (health check)
+     *
+     * @returns {Promise<boolean>} true if a database is connected, false otherwise
+     */
+    async checkHealth() {
+        const client = await this.pool.connect();
+        try {
+            await client.query('SELECT NOW()');
+            return true;
+        } catch (err) {
+            this.logger.error('Database health check failed', { error: err.message });
+            return false;
+        } finally {
+            client.release();
+        }
+    }
 }

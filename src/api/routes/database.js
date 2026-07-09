@@ -238,66 +238,18 @@ export function createDatabaseRouter(pool) {
                 const status = req.query.status?.toLowerCase();
                 const days = Math.max(1, parseInt(req.query.days || '30'));
 
-                const client = await pool.connect();
-                try {
-                    // Build query
-                    let whereClause = 'WHERE created_at > NOW() - INTERVAL \'1 day\' * $1';
-                    const params = [days];
+                const { jobs, total } = await dbManager.getCleanupJobs(offset, limit, status, days);
 
-                    if (status && ['completed', 'failed', 'simulated'].includes(status)) {
-                        whereClause += ` AND status = $${params.length + 1}`;
-                        params.push(status);
-                    }
-
-                    // Get total count
-                    const countResult = await client.query(
-                        `SELECT COUNT(*) as total FROM database_maintenance_log ${whereClause}`,
-                        params
-                    );
-                    const total = parseInt(countResult.rows[0].total);
-
-                    // Get paginated results
-                    const result = await client.query(
-                        `SELECT * FROM database_maintenance_log 
-                         ${whereClause}
-                         ORDER BY created_at DESC
-                         LIMIT $${params.length + 1} OFFSET $${params.length + 2}`,
-                        [...params, limit, offset]
-                    );
-
-                    const cleanupJobs = result.rows.map(row => ({
-                        id: row.id,
-                        type: 'cleanup-job',
-                        attributes: {
-                            status: row.status,
-                            strategy: row.operation,  // 'purge' or 'optimize'
-                            preset: row.preset,
-                            params: row.params || {},
-                            dry_run: row.dry_run || false,
-                            executed_by: row.executed_by,
-                            created_at: row.created_at?.toISOString(),
-                            completed_at: row.completed_at?.toISOString(),
-                            duration_seconds: row.completed_at && row.started_at
-                                ? Math.round((row.completed_at - row.started_at) / 1000)
-                                : null,
-                            tables_affected: row.tables_affected || [],
-                            statistics: row.results || {},
+                res.status(200).json({
+                    data: jobs,
+                    meta: {
+                        pagination: {
+                            offset,
+                            limit,
+                            total,
                         },
-                    }));
-
-                    res.status(200).json({
-                        data: cleanupJobs,
-                        meta: {
-                            pagination: {
-                                offset,
-                                limit,
-                                total,
-                            },
-                        },
-                    });
-                } finally {
-                    client.release();
-                }
+                    },
+                });
             } catch (err) {
                 logger.error('Failed to get cleanup jobs', { error: err.message });
                 next(err);
@@ -312,16 +264,10 @@ export function createDatabaseRouter(pool) {
      * (Used for monitoring, doesn't require Bearer token)
      */
     router.get('/health', async (req, res) => {
-        try {
-            const client = await pool.connect();
-            try {
-                await client.query('SELECT NOW()');
-                res.status(200).json({ status: 'ok', database: 'connected' });
-            } finally {
-                client.release();
-            }
-        } catch (err) {
-            logger.error('Database health check failed', { error: err.message });
+        const isHealthy = await dbManager.checkHealth();
+        if (isHealthy) {
+            res.status(200).json({ status: 'ok', database: 'connected' });
+        } else {
             res.status(503).json({ status: 'error', database: 'disconnected' });
         }
     });
