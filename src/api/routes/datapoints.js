@@ -351,6 +351,12 @@ export function datapointsRouter(stateEngine, tunnelManager) {
                     ?? mappingByGa.get(state.ga)
                     ?? null;
 
+                // Skip orphaned states without a mapping
+                // (prevents duplicate/stale datapoints from old KNX systems appearing in API)
+                if (!mapping) {
+                    continue;
+                }
+
                 const merged = {
                     ...mapping,
                     ...state,
@@ -520,6 +526,11 @@ export function datapointsRouter(stateEngine, tunnelManager) {
                     ?? mappingByGa.get(state.ga)
                     ?? null;
 
+                // Skip orphaned states without a mapping
+                if (!mapping) {
+                    continue;
+                }
+
                 const merged = {
                     ...mapping,
                     ...state,
@@ -613,6 +624,11 @@ export function datapointsRouter(stateEngine, tunnelManager) {
                 const mapping = mappingByDatapointId.get(state.datapointId)
                     ?? mappingByGa.get(state.ga)
                     ?? null;
+
+                // Skip orphaned states without a mapping
+                if (!mapping) {
+                    continue;
+                }
 
                 const merged = {
                     ...mapping,
