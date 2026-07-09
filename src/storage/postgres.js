@@ -252,6 +252,33 @@ export class PostgresClient {
               ON subscription_events (subscription_id, ts DESC);
           `);
 
+            // Table: database_maintenance_log (Audit log for purge/optimize operations)
+            await client.query(`
+            CREATE TABLE IF NOT EXISTS database_maintenance_log (
+              id              TEXT PRIMARY KEY,
+              operation       TEXT NOT NULL CHECK (operation IN ('purge', 'optimize')),
+              preset          TEXT,
+              older_than      TIMESTAMPTZ,
+              purge_all       BOOLEAN,
+              dry_run         BOOLEAN NOT NULL DEFAULT FALSE,
+              executed_by     TEXT,
+              created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+              started_at      TIMESTAMPTZ,
+              completed_at    TIMESTAMPTZ,
+              status          TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'running', 'completed', 'failed')),
+              results         JSONB,
+              error_message   TEXT,
+              tables_affected TEXT[] DEFAULT ARRAY[]::TEXT[]
+            );
+          `);
+
+            await client.query(`
+            CREATE INDEX IF NOT EXISTS idx_maintenance_status 
+              ON database_maintenance_log (status, created_at DESC);
+            CREATE INDEX IF NOT EXISTS idx_maintenance_created 
+              ON database_maintenance_log (created_at DESC);
+          `);
+
             await client.query('COMMIT');
             this.logger.info('✅ Database schema initialized');
 

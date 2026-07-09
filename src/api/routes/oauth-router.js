@@ -117,14 +117,14 @@ function getClientConfig(clientId) {
         'knx-default-client': {
             secret: process.env.OAUTH_CLIENT_SECRET ?? 'change-me-in-production',
             allowedGrantTypes: ['authorization_code', 'client_credentials', 'refresh_token'],
-            allowedScopes: ['read', 'write', 'manage'],
+            allowedScopes: ['read', 'write', 'manage', 'delete:database'],
         },
     };
     return clients[clientId] ?? defaults[clientId] ?? null;
 }
 
-// ── Scope validation ──────────────────────────────────────────────────────────
-const KNOWN_SCOPES = new Set(['read', 'write', 'manage']);
+// ── Scope validation ──────────────────────────────────────────────────────
+const KNOWN_SCOPES = new Set(['read', 'write', 'manage', 'delete:database']);
 
 function validateScope(requestedScope, clientConfig) {
     if (!requestedScope) return { valid: true, scope: '' };
