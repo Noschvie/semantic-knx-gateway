@@ -316,8 +316,9 @@ export class DatabaseManager {
 
             // This should never happen due to validation above
             if (!thresholdDate) {
-                // noinspection ExceptionCaughtLocallyJS
+                // noinspection JSUnusedLocalSymbols
                 const validPresets = Object.keys(DatabaseManager.PURGE_PRESETS);
+                // noinspection ExceptionCaughtLocallyJS
                 throw new Error(`Failed to calculate threshold for preset: ${preset}. Valid: ${validPresets.join(', ')}`);
             }
 
