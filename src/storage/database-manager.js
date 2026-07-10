@@ -45,6 +45,9 @@ export class DatabaseManager {
      * @returns {Promise<object>} Database statistics
      */
     async getStatistics() {
+        if (!this.pool) {
+            throw new Error('Database pool not initialized');
+        }
         let client;
         try {
             client = await this.pool.connect();
