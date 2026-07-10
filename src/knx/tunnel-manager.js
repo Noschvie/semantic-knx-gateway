@@ -126,7 +126,7 @@ export class TunnelManager {
                             : '';
 
                         // ===== APCI + VALUE =====
-                        // eslint-disable-next-line no-underscore-dangle
+                        // noinspection JSUnresolvedReference
                         const apciRaw = cemi?.npdu?._apci ?? 0;
                         const apciCmd = apciRaw & 0xC0; // Bits 7:6 -> command type
                         const apciData = apciRaw & 0x3F; // Bits 5:0 -> short data (<= 6 bit)
@@ -145,7 +145,7 @@ export class TunnelManager {
                         }
 
                         // ===== VALUE =====
-                        // eslint-disable-next-line no-underscore-dangle
+                        // noinspection JSUnresolvedReference
                         const npduData = cemi?.npdu?._data;
 
                         // Cover all possible knxultimate data paths
