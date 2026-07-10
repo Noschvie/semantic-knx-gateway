@@ -9,6 +9,7 @@
  * 1. Logging DPT changes for audit trail
  * 2. Finding the DPT that was active at a given timestamp
  * 3. Ensuring correct value interpretation even after DPT changes
+ * 4. Uses views (v_dpt_current, v_dpt_history) for optimal performance
  */
 
 export class DptHistoryManager {
@@ -48,6 +49,7 @@ export class DptHistoryManager {
 
     /**
      * Get the DPT that was active at a specific timestamp
+     * Uses v_dpt_history view for efficient lookup
      * @param {string} ga - Group address
      * @param {Date|string} timestamp - Point in time
      * @returns {Promise<string|null>} - The DPT that was active at that time
@@ -55,9 +57,8 @@ export class DptHistoryManager {
     async getDptAtTime(ga, timestamp) {
         try {
             const result = await this.db.query(
-                `SELECT new_dpt FROM dpt_change_log
-                 WHERE ga = $1 AND changed_at <= $2
-                 ORDER BY changed_at DESC
+                `SELECT new_dpt FROM v_dpt_history
+                 WHERE ga = $1 AND changed_at <= $2 AND (valid_until IS NULL OR valid_until > $2)
                  LIMIT 1`,
                 [ga, new Date(timestamp)]
             );
@@ -80,6 +81,7 @@ export class DptHistoryManager {
 
     /**
      * Get complete history of DPT changes for a GA
+     * Uses v_dpt_history view for consistent results
      * @param {string} ga - Group address
      * @returns {Promise<Array>} - List of all DPT changes with timestamps
      */
@@ -87,14 +89,13 @@ export class DptHistoryManager {
         try {
             const result = await this.db.query(
                 `SELECT 
-                    id,
+                    ga,
                     datapoint_id,
                     old_dpt,
                     new_dpt,
                     changed_at,
-                    changed_by,
-                    reason
-                 FROM dpt_change_log
+                    valid_until
+                 FROM v_dpt_history
                  WHERE ga = $1
                  ORDER BY changed_at ASC`,
                 [ga]
@@ -104,6 +105,35 @@ export class DptHistoryManager {
         } catch (error) {
             this.logger.error(`[DPT History] Failed to get history for ${ga}:`, error.message);
             return [];
+        }
+    }
+
+    /**
+     * Get current DPT for all Group Addresses
+     * Uses v_dpt_current view for optimal performance
+     * @returns {Promise<Map>} - Map of GA -> {dpt, datapointId, changed_at, changed_by}
+     */
+    async getCurrentDptMap() {
+        try {
+            const result = await this.db.query(`
+                SELECT ga, dpt, datapoint_id, changed_at, changed_by
+                FROM v_dpt_current
+            `);
+
+            const map = new Map();
+            result.rows.forEach(row => {
+                map.set(row.ga, {
+                    dpt: row.dpt,
+                    datapointId: row.datapoint_id,
+                    changedAt: row.changed_at,
+                    changedBy: row.changed_by,
+                });
+            });
+
+            return map;
+        } catch (error) {
+            this.logger.error('[DPT History] Failed to get current DPT map:', error.message);
+            return new Map();
         }
     }
 
@@ -140,25 +170,21 @@ export class DptHistoryManager {
                 }
             }
 
-            // Check against existing mappings
+            // Check against existing mappings (using v_dpt_current for consistency)
+            const currentDptMap = await this.getCurrentDptMap();
             for (const [ga, newMappings] of gaMap.entries()) {
-                const currentResult = await this.db.query(
-                    `SELECT dpt FROM datapoint_mappings WHERE ga = $1`,
-                    [ga]
-                );
-
-                if (currentResult.rows.length > 0) {
-                    const currentDpt = currentResult.rows[0].dpt;
+                const current = currentDptMap.get(ga);
+                if (current) {
                     const newDpts = new Set(newMappings.map(m => m.dpt).filter(Boolean));
-
                     if (newDpts.size === 1) {
                         const newDpt = Array.from(newDpts)[0];
-                        if (newDpt !== currentDpt) {
+                        if (newDpt !== current.dpt) {
                             conflicts.push({
                                 ga,
                                 type: 'DPT_CHANGE_DETECTED',
-                                old_dpt: currentDpt,
-                                new_dpt: newDpt
+                                old_dpt: current.dpt,
+                                new_dpt: newDpt,
+                                lastChangedBy: current.changedBy
                             });
                         }
                     }
@@ -201,7 +227,3 @@ export class DptHistoryManager {
         }
     }
 }
-
-export default DptHistoryManager;
-
-
