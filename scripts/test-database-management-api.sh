@@ -5,7 +5,7 @@
 
 BASE_URL="http://localhost:3000/api/v2/database"
 CLIENT_ID="knx-default-client"
-CLIENT_SECRET="knx-default-secret"
+OAUTH_CLIENT_SECRET="${OAUTH_CLIENT_SECRET:-change-me-in-production}"
 
 cat << 'EOF'
 ==========================================
