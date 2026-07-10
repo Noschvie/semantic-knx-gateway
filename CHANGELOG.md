@@ -35,6 +35,12 @@ Unreleased
   - Conflict detection performed **before** applying new mappings during TTL import
   - All detected conflicts are logged as warnings; import continues safely
   - Each datapoint registration triggers DPT change logging if DPT differs
+
+  **TTL Loader Integration** (`src/semantic/ttl-loader.js`):
+  - Constructor remains clean and simple (no dependencies injected)
+  - Works independently as an RDF parsing utility
+  - DPT conflict detection is handled by `SemanticMapper` using `DptHistoryManager.detectDptConflicts()`
+  - Backward compatible with existing codebase
   
   **Diagnostic Tools:**
   - `scripts/dpt-history-check.sh` — Check table status, view statistics, verify consistency
@@ -51,6 +57,56 @@ Unreleased
   - Changing DPT for existing GA (logged with old→new DPT tracking)
   - Importing a new TTL file with DPT changes (conflicts detected, logged, safely applied)
   - Interpreting historical states with correct DPT (via `getDptAtTime()`)
+
+- **API Response Enhancement: Historical DPT Tracking** – KNX vendor-specific extension to datapoint responses:
+  
+  **Field Addition:**
+  - New `knx:dptAtCapture` field in response `meta` object (KNX vendor-specific namespace prefix)
+  - Shows the DPT that was active when a historical value was captured
+  - Added to all datapoint and timeseries endpoints for accurate historical value interpretation
+  
+  **Integration Points:**
+  - `GET /api/v2/datapoints/` — Lists all datapoints with `knx:dptAtCapture` if DPT differs from current
+  - `GET /api/v2/datapoints/{id}` — Single datapoint with historical DPT context
+  - `GET /api/v2/datapoints/{id}/timeseries` — Each timeseries entry includes `knx:dptAtCapture` for its timestamp
+  - `GET /api/v2/datapoints/values` — Bulk endpoint with `knx:dptAtCapture` per datapoint
+  
+  **Spec Compliance:**
+  - Fully compliant with KNX IoT 3rd Party API v2.1.0
+  - Uses KNX vendor-specific namespace prefix (`knx:`) per spec §2.1.0, line 2793
+  - Placed in JSON:API `meta` object (not `attributes`) per spec §2.1.0, line 2805
+  - Graceful fallback: omitted if DPT hasn't changed since capture
+  
+  **Example Response:**
+  ```json
+  {
+    "data": {
+      "id": "uuid...",
+      "type": "datapoint",
+      "attributes": {
+        "title": "Temperature",
+        "value": "21.5",
+        "timestamp": "2026-07-10T10:30:00Z",
+        "dpt": "9.001"
+      },
+      "meta": {
+        "@type": ["knx:dpa.418.52"],
+        "ga": "1/2/3",
+        "dpt": "9.001",
+        "knx:dptAtCapture": "10.001"
+      }
+    }
+  }
+  ```
+  
+  **Implementation Details:**
+  - Helper function: `toDatapointResourceWithHistoricalDpt()` in `src/api/routes/datapoints.js`
+  - Updated transform: `toDatapointResource()` accepts optional `dptAtCapture` parameter  
+  - Reuses `DptHistoryManager` instance from StateEngine for API endpoints (consistency & efficiency)
+  - Conflict detection happens in `SemanticMapper.mapDatapointsToStateEngine()` via `DptHistoryManager.detectDptConflicts()`
+  - DPT logging occurs in `StateEngine.registerDatapoint()` when mapping is registered
+  - Uses `DptHistoryManager.getDptAtTime()` to look up historical DPT for responses
+  - Non-blocking: gracefully handles missing history (optional enhancement)
 
 2026-07-09
 ----------
