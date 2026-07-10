@@ -47,10 +47,9 @@ export function createDatabaseRouter(pool) {
             try {
                 logger.debug('GET /info requested');
 
-                const [stats, capabilities] = await Promise.all([
-                    dbManager.getStatistics(),
-                    dbManager.getCapabilities(),
-                ]);
+                // Execute sequentially to avoid concurrent connection conflicts
+                const stats = await dbManager.getStatistics();
+                const capabilities = await dbManager.getCapabilities();
 
                 res.status(200).json({
                     data: {
