@@ -200,7 +200,9 @@ if [ "$DO_CLEANUP" = true ]; then
       FROM current_state cs
       LEFT JOIN datapoint_mappings m ON cs.datapoint_id = m.datapoint_id
       WHERE m.datapoint_id IS NULL
-    ")
+    " | xargs)
+
+    if [ -z "$REMAINING" ]; then REMAINING=0; fi
 
     if [ "$REMAINING" -eq 0 ]; then
       echo -e "  ${GREEN}✓ All orphaned states removed${NC}"
@@ -225,9 +227,7 @@ if [ "$DO_CLEANUP" = true ]; then
   fi
 
   if [ "$CLEANUP_DONE" = true ]; then
-    echo "  Running VACUUM..."
-    run_sql "VACUUM FULL ANALYZE;" > /dev/null
-    echo -e "  ${GREEN}✓ Vacuum complete${NC}"
+    echo -e "  ${GREEN}✓ Cleanup complete${NC}"
   else
     echo -e "  ${YELLOW}ℹ️  Nothing to cleanup${NC}"
   fi
