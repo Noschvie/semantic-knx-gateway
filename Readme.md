@@ -139,6 +139,6 @@ To enable full auto-tuning instead, add `cgroup_memory=1 cgroup_enable=memory` t
 
 ## License
 
-AGPL-3.0-or-later. Commercial licenses available on request — see [LICENSE](./LICENSE) and [COMMERCIAL-LICENSE.md](./COMMERCIAL-LICENSE.md).
+AGPL-3.0-or-later. Commercial licenses are available on request — see [LICENSE](./LICENSE) and [COMMERCIAL-LICENSE.md](./COMMERCIAL-LICENSE.md).
 
 > KNX is a trademark of the KNX Association. This project is independent and not affiliated with or endorsed by the KNX Association.

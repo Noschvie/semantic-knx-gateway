@@ -8,6 +8,83 @@ contributors and users to follow meaningful changes over time.
 Unreleased
 ----------
 
+2026-07-09
+----------
+
+### Added
+- **Database Management API (Vendor Extension)** – Comprehensive database maintenance endpoints
+  under `/api/v2/database/...` (not in KNX IoT spec, vendor extension):
+  
+  **Tier 1: Information**
+  - `GET /api/v2/database/info` — Real-time database statistics and health metrics:
+    - Database size, version, backend capabilities
+    - Per-table statistics (rows, sizes, indexes)
+    - Event timeline (earliest/latest event, coverage, average events/day)
+    - TimescaleDB hypertable compression info (chunk count, compression ratio)
+    - Subscription counts (total, active, expired)
+    - Backend capability flags (VACUUM support, compression support, dry-run support, presets)
+    - **Authentication**: Bearer token with `read` scope
+  
+  **Tier 2: Maintenance**
+  - `POST /api/v2/database/purge` — Delete old events with configurable retention policies:
+    - **Presets**: `30_days`, `90_days` (recommended), `365_days`, `custom`, `purge_all`
+    - **Workflow**: Call with `dry_run=true` to preview, then `dry_run=false` + `confirm=true` to execute
+    - **Response (Dry-Run, 200 OK)**: Detailed preview of rows/size to be deleted
+    - **Response (Execution, 202 Accepted)**: Job ID, execution timestamps, actual results
+    - **Safety**: Destructive operations require explicit confirmation; `purge_all` irreversible
+    - **Authentication**: Bearer token with `delete:database` scope
+  
+  - `POST /api/v2/database/optimize` — Reclaim disk space from deleted rows (PostgreSQL VACUUM):
+    - **VACUUM ANALYZE (default)**: Online operation, API stays responsive, ~80-95% space reclamation
+    - **VACUUM FULL (optional)**: Maximum space reclamation (100%), requires **maintenance window** (system goes offline 10-30 minutes)
+    - **Parameters**: `full: boolean`, `analyze: boolean` (update query planner stats)
+    - **Response (202 Accepted)**: Space freed (bytes/pretty), method used, downtime warning for VACUUM FULL
+    - **Critical Warning**: VACUUM FULL causes API downtime; never schedule automatically in production
+    - **Authentication**: Bearer token with `delete:database` scope
+  
+  **Tier 3: Audit**
+  - `GET /api/v2/database/cleanup-jobs` — Query audit log of all purge/optimize operations:
+    - **Pagination**: `offset`, `limit` (max 100), `total` count
+    - **Filtering**: `status` (completed/failed), `days` (last N days, default 30)
+    - **Results**: Job ID, operation type, strategy, parameters, execution timestamps, duration, affected tables, statistics
+    - **Authentication**: Bearer token with `read` scope
+  - `GET /api/v2/database/health` — Simple database connectivity check (no authentication required)
+
+- **Database Maintenance Audit Log** – New persistent table `database_maintenance_log`:
+  - Tracks all purge and optimize operations with full audit trail
+  - Stores: operation type, preset, parameters, execution timestamps, status, results (JSONB)
+  - Indexed on status and created_at for efficient queries
+  - User attribution via `executed_by` field
+
+- **DatabaseManager class** (`src/storage/database-manager.js`) — High-level database maintenance logic:
+  - `getStatistics()` — Comprehensive database metrics (tables, events, hypertables, subscriptions)
+  - `getCapabilities()` — Backend feature support detection
+  - `getPurgePreview(preset, olderThan)` — Dry-run preview without deletion
+  - `executePurge(preset, olderThan, executedBy)` — Execute deletion with audit logging
+  - `optimizeDatabase(options, executedBy)` — VACUUM with downtime warnings
+  - Helper: Static `formatBytes()` for human-readable size formatting
+  - Helper: `_getTotalRowCount()` for row count queries
+  - Static `PURGE_PRESETS` configuration for retention policies
+
+- OAuth2 scope `delete:database` added for maintenance operation authorization
+
+### Security
+- Database maintenance endpoints require specific OAuth2 scopes (`read` or `delete:database`)
+- Destructive purge operations require explicit `confirm=true` flag (2-step confirmation via dry-run)
+- `purge_all` operation is intentionally irreversible; dry-run mandatory before execution
+- All maintenance operations logged with user attribution in `database_maintenance_log`
+- VACUUM FULL downtime warnings prevent accidental system disruption
+
+### Documentation
+- Comprehensive Database Management API guide in `docs/DATABASE_MANAGEMENT.md`:
+  - Endpoint specifications with request/response examples
+  - VACUUM behavior explained (online vs. maintenance-window operations)
+  - Admin runbook for daily/monthly operations
+  - Dry-run workflow documentation
+  - Preset configuration details
+  - Performance considerations for TimescaleDB compression
+  - Deployment and scheduling recommendations
+
 2026-07-07
 ----------
 
