@@ -97,7 +97,7 @@ export class DatabaseManager {
             `);
             const dbSize = dbSizeResult.rows[0];
 
-            // Get table information
+            // Get table information (only from public schema where app tables are)
             const tablesResult = await client.query(`
                 SELECT 
                     schemaname,
@@ -106,7 +106,7 @@ export class DatabaseManager {
                     pg_relation_size(schemaname || '.' || tablename) as table_size,
                     pg_indexes_size(schemaname || '.' || tablename) as index_size
                 FROM pg_tables
-                WHERE schemaname NOT IN ('pg_catalog', 'information_schema')
+                WHERE schemaname = 'public'
                 ORDER BY total_size DESC;
             `);
 
