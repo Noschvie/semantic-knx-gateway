@@ -38,7 +38,7 @@ export function formatDPTValue(value, fallback = 'N/A') {
     }
 
     // Handle object values directly
-    if (typeof value === 'object' && value !== null && !Array.isArray(value)) {
+    if (typeof value === 'object') {
         if (value.formatted) {
             return value.formatted;
         }
