@@ -37,11 +37,12 @@ export class DatabaseManager {
      * @returns {string} Formatted size (e.g. "2.7 GB")
      */
     static formatBytes(bytes) {
-        if (!bytes || bytes === 0) return '0 B';
+        const numBytes = parseInt(bytes, 10);
+        if (!numBytes || numBytes === 0) return '0 B';
         const k = 1024;
         const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
-        const i = Math.floor(Math.log(bytes) / Math.log(k));
-        return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+        const i = Math.floor(Math.log(numBytes) / Math.log(k));
+        return parseFloat((numBytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
     }
 
     /**
@@ -173,7 +174,7 @@ export class DatabaseManager {
                             (latest - earliest) / (1000 * 60 * 60 * 24)
                         );
                         eventTimeline = {
-                            total_events: parseInt(row.total_count),
+                            total_events: this.#parseInt(row.total_count),
                             earliest_event: earliest.toISOString(),
                             latest_event: latest.toISOString(),
                             coverage_days: Math.max(1, coverageDays),
@@ -202,9 +203,9 @@ export class DatabaseManager {
                 if (subsResult.rows[0]) {
                     const row = subsResult.rows[0];
                     subscriptionCounts = {
-                        total_subscriptions: parseInt(row.total),
-                        active: parseInt(row.active),
-                        expired: parseInt(row.expired),
+                        total_subscriptions: this.#parseInt(row.total),
+                        active: this.#parseInt(row.active),
+                        expired: this.#parseInt(row.expired),
                     };
                 }
             } catch (err) {
@@ -215,13 +216,15 @@ export class DatabaseManager {
             const tables = {};
             for (const row of tablesResult.rows) {
                 const rowCount = rowCountMap.get(row.tablename) || 0;
+                const tableSize = this.#parseInt(row.table_size);
+                const indexSize = this.#parseInt(row.index_size);
                 tables[row.tablename] = {
                     type: hypertableInfo[row.tablename] ? 'hypertable' : 'regular',
                     row_count: rowCount,
-                    size_bytes: row.table_size,
-                    size_pretty: DatabaseManager.formatBytes(row.table_size),
-                    index_size_bytes: row.index_size || 0,
-                    index_size_pretty: DatabaseManager.formatBytes(row.index_size || 0),
+                    size_bytes: tableSize,
+                    size_pretty: DatabaseManager.formatBytes(tableSize),
+                    index_size_bytes: indexSize,
+                    index_size_pretty: DatabaseManager.formatBytes(indexSize),
                 };
             }
 
@@ -229,8 +232,8 @@ export class DatabaseManager {
                 timestamp: new Date().toISOString(),
                 database: {
                     name: dbSize.database_name,
-                    size_bytes: dbSize.size_bytes,
-                    size_pretty: DatabaseManager.formatBytes(dbSize.size_bytes),
+                    size_bytes: this.#parseInt(dbSize.size_bytes),
+                    size_pretty: DatabaseManager.formatBytes(this.#parseInt(dbSize.size_bytes)),
                     version: version,
                 },
                 tables,
@@ -345,8 +348,8 @@ export class DatabaseManager {
             `, [thresholdDate]);
 
             const knxData = knxEventsResult.rows[0];
-            const rowsToDeleteKnx = parseInt(knxData.rows_to_delete);
-            const tableSizeKnx = parseInt(knxData.table_size);
+            const rowsToDeleteKnx = this.#parseInt(knxData.rows_to_delete);
+            const tableSizeKnx = this.#parseInt(knxData.table_size);
             const deletionRatioKnx = rowsToDeleteKnx > 0 ? rowsToDeleteKnx / (await this.#getTotalRowCount(client, 'knx_events')) : 0;
             const estimatedFreedKnx = Math.floor(tableSizeKnx * deletionRatioKnx);
 
@@ -360,8 +363,8 @@ export class DatabaseManager {
             `, [thresholdDate]);
 
             const subData = subEventsResult.rows[0];
-            const rowsToDeleteSub = parseInt(subData.rows_to_delete);
-            const tableSizeSub = parseInt(subData.table_size);
+            const rowsToDeleteSub = this.#parseInt(subData.rows_to_delete);
+            const tableSizeSub = this.#parseInt(subData.table_size);
             const deletionRatioSub = rowsToDeleteSub > 0 ? rowsToDeleteSub / (await this.#getTotalRowCount(client, 'subscription_events')) : 0;
             const estimatedFreedSub = Math.floor(tableSizeSub * deletionRatioSub);
 
@@ -462,8 +465,8 @@ export class DatabaseManager {
             const beforeKnx = await client.query('SELECT COUNT(*) as count FROM knx_events');
             const beforeSub = await client.query('SELECT COUNT(*) as count FROM subscription_events');
 
-            const rowsBeforeKnx = parseInt(beforeKnx.rows[0].count);
-            const rowsBeforeSub = parseInt(beforeSub.rows[0].count);
+            const rowsBeforeKnx = this.#parseInt(beforeKnx.rows[0].count);
+            const rowsBeforeSub = this.#parseInt(beforeSub.rows[0].count);
 
             this.logger.info('📊 Row counts before purge', {
                 jobId,
@@ -498,10 +501,10 @@ export class DatabaseManager {
                 'SELECT pg_total_relation_size(\'subscription_events\') as size'
             );
 
-            const rowsAfterKnx = parseInt(afterKnx.rows[0].count);
-            const rowsAfterSub = parseInt(afterSub.rows[0].count);
-            const sizeAfterKnx = parseInt(sizeKnxAfter.rows[0].size);
-            const sizeAfterSub = parseInt(sizeSubAfter.rows[0].size);
+            const rowsAfterKnx = this.#parseInt(afterKnx.rows[0].count);
+            const rowsAfterSub = this.#parseInt(afterSub.rows[0].count);
+            const sizeAfterKnx = this.#parseInt(sizeKnxAfter.rows[0].size);
+            const sizeAfterSub = this.#parseInt(sizeSubAfter.rows[0].size);
 
             this.logger.info('📊 Row counts and sizes after deletion', {
                 jobId,
@@ -529,19 +532,19 @@ export class DatabaseManager {
             const results = {
                 knx_events: {
                     rows_deleted: knxRowsDeleted,
-                    rows_remaining: parseInt(afterKnx.rows[0].count),
+                    rows_remaining: rowsAfterKnx,
                     size_freed_bytes: 0,  // Estimation
                     size_freed_pretty: '~' + DatabaseManager.formatBytes(0),
                 },
                 subscription_events: {
                     rows_deleted: subRowsDeleted,
-                    rows_remaining: parseInt(afterSub.rows[0].count),
+                    rows_remaining: rowsAfterSub,
                     size_freed_bytes: 0,
                     size_freed_pretty: '~' + DatabaseManager.formatBytes(0),
                 },
                 totals: {
                     total_rows_deleted: knxRowsDeleted + subRowsDeleted,
-                    total_rows_remaining: parseInt(afterKnx.rows[0].count) + parseInt(afterSub.rows[0].count),
+                    total_rows_remaining: rowsAfterKnx + rowsAfterSub,
                     total_freed_bytes: 0,
                     total_freed_pretty: '~0 MB',
                 },
@@ -620,7 +623,7 @@ export class DatabaseManager {
             const sizeBefore = await client.query(
                 'SELECT pg_database_size(current_database()) as size'
             );
-            const sizeBeforeBytes = parseInt(sizeBefore.rows[0].size);
+            const sizeBeforeBytes = this.#parseInt(sizeBefore.rows[0].size);
 
             // Log the job
             const startedAt = new Date();
@@ -643,7 +646,7 @@ export class DatabaseManager {
             const sizeAfter = await client.query(
                 'SELECT pg_database_size(current_database()) as size'
             );
-            const sizeAfterBytes = parseInt(sizeAfter.rows[0].size);
+            const sizeAfterBytes = this.#parseInt(sizeAfter.rows[0].size);
 
             const completedAt = new Date();
             const spaceFreedbytes = sizeBeforeBytes - sizeAfterBytes;
@@ -738,7 +741,7 @@ export class DatabaseManager {
                 `SELECT COUNT(*) as total FROM database_maintenance_log ${whereClause}`,
                 params
             );
-            const total = parseInt(countResult.rows[0].total);
+            const total = this.#parseInt(countResult.rows[0].total);
 
             // Get paginated results
             const result = await client.query(
@@ -805,12 +808,20 @@ export class DatabaseManager {
     }
 
     /**
+     * Helper: Safe parseInt with radix 10 and default value 0
+     */
+    #parseInt(value) {
+        const parsed = parseInt(value, 10);
+        return Number.isNaN(parsed) ? 0 : parsed;
+    }
+
+    /**
      * Helper: Get the total row count for a table
      */
     async #getTotalRowCount(client, tableName) {
         try {
             const result = await client.query(`SELECT COUNT(*) as count FROM ${tableName}`);
-            return parseInt(result.rows[0].count);
+            return this.#parseInt(result.rows[0].count);
         } catch (err) {
             return 0;
         }
