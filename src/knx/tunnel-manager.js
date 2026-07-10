@@ -7,9 +7,18 @@
 import { createRequire } from 'module';
 import { createLogger } from '../utils/logger.js';
 import { TelegramDecoder } from './telegram-decoder.js';
+import { TelegramQueue } from './telegram-queue.js';
 
 const require = createRequire(import.meta.url);
 const { KNXClient, dptlib, KNXClientEvents } = require('knxultimate');
+
+// ===== CONSTANTS =====
+const HEALTH_CHECK_INTERVAL_MS = 30000; // 30 seconds
+const INITIAL_RECONNECT_DELAY_MS = 2000; // 2 seconds
+const MAX_RECONNECT_DELAY_MS = 30000; // 30 seconds (= PERSISTENT_RECONNECT_INTERVAL_MS)
+const MAX_RECONNECT_ATTEMPTS = 10; // After this, switch to persistent 30s interval
+const PERSISTENT_RECONNECT_INTERVAL_MS = 30000; // 30 seconds for persistent reconnection
+const MAX_QUEUE_SIZE = 100;
 
 export class TunnelManager {
     constructor(stateEngine) {
@@ -18,11 +27,15 @@ export class TunnelManager {
         this.connection = null;
         this.decoder = new TelegramDecoder();
         this.reconnectAttempts = 0;
-        this.maxReconnectAttempts = 10;
+        this.maxReconnectAttempts = MAX_RECONNECT_ATTEMPTS;
         this.isShuttingDown = false;
         this.reconnectTimer = null;
+        this.healthCheckTimer = null;
         this.isConnected = false;
         this.isConnecting = false;
+
+        // Telegram queue for outgoing writes during disconnect (FIFO with drop policy)
+        this.telegramQueue = new TelegramQueue(MAX_QUEUE_SIZE, this.logger);
     }
 
     async connect() {
@@ -194,6 +207,12 @@ export class TunnelManager {
             clearTimeout(this.reconnectTimer);
             this.reconnectTimer = null;
         }
+
+        // Start health check
+        this.startHealthCheck();
+
+        // Process queued outgoing telegrams
+        this.processQueuedTelegrams();
     }
 
     onDisconnected() {
@@ -209,6 +228,10 @@ export class TunnelManager {
         if (this.isConnected) {
             this.logger.warn('❌ KNX Tunnel disconnected');
             this.isConnected = false;
+
+            // Stop health check
+            this.stopHealthCheck();
+
             this.scheduleReconnect();
         }
     }
@@ -268,25 +291,39 @@ export class TunnelManager {
             return;
         }
 
-        if (this.reconnectAttempts >= this.maxReconnectAttempts) {
-            this.logger.error('Max reconnect attempts reached. Giving up.');
-            return;
-        }
-
         if (this.reconnectTimer) {
             clearTimeout(this.reconnectTimer);
         }
 
         this.reconnectAttempts++;
-        const delay = Math.min(2000 * this.reconnectAttempts, 30000);
-        this.logger.info(`Reconnecting in ${delay}ms (attempt ${this.reconnectAttempts})`);
+
+        // Determine delay: exponential backoff for first 10 attempts, then persistent interval
+        let delay;
+        if (this.reconnectAttempts <= this.maxReconnectAttempts) {
+            // Exponential backoff: 2s, 4s, 6s, ..., up to 30s
+            delay = Math.min(
+                INITIAL_RECONNECT_DELAY_MS * this.reconnectAttempts,
+                MAX_RECONNECT_DELAY_MS
+            );
+            this.logger.info(
+                `⏳ Reconnecting in ${delay}ms (attempt ${this.reconnectAttempts}/${this.maxReconnectAttempts})`
+            );
+        } else {
+            // After maxReconnectAttempts, use persistent interval (30s)
+            delay = PERSISTENT_RECONNECT_INTERVAL_MS;
+            this.logger.warn(
+                `⏳ Persistent reconnect: trying again in ${delay}ms (attempt ${this.reconnectAttempts})`
+            );
+        }
 
         this.reconnectTimer = setTimeout(() => {
             if (!this.isShuttingDown && !this.isConnecting) {
                 this.connect().catch((err) => {
-                    this.logger.error('Reconnect failed:', err);
+                    this.logger.error(`Reconnect failed: ${err.message}`);
                     this.isConnected = false;
                     this.isConnecting = false;
+                    // Schedule next retry
+                    this.scheduleReconnect();
                 });
             }
         }, delay);
@@ -301,6 +338,8 @@ export class TunnelManager {
             this.reconnectTimer = null;
         }
 
+        this.stopHealthCheck();
+
         if (this.connection) {
             this.connection.Disconnect();
             this.connection = null;
@@ -309,12 +348,26 @@ export class TunnelManager {
     }
 
     async write(groupAddress, value, dpt) {
+        const telegram = {
+            groupAddress,
+            value,
+            dpt,
+            timestamp: new Date().toISOString(),
+        };
+
         if (!this.connection || !this.isConnected) {
-            throw new Error('Not connected to KNX');
+            // Queue for later delivery (FIFO Drop policy handled by TelegramQueue)
+            this.telegramQueue.push(telegram);
+            this.logger.warn(
+                `📋 KNX write queued (not connected): ${groupAddress} = ${value} ` +
+                `(queue: ${this.telegramQueue.length}/${this.telegramQueue.maxSize})`
+            );
+            return;
         }
 
         return new Promise((resolve, reject) => {
             try {
+                this.logger.debug(`📤 KNX write: ${groupAddress} = ${value} (DPT: ${dpt})`);
                 this.connection.write(groupAddress, value, dpt);
                 resolve();
             } catch (error) {
@@ -322,5 +375,70 @@ export class TunnelManager {
                 reject(error);
             }
         });
+    }
+
+    /**
+     * Process queued telegrams after reconnection
+     */
+    async processQueuedTelegrams() {
+        if (this.telegramQueue.isEmpty()) {
+            return;
+        }
+
+        const queueSize = this.telegramQueue.length;
+        this.logger.info(`📤 Processing ${queueSize} queued telegrams...`);
+
+        const queue = this.telegramQueue.drain();
+        let successCount = 0;
+        let failureCount = 0;
+
+        for (const telegram of queue) {
+            try {
+                await this.write(telegram.groupAddress, telegram.value, telegram.dpt);
+                successCount++;
+            } catch (err) {
+                failureCount++;
+                this.logger.error(
+                    `Failed to send queued telegram to ${telegram.groupAddress}: ${err.message}`
+                );
+            }
+        }
+
+        this.logger.info(
+            `✅ Queue processing complete: ${successCount} sent, ${failureCount} failed`
+        );
+    }
+
+    /**
+     * Start periodic health check (ping)
+     */
+    startHealthCheck() {
+        if (this.healthCheckTimer) {
+            return;
+        }
+
+        this.logger.debug('Starting health check...');
+
+        // Check every HEALTH_CHECK_INTERVAL_MS
+        this.healthCheckTimer = setInterval(() => {
+            if (!this.isConnected || !this.connection) {
+                this.logger.warn('⚠️ Health check: Connection lost detected');
+                this.onDisconnected();
+                return;
+            }
+
+            this.logger.debug('💓 Health check OK');
+        }, HEALTH_CHECK_INTERVAL_MS);
+    }
+
+    /**
+     * Stop periodic health check
+     */
+    stopHealthCheck() {
+        if (this.healthCheckTimer) {
+            clearInterval(this.healthCheckTimer);
+            this.healthCheckTimer = null;
+            this.logger.debug('Health check stopped');
+        }
     }
 }

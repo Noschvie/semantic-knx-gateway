@@ -9,6 +9,74 @@ Unreleased
 ----------
 
 ### Added
+- **KNX Connection Resilience & Automatic Reconnection** — Robust handling of network interruptions:
+
+  **Automatic Reconnection Strategy:**
+  - Phase 1: Exponential backoff for the first 10 attempts (2s, 4s, 6s, ..., 30s)
+  - Phase 2: Persistent retry every 30 seconds indefinitely (never gives up)
+  - **Never terminates**: System continues reconnecting forever until connection restored
+  - Configuration via constants: `MAX_RECONNECT_ATTEMPTS`, `INITIAL_RECONNECT_DELAY_MS`, `MAX_RECONNECT_DELAY_MS`, `PERSISTENT_RECONNECT_INTERVAL_MS`
+
+  **Outgoing Telegram Queue with FIFO Drop Policy:**
+  - New `TelegramQueue` class (`src/knx/telegram-queue.js`) implements FIFO queue for outgoing writes
+  - Max queue size: 100 (constant `MAX_QUEUE_SIZE`, configurable)
+  - **FIFO Drop policy**: When the queue is full, the oldest telegram is dropped to make room for the newest
+  - Write API requests return 200 OK even during disconnect (telegram queued for later delivery)
+  - Queue automatically processes on reconnection (sends all queued telegrams in FIFO order)
+  - Logging for queue status and dropped telegrams
+
+  **Health Check:**
+  - Periodic health check every 30 seconds (constant `HEALTH_CHECK_INTERVAL_MS`)
+  - Detects silent connection losses (a connection object still exists but no longer responsive)
+  - Triggers automatic reconnection flow on detection
+
+  **Event Emission:**
+  - After 10 failed reconnection attempts, the system switches to persistent 30s retry mode
+  - Event `knx:max-reconnect-attempts` emitted for admin alerting (email, SMS, dashboard notification)
+
+  **Implementation Details:**
+  - `TunnelManager.connect()` — Attempts connection with 10s timeout
+  - `TunnelManager.scheduleReconnect()` — Manages exponential backoff + persistent retry
+  - `TunnelManager.write()` — Queues telegrams if disconnected (never throws error)
+  - `TunnelManager.processQueuedTelegrams()` — Sends all queued telegrams after reconnection
+  - `TunnelManager.startHealthCheck()` / `stopHealthCheck()` — 30s health monitoring
+  - All constants defined at top of `src/knx/tunnel-manager.js` for easy tuning
+
+  **Documentation:**
+  - Comprehensive guide in `docs/KNX_RECONNECT_RESILIENCE.md`
+  - State transition diagram showing phases and flows
+  - Usage examples for API requests during disconnect
+  - Configuration and troubleshooting guide
+  - `TelegramQueue` API reference with all methods
+
+- **Duplicate Datapoints Prevention** — Filters orphaned states from API responses:
+  - API no longer returns stale datapoints when switching KNX systems
+  - Orphaned states (without corresponding datapoint_mappings) are automatically ignored
+  - Affected endpoints: `GET /api/v2/datapoints`, `GET /api/v2/datapoints/:id`, `GET /api/v2/datapoints/:id/timeseries`
+  - Documentation in `docs/DUPLICATE_DATAPOINTS_PREVENTION.md`
+
+- **DPT History Database Views** — Performance optimization for DPT lookups:
+  - New views: `v_dpt_current` (current DPT for each GA), `v_dpt_history` (complete change timeline)
+  - `getDptAtTime()` now uses `v_dpt_history` view for efficient historical lookups
+  - `getCurrentDptMap()` NEW method uses `v_dpt_current` for O(1) DPT lookups
+  - `detectDptConflicts()` now O(n) instead of O(n²) using `getCurrentDptMap()`
+
+- **TelegramQueue Class** — Separated queue logic from TunnelManager:
+  - New file: `src/knx/telegram-queue.js`
+  - FIFO queue with automatic drop policy
+  - Methods: `push()`, `shift()`, `drain()`, `clear()`, `isEmpty()`, `isFull()`, `getStats()`, `getAll()`, `length`
+  - Thread-safe for Node.js single-threaded environment
+  - Testable in isolation, reusable in other contexts
+
+- **Connection Constants** — Centralized configuration for KNX reconnection:
+  - `HEALTH_CHECK_INTERVAL_MS = 30000` — Health check every 30 seconds
+  - `INITIAL_RECONNECT_DELAY_MS = 2000` — Start with 2 second backoff
+  - `MAX_RECONNECT_DELAY_MS = 30000` — Cap backoff at 30 seconds
+  - `MAX_RECONNECT_ATTEMPTS = 10` — Switch to persistent mode after 10 attempts
+  - `PERSISTENT_RECONNECT_INTERVAL_MS = 30000` — Persistent retry every 30 seconds
+  - `MAX_QUEUE_SIZE = 100` — Maximum outgoing telegram queue size
+  - All are configurable at top of `src/knx/tunnel-manager.js`
+ 
 - **DPT Change History Tracking & Conflict Detection** — New audit trail for datapoint type (DPT) changes:
   
   **Database Schema:**
