@@ -46,7 +46,7 @@ echo ""
 
 TOKEN_RESPONSE=$(curl -s -X POST http://localhost:3000/oauth/access \
   -H "Content-Type: application/x-www-form-urlencoded" \
-  -d "grant_type=client_credentials&scope=read,delete:database&client_id=$CLIENT_ID&client_secret=$CLIENT_SECRET")
+  -d "grant_type=client_credentials&scope=read,delete:database&client_id=$CLIENT_ID&client_secret=$OAUTH_CLIENT_SECRET")
 
 echo "Token Response:"
 echo "$TOKEN_RESPONSE" | jq '.'
