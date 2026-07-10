@@ -8,6 +8,50 @@ contributors and users to follow meaningful changes over time.
 Unreleased
 ----------
 
+### Added
+- **DPT Change History Tracking & Conflict Detection** — New audit trail for datapoint type (DPT) changes:
+  
+  **Database Schema:**
+  - New `dpt_change_log` table tracking all DPT modifications per group address
+  - Columns: `id`, `datapoint_id`, `ga`, `old_dpt`, `new_dpt`, `changed_at`, `changed_by`, `reason`, `metadata`
+  - Indexed on `(ga, changed_at DESC)` and `(datapoint_id, changed_at DESC)` for efficient lookups
+  - Automatically created on startup if missing
+  
+  **DPT History Manager** (`src/storage/dpt-history.js`):
+  - `logDptChange(datapointId, ga, oldDpt, newDpt, changedBy, reason)` — Log a DPT change with audit trail
+  - `getDptAtTime(ga, timestamp)` — Retrieve the DPT that was active at a specific point in time (for historical value interpretation)
+  - `getDptHistory(ga)` — Fetch complete change history for a group address
+  - `detectDptConflicts(newMappings)` — Detect conflicts before applying new mappings:
+    - **Type 1**: DPT changes for existing group addresses (warns before applying)
+    - **Type 2**: Multiple datapoints with different DPTs for same GA in import (error condition)
+  - `getStatistics()` — Aggregate statistics (total changes, affected GAs, last change timestamp)
+  
+  **State Engine Integration** (`src/state/state-engine.js`):
+  - DptHistoryManager initialized in constructor
+  - `registerDatapoint()` detects DPT changes and logs them with reason "DPT changed during mapping update"
+  - Supports initial DPT recording for new group addresses
+  
+  **Semantic Mapper Integration** (`src/semantic/semantic-mapper.js`):
+  - Conflict detection performed **before** applying new mappings during TTL import
+  - All detected conflicts are logged as warnings; import continues safely
+  - Each datapoint registration triggers DPT change logging if DPT differs
+  
+  **Diagnostic Tools:**
+  - `scripts/dpt-history-check.sh` — Check table status, view statistics, verify consistency
+  - Supports `--log` (recent changes), `--stats` (detailed overview), `--consistency` (mismatch detection)
+  
+  **Benefits:**
+  - ✅ Full audit trail of who changed what DPT and when
+  - ✅ Historical values are always interpreted with the correct DPT context
+  - ✅ Conflict detection prevents data corruption during TTL imports
+  - ✅ Enables debugging of DPT-related issues (e.g., why a value appears wrong)
+  
+  **Use Cases Now Supported:**
+  - Renaming a group address (no DPT logging triggered)
+  - Changing DPT for existing GA (logged with old→new DPT tracking)
+  - Importing a new TTL file with DPT changes (conflicts detected, logged, safely applied)
+  - Interpreting historical states with correct DPT (via `getDptAtTime()`)
+
 2026-07-09
 ----------
 
