@@ -356,7 +356,8 @@ export function bearerAuthMiddleware(requiredScopes = []) {
         }
 
         if (requiredScopes.length > 0) {
-            const grantedScopes = new Set((entry.scope ?? '').split(/\s+/));
+            // Split scopes by whitespace or comma (support both formats)
+            const grantedScopes = new Set((entry.scope ?? '').split(/[\s,]+/));
             const missing = requiredScopes.filter(s => !grantedScopes.has(s));
             if (missing.length > 0) {
                 return res.status(403)

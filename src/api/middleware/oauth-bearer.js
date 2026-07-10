@@ -64,7 +64,8 @@ export function bearer(...requiredScopes) {
         }
 
         if (requiredScopes.length > 0) {
-            const granted = new Set((entry.scope ?? '').split(/\s+/).filter(Boolean));
+            // Split scopes by whitespace or comma (support both formats)
+            const granted = new Set((entry.scope ?? '').split(/[\s,]+/).filter(Boolean));
             const missing = requiredScopes.filter(s => !granted.has(s));
 
             if (missing.length > 0) {
