@@ -36,7 +36,7 @@ export function toDatapointResource(state, options = {}) {
             datapointId: state.datapointId,
             ga:          state.ga,
             dpt:         state.dpt,
-            ...(options.dptAtCapture ? { dptAtCapture: options.dptAtCapture } : {}),
+            ...(options.dptAtCapture ? { 'knx:dptAtCapture': options.dptAtCapture } : {}),
         },
         relationships: {
             datapointFunctions: { links: { related: `/functions?datapointId=${uuid}` } },
