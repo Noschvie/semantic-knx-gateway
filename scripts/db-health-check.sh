@@ -73,7 +73,9 @@ ORPHANED=$(run_sql "
   FROM current_state cs
   LEFT JOIN datapoint_mappings m ON cs.datapoint_id = m.datapoint_id
   WHERE m.datapoint_id IS NULL
-")
+" | xargs)
+
+if [ -z "$ORPHANED" ]; then ORPHANED=0; fi
 
 if [ "$ORPHANED" -gt 0 ]; then
   echo -e "${RED}⚠️  FOUND $ORPHANED orphaned states (states without mappings)${NC}"
@@ -105,7 +107,9 @@ DUPLICATES=$(run_sql "
   FROM (
     SELECT ga, COUNT(*) FROM datapoint_mappings GROUP BY ga HAVING COUNT(*) > 1
   ) t
-")
+" | xargs)
+
+if [ -z "$DUPLICATES" ]; then DUPLICATES=0; fi
 
 if [ "$DUPLICATES" -gt 0 ]; then
   echo -e "${RED}⚠️  FOUND $DUPLICATES GAs with multiple entries${NC}"
@@ -134,7 +138,9 @@ STALE=$(run_sql "
   FROM datapoint_mappings m
   LEFT JOIN current_state cs ON m.datapoint_id = cs.datapoint_id
   WHERE cs.datapoint_id IS NULL
-")
+" | xargs)
+
+if [ -z "$STALE" ]; then STALE=0; fi
 
 if [ "$STALE" -gt 0 ]; then
   echo -e "${YELLOW}ℹ️  Found $STALE mappings without current state${NC}"
@@ -164,9 +170,11 @@ if [ "$DO_BACKUP" = true ]; then
 fi
 
 # 6. Cleanup (if requested)
-if [ "$DO_CLEANUP" = true ] && [ "$ORPHANED" -gt 0 ]; then
-  echo -e "${YELLOW}6. CLEANUP ORPHANED STATES${NC}"
+if [ "$DO_CLEANUP" = true ]; then
+  echo -e "${YELLOW}6. CLEANUP OPERATIONS${NC}"
   echo "─────────────────────────────────────────────────────────────"
+
+  CLEANUP_DONE=false
 
   if [ "$DO_BACKUP" = false ]; then
     echo -e "${RED}⚠️  Creating backup before cleanup...${NC}"
@@ -176,31 +184,53 @@ if [ "$DO_CLEANUP" = true ] && [ "$ORPHANED" -gt 0 ]; then
     echo "  Backup: $BACKUP_FILE"
   fi
 
-  echo "  Deleting $ORPHANED orphaned states..."
-  run_sql "
-    DELETE FROM current_state cs
-    WHERE NOT EXISTS (
-      SELECT 1 FROM datapoint_mappings m
-      WHERE m.datapoint_id = cs.datapoint_id
-    );
-  " > /dev/null
+  # Cleanup orphaned states
+  if [ "$ORPHANED" -gt 0 ]; then
+    echo "  Deleting $ORPHANED orphaned states..."
+    run_sql "
+      DELETE FROM current_state cs
+      WHERE NOT EXISTS (
+        SELECT 1 FROM datapoint_mappings m
+        WHERE m.datapoint_id = cs.datapoint_id
+      );
+    " > /dev/null
 
-  REMAINING=$(run_sql "
-    SELECT COUNT(*)
-    FROM current_state cs
-    LEFT JOIN datapoint_mappings m ON cs.datapoint_id = m.datapoint_id
-    WHERE m.datapoint_id IS NULL
-  ")
+    REMAINING=$(run_sql "
+      SELECT COUNT(*)
+      FROM current_state cs
+      LEFT JOIN datapoint_mappings m ON cs.datapoint_id = m.datapoint_id
+      WHERE m.datapoint_id IS NULL
+    ")
 
-  if [ "$REMAINING" -eq 0 ]; then
-    echo -e "  ${GREEN}✓ All orphaned states removed${NC}"
-  else
-    echo -e "  ${RED}⚠️  $REMAINING states still orphaned (???)${NC}"
+    if [ "$REMAINING" -eq 0 ]; then
+      echo -e "  ${GREEN}✓ All orphaned states removed${NC}"
+    else
+      echo -e "  ${RED}⚠️  $REMAINING states still orphaned (???)${NC}"
+    fi
+    CLEANUP_DONE=true
   fi
 
-  echo "  Running VACUUM..."
-  run_sql "VACUUM FULL ANALYZE current_state;" > /dev/null
-  echo -e "  ${GREEN}✓ Vacuum complete${NC}"
+  # Cleanup stale mappings
+  if [ "$STALE" -gt 0 ]; then
+    echo "  Deleting $STALE stale mappings (without current state)..."
+    run_sql "
+      DELETE FROM datapoint_mappings m
+      WHERE NOT EXISTS (
+        SELECT 1 FROM current_state cs
+        WHERE cs.datapoint_id = m.datapoint_id
+      );
+    " > /dev/null
+    echo -e "  ${GREEN}✓ Stale mappings removed${NC}"
+    CLEANUP_DONE=true
+  fi
+
+  if [ "$CLEANUP_DONE" = true ]; then
+    echo "  Running VACUUM..."
+    run_sql "VACUUM FULL ANALYZE;" > /dev/null
+    echo -e "  ${GREEN}✓ Vacuum complete${NC}"
+  else
+    echo -e "  ${YELLOW}ℹ️  Nothing to cleanup${NC}"
+  fi
   echo ""
 fi
 
