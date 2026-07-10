@@ -161,34 +161,13 @@ async function getDatapointMappingByUuid(uuid, stateEngine) {
     return mappings.find(m => stableUuid(m.datapointId) === uuid) ?? null;
 }
 
-function toDatapointResourceWithStateMeta(state) {
-    const resource = toDatapointResource(state);
-
-    resource.meta = {
-        ...(resource.meta ?? {}),
-        hasCurrentState: state.hasCurrentState === true,
-    };
-
-    if (state.hasCurrentState !== true) {
-        resource.attributes = {
-            ...(resource.attributes ?? {}),
-            value: null,
-            valueType: 'string',
-            timestamp: null,
-        };
-    }
-
-    return resource;
-}
-
 /**
  * Enriches a datapoint resource with historical DPT information
  * @param {Object} state - Datapoint state
  * @param {DptHistoryManager} dptHistory - DPT history manager instance
- * @param {Object} options - Optional parameters
  * @returns {Promise<Object>} Enriched resource
  */
-async function toDatapointResourceWithHistoricalDpt(state, dptHistory, options = {}) {
+async function toDatapointResourceWithHistoricalDpt(state, dptHistory) {
     const resource = toDatapointResource(state);
 
     resource.meta = {
@@ -210,7 +189,7 @@ async function toDatapointResourceWithHistoricalDpt(state, dptHistory, options =
         try {
             const dptAtCapture = await dptHistory.getDptAtTime(state.ga, state.updated_at);
             if (dptAtCapture && dptAtCapture !== state.dpt) {
-                resource.meta.dptAtCapture = dptAtCapture;
+                resource.meta['knx:dptAtCapture'] = dptAtCapture;
             }
         } catch (err) {
             // Silently fail - historical DPT is optional
