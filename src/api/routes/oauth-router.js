@@ -162,15 +162,15 @@ function authenticateClient(req) {
     if (client_id) {
         const cfg = getClientConfig(client_id);
         if (!cfg) return null;
-        if (client_secret) {
-            // Use length check before timingSafeEqual to avoid buffer length mismatch
-            if (Buffer.byteLength(cfg.secret) !== Buffer.byteLength(client_secret)) return null;
-            const valid = crypto.timingSafeEqual(
-                Buffer.from(cfg.secret),
-                Buffer.from(client_secret),
-            );
-            if (!valid) return null;
-        }
+        // Client secret is required for body-based auth
+        if (!client_secret) return null;
+        // Use length check before timingSafeEqual to avoid buffer length mismatch
+        if (Buffer.byteLength(cfg.secret) !== Buffer.byteLength(client_secret)) return null;
+        const valid = crypto.timingSafeEqual(
+            Buffer.from(cfg.secret),
+            Buffer.from(client_secret),
+        );
+        if (!valid) return null;
         return { clientId: client_id, config: cfg };
     }
 
