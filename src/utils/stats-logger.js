@@ -4,6 +4,7 @@
 
 import { createLogger } from './logger.js';
 import { formatTimestamp } from './timezone.js';
+import { formatDPTValue } from './dpt-formatter.js';
 
 export class StatsLogger {
     constructor(db) {
@@ -82,7 +83,7 @@ export class StatsLogger {
                 output.push(
                     `   • ${ga.ga.padEnd(12)} → ${String(ga.count).padStart(4)} events` +
                     `   | ${formatTimestamp(ga.lastSeen) || 'N/A'}` +
-                    `   | Value: ${ga.currentValue ?? 'N/A'}`,
+                    `   | Value: ${formatDPTValue(ga.currentValue)}`,
                 );
             }
 

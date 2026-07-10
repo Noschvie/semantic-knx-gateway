@@ -4,6 +4,7 @@
 
 import { Router } from 'express';
 import { formatTimestamp } from '../../utils/timezone.js';
+import { formatDPTValue } from '../../utils/dpt-formatter.js';
 import { bearer } from '../middleware/oauth-bearer.js';
 
 // ── Vendor-Extension: Stats Endpoints ────────────────────────────────────────
@@ -222,7 +223,7 @@ export function statsRouter(stateEngine, db) {
                     eventCount:    parseInt(row.event_count),
                     lastEvent:     formatTimestamp(row.last_event),
                     lastEventISO:  row.last_event,
-                    currentValue:  row.current_value,
+                    currentValue:  formatDPTValue(row.current_value),
                     datapointName: row.datapoint_name,
                     dpt:           row.dpt,
                 })),
