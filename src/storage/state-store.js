@@ -41,6 +41,14 @@ export class StateStore {
             // Handle actual Buffer instances
             valueForText = value.toString('hex');
             valueForJson = { type: 'Buffer', data: Array.from(value) };
+        } else if (value && typeof value === 'object' && !Array.isArray(value)) {
+            // Handle decoded DPT objects (with 'formatted' field for DPT 10, 11, 18, 19)
+            if (value.formatted) {
+                valueForText = value.formatted;
+            } else {
+                valueForText = JSON.stringify(value);
+            }
+            valueForJson = value;
         } else {
             // Regular values
             valueForText = String(value);
