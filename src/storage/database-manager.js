@@ -14,10 +14,22 @@ import { createLogger } from '../utils/logger.js';
  * - Audit logging
  */
 export class DatabaseManager {
-    constructor(pool) {
-        this.pool = pool;
+    constructor(postgresClient) {
+        this.db = postgresClient;
+        this.pool = postgresClient.pool;
         this.logger = createLogger('DatabaseManager');
     }
+
+    /**
+     * Purge presets configuration
+     */
+    static PURGE_PRESETS = {
+        '30_days': { label: 'Last 30 days', days: 30 },
+        '90_days': { label: 'Last 90 days (Recommended)', days: 90 },
+        '365_days': { label: 'Last 365 days (1 year)', days: 365 },
+        'custom': { label: 'Custom date', days: null },
+        'purge_all': { label: '⚠️ Delete All', days: null },
+    };
 
     /**
      * Format bytes to human-readable size
@@ -30,6 +42,25 @@ export class DatabaseManager {
         const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
         const i = Math.floor(Math.log(bytes) / Math.log(k));
         return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+    }
+
+    /**
+     * Calculate the date threshold for a purge preset
+     * @param {string} preset - Preset name
+     * @param {Date} customDate - Optional custom date for 'custom' preset
+     * @returns {Date} The threshold date
+     */
+    static _calculateThresholdDate(preset, customDate = null) {
+        if (preset === 'custom' && customDate) {
+            return customDate;
+        }
+        const presetConfig = DatabaseManager.PURGE_PRESETS[preset];
+        if (presetConfig?.days) {
+            const now = new Date();
+            now.setDate(now.getDate() - presetConfig.days);
+            return now;
+        }
+        return null;
     }
 
     /**
@@ -103,7 +134,7 @@ export class DatabaseManager {
                     ORDER BY ht.table_name;
                 `);
                 for (const row of hypertablesResult.rows) {
-                    const compressionRatio = await this._getCompressionRatio(client, row.table_name);
+                    const compressionRatio = await this.#getCompressionRatio(client, row.table_name);
                     hypertableInfo[row.table_name] = {
                         chunk_count: row.chunk_count,
                         earliest_chunk: row.earliest_chunk ? row.earliest_chunk.toISOString().split('T')[0] : null,
@@ -268,36 +299,6 @@ export class DatabaseManager {
     }
 
     /**
-     * Purge presets configuration
-     */
-    static PURGE_PRESETS = {
-        '30_days': { label: 'Last 30 days', days: 30 },
-        '90_days': { label: 'Last 90 days (Recommended)', days: 90 },
-        '365_days': { label: 'Last 365 days (1 year)', days: 365 },
-        'custom': { label: 'Custom date', days: null },
-        'purge_all': { label: '⚠️ Delete All', days: null },
-    };
-
-    /**
-     * Calculate the date threshold for a purge preset
-     * @param {string} preset - Preset name
-     * @param {Date} customDate - Optional custom date for 'custom' preset
-     * @returns {Date} The threshold date
-     */
-    static _calculateThresholdDate(preset, customDate = null) {
-        if (preset === 'custom' && customDate) {
-            return customDate;
-        }
-        const presetConfig = DatabaseManager.PURGE_PRESETS[preset];
-        if (presetConfig?.days) {
-            const now = new Date();
-            now.setDate(now.getDate() - presetConfig.days);
-            return now;
-        }
-        return null;
-    }
-
-    /**
      * Get a preview of what would be purged without actually deleting
      *
      * @param {string} preset - Purge preset ('30_days', '90_days', etc.)
@@ -346,7 +347,7 @@ export class DatabaseManager {
             const knxData = knxEventsResult.rows[0];
             const rowsToDeleteKnx = parseInt(knxData.rows_to_delete);
             const tableSizeKnx = parseInt(knxData.table_size);
-            const deletionRatioKnx = rowsToDeleteKnx > 0 ? rowsToDeleteKnx / (await this._getTotalRowCount(client, 'knx_events')) : 0;
+            const deletionRatioKnx = rowsToDeleteKnx > 0 ? rowsToDeleteKnx / (await this.#getTotalRowCount(client, 'knx_events')) : 0;
             const estimatedFreedKnx = Math.floor(tableSizeKnx * deletionRatioKnx);
 
             // Get preview for subscription_events
@@ -361,7 +362,7 @@ export class DatabaseManager {
             const subData = subEventsResult.rows[0];
             const rowsToDeleteSub = parseInt(subData.rows_to_delete);
             const tableSizeSub = parseInt(subData.table_size);
-            const deletionRatioSub = rowsToDeleteSub > 0 ? rowsToDeleteSub / (await this._getTotalRowCount(client, 'subscription_events')) : 0;
+            const deletionRatioSub = rowsToDeleteSub > 0 ? rowsToDeleteSub / (await this.#getTotalRowCount(client, 'subscription_events')) : 0;
             const estimatedFreedSub = Math.floor(tableSizeSub * deletionRatioSub);
 
             const totalRowsToDelete = rowsToDeleteKnx + rowsToDeleteSub;
@@ -375,22 +376,22 @@ export class DatabaseManager {
                     tables: {
                         knx_events: {
                             rows_to_delete: rowsToDeleteKnx,
-                            rows_remaining: (await this._getTotalRowCount(client, 'knx_events')) - rowsToDeleteKnx,
+                            rows_remaining: (await this.#getTotalRowCount(client, 'knx_events')) - rowsToDeleteKnx,
                             size_to_free_bytes: estimatedFreedKnx,
                             size_to_free_pretty: DatabaseManager.formatBytes(estimatedFreedKnx),
-                            percentage: rowsToDeleteKnx > 0 ? parseFloat(((rowsToDeleteKnx / (await this._getTotalRowCount(client, 'knx_events'))) * 100).toFixed(1)) : 0,
+                            percentage: rowsToDeleteKnx > 0 ? parseFloat(((rowsToDeleteKnx / (await this.#getTotalRowCount(client, 'knx_events'))) * 100).toFixed(1)) : 0,
                         },
                         subscription_events: {
                             rows_to_delete: rowsToDeleteSub,
-                            rows_remaining: (await this._getTotalRowCount(client, 'subscription_events')) - rowsToDeleteSub,
+                            rows_remaining: (await this.#getTotalRowCount(client, 'subscription_events')) - rowsToDeleteSub,
                             size_to_free_bytes: estimatedFreedSub,
                             size_to_free_pretty: DatabaseManager.formatBytes(estimatedFreedSub),
-                            percentage: rowsToDeleteSub > 0 ? parseFloat(((rowsToDeleteSub / (await this._getTotalRowCount(client, 'subscription_events'))) * 100).toFixed(1)) : 0,
+                            percentage: rowsToDeleteSub > 0 ? parseFloat(((rowsToDeleteSub / (await this.#getTotalRowCount(client, 'subscription_events'))) * 100).toFixed(1)) : 0,
                         },
                     },
                     totals: {
                         total_rows_to_delete: totalRowsToDelete,
-                        total_rows_remaining: (await this._getTotalRowCount(client, 'knx_events')) + (await this._getTotalRowCount(client, 'subscription_events')) - totalRowsToDelete,
+                        total_rows_remaining: (await this.#getTotalRowCount(client, 'knx_events')) + (await this.#getTotalRowCount(client, 'subscription_events')) - totalRowsToDelete,
                         total_size_to_free_bytes: totalSizeToFree,
                         total_size_to_free_pretty: DatabaseManager.formatBytes(totalSizeToFree),
                     },
@@ -711,47 +712,6 @@ export class DatabaseManager {
     }
 
     /**
-     * Helper: Get the total row count for a table
-     * @private
-     */
-    async _getTotalRowCount(client, tableName) {
-        try {
-            const result = await client.query(`SELECT COUNT(*) as count FROM ${tableName}`);
-            return parseInt(result.rows[0].count);
-        } catch (err) {
-            return 0;
-        }
-    }
-
-    /**
-     * Helper: Get a compression ratio for a hypertable
-     * @private
-     */
-    async _getCompressionRatio(client, tableName) {
-        try {
-            const result = await client.query(`
-                SELECT 
-                    COALESCE(
-                        ROUND(
-                            (SELECT pg_total_relation_size(tablename)
-                             FROM pg_tables WHERE tablename = $1) /
-                            NULLIF(
-                                (SELECT total_compressed_bytes FROM _timescaledb_internal.compressed_hypertable_stats
-                                 WHERE hypertable_id = (SELECT id FROM _timescaledb_catalog.hypertable WHERE table_name = $1)),
-                                0
-                            ),
-                            1
-                        )::text || ':1',
-                        'N/A'
-                    ) as ratio;
-            `, [tableName]);
-            return result.rows[0]?.ratio || 'N/A';
-        } catch (err) {
-            return 'N/A';
-        }
-    }
-
-    /**
      * Get cleanup jobs from the audit log with pagination and filtering
      *
      * @param {number} offset - Pagination offset
@@ -841,6 +801,45 @@ export class DatabaseManager {
             if (client) {
                 client.release();
             }
+        }
+    }
+
+    /**
+     * Helper: Get the total row count for a table
+     */
+    async #getTotalRowCount(client, tableName) {
+        try {
+            const result = await client.query(`SELECT COUNT(*) as count FROM ${tableName}`);
+            return parseInt(result.rows[0].count);
+        } catch (err) {
+            return 0;
+        }
+    }
+
+    /**
+     * Helper: Get a compression ratio for a hypertable
+     */
+    async #getCompressionRatio(client, tableName) {
+        try {
+            const result = await client.query(`
+                SELECT 
+                    COALESCE(
+                        ROUND(
+                            (SELECT pg_total_relation_size(tablename)
+                             FROM pg_tables WHERE tablename = $1) /
+                            NULLIF(
+                                (SELECT total_compressed_bytes FROM _timescaledb_internal.compressed_hypertable_stats
+                                 WHERE hypertable_id = (SELECT id FROM _timescaledb_catalog.hypertable WHERE table_name = $1)),
+                                0
+                            ),
+                            1
+                        )::text || ':1',
+                        'N/A'
+                    ) as ratio;
+            `, [tableName]);
+            return result.rows[0]?.ratio || 'N/A';
+        } catch (err) {
+            return 'N/A';
         }
     }
 }
