@@ -8,6 +8,9 @@ contributors and users to follow meaningful changes over time.
 Unreleased
 ----------
 
+2026-07-09
+----------
+
 ### Added
 - **Database Management API (Vendor Extension)** – Comprehensive database maintenance endpoints
   under `/api/v2/database/...` (not in KNX IoT spec, vendor extension):
