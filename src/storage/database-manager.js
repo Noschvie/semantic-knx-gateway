@@ -45,8 +45,9 @@ export class DatabaseManager {
      * @returns {Promise<object>} Database statistics
      */
     async getStatistics() {
-        const client = await this.pool.connect();
+        let client;
         try {
+            client = await this.pool.connect();
             // Get PostgreSQL version
             const versionResult = await client.query(`
                 SELECT version();
@@ -207,7 +208,9 @@ export class DatabaseManager {
             this.logger.error('Failed to get database statistics', { error: err.message });
             throw err;
         } finally {
-            client.release();
+            if (client) {
+                client.release();
+            }
         }
     }
 
@@ -219,8 +222,9 @@ export class DatabaseManager {
      * @returns {Promise<object>} Capabilities
      */
     async getCapabilities() {
-        const client = await this.pool.connect();
+        let client;
         try {
+            client = await this.pool.connect();
             // Check for TimescaleDB
             const tsdbResult = await client.query(`
                 SELECT EXISTS (
@@ -254,7 +258,9 @@ export class DatabaseManager {
                 },
             };
         } finally {
-            client.release();
+            if (client) {
+                client.release();
+            }
         }
     }
 
@@ -302,8 +308,9 @@ export class DatabaseManager {
             throw new Error(`Invalid preset: ${preset}. Valid options: ${validPresets.join(', ')}`);
         }
 
-        const client = await this.pool.connect();
+        let client;
         try {
+            client = await this.pool.connect();
             let thresholdDate;
 
             if (preset === 'custom' && olderThan) {
@@ -392,7 +399,9 @@ export class DatabaseManager {
             this.logger.error('Failed to get purge preview', { error: err.message, preset, olderThan });
             throw err;
         } finally {
-            client.release();
+            if (client) {
+                client.release();
+            }
         }
     }
 
@@ -411,10 +420,11 @@ export class DatabaseManager {
             throw new Error(`Invalid preset: ${preset}. Valid options: ${validPresets.join(', ')}`);
         }
 
-        const client = await this.pool.connect();
+        let client;
         const jobId = `purge-job-${Date.now()}-${Math.random().toString(36).substring(7)}`;
 
         try {
+            client = await this.pool.connect();
             // Calculate threshold date
             let thresholdDate;
             if (preset === 'custom' && olderThan) {
@@ -574,15 +584,17 @@ export class DatabaseManager {
                 );
             } catch (logErr) {
                 this.logger.error('Failed to log purge failure', { error: logErr.message });
-            }
-            throw err;
-        } finally {
-            client.release();
-        }
-    }
+             }
+             throw err;
+         } finally {
+             if (client) {
+                 client.release();
+             }
+         }
+     }
 
     /**
-     * Optimize database using VACUUM
+     * Optimize a database using VACUUM
      *
      * @param {object} options - { full: boolean, analyze: boolean }
      * @param {string} executedBy - User email/ID
@@ -590,10 +602,11 @@ export class DatabaseManager {
      */
     async optimizeDatabase(options = {}, executedBy = 'system') {
         const { full = false, analyze = true } = options;
-        const client = await this.pool.connect();
+        let client;
         const jobId = `optimize-job-${Date.now()}-${Math.random().toString(36).substring(7)}`;
 
         try {
+            client = await this.pool.connect();
             const vacuumMethod = full ? 'VACUUM FULL' : 'VACUUM';
             const vacuumCommand = analyze
                 ? (full ? `${vacuumMethod} ANALYZE` : `${vacuumMethod} ANALYZE`)
@@ -688,7 +701,9 @@ export class DatabaseManager {
             }
             throw err;
         } finally {
-            client.release();
+            if (client) {
+                client.release();
+            }
         }
     }
 
@@ -743,8 +758,9 @@ export class DatabaseManager {
      * @returns {Promise<object>} { jobs: [], total: number }
      */
     async getCleanupJobs(offset = 0, limit = 20, status = null, days = 30) {
-        const client = await this.pool.connect();
+        let client;
         try {
+            client = await this.pool.connect();
             // Build query
             let whereClause = 'WHERE created_at > NOW() - INTERVAL \'1 day\' * $1';
             const params = [days];
@@ -798,7 +814,9 @@ export class DatabaseManager {
             this.logger.error('Failed to get cleanup jobs', { error: err.message, offset, limit, status, days });
             throw err;
         } finally {
-            client.release();
+            if (client) {
+                client.release();
+            }
         }
     }
 
@@ -808,15 +826,18 @@ export class DatabaseManager {
      * @returns {Promise<boolean>} true if a database is connected, false otherwise
      */
     async checkHealth() {
-        const client = await this.pool.connect();
-        try {
+         let client;
+         try {
+             client = await this.pool.connect();
             await client.query('SELECT NOW()');
             return true;
         } catch (err) {
             this.logger.error('Database health check failed', { error: err.message });
             return false;
         } finally {
-            client.release();
+            if (client) {
+                client.release();
+            }
         }
     }
 }
