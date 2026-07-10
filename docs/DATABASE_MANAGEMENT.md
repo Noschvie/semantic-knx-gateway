@@ -2,9 +2,9 @@
 
 **Feature Documentation & Implementation Guide**
 
-Version: 1.2
-Status: ✅ Implemented / Ready for Testing
-Date: 2026-07-08
+Version: 1.3
+Status: ✅ Implemented & Tested / Ready for Production
+Date: 2026-07-10
 
 ---
 
@@ -1597,8 +1597,28 @@ curl http://localhost:3000/api/v2/database/info \
 
 - [../ARCHITECTURE.md](../ARCHITECTURE.md) — Database schema overview
 - [../CONFIGURATION.md](../CONFIGURATION.md) — Environment variables
+- [DATABASE_MANAGEMENT_API_TESTS.md](DATABASE_MANAGEMENT_API_TESTS.md) — **Test Suite & Examples** ⭐
 - `DATABASE_BACKUP_RESTORE.md` *(planned)* — Backup strategies
 - [../API-TESTING.md](../API-TESTING.md) — Test examples
+
+---
+
+## 🧪 Quick Start: Testing the API
+
+To test all endpoints (Health, Info, Cleanup-Jobs, Purge, Optimize):
+
+```bash
+./scripts/test-database-management-api.sh
+```
+
+**Key Features:**
+- ✅ Automated token generation (OAuth2)
+- ✅ Tests all five endpoints
+- ✅ Purge dry-run preview
+- ✅ Interactive VACUUM FULL confirmation (downtime warning)
+- ✅ Before/after comparison
+
+For detailed test documentation, see: [DATABASE_MANAGEMENT_API_TESTS.md](DATABASE_MANAGEMENT_API_TESTS.md)
 
 ---
 
@@ -1607,9 +1627,3 @@ curl http://localhost:3000/api/v2/database/info \
 - GitHub Issues: [semantic-knx-gateway/issues](https://github.com/Noschvie/semantic-knx-gateway/issues)
 - Documentation: https://schema.knx.org/2020/api
 - KNX Association: https://www.knx.org
-
----
-
-**Last Updated**: 2026-07-08  
-**Status**: ✅ Implemented — Ready for Testing  
-**Version**: 1.2-DRAFT (Enhanced with maintenance window documentation)
