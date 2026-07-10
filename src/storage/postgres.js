@@ -143,6 +143,24 @@ export class PostgresClient {
             );
           `);
 
+            // Table: dpt_change_log
+            // Tracks DPT changes for audit trail and historical value interpretation
+            await client.query(`
+            CREATE TABLE IF NOT EXISTS dpt_change_log (
+              id SERIAL PRIMARY KEY,
+              datapoint_id TEXT NOT NULL,
+              ga TEXT NOT NULL,
+              old_dpt TEXT,
+              new_dpt TEXT NOT NULL,
+              changed_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+              changed_by TEXT DEFAULT 'system',
+              reason TEXT,
+              metadata JSONB,
+              CONSTRAINT fk_dpt_log_mapping FOREIGN KEY (datapoint_id)
+                REFERENCES datapoint_mappings(datapoint_id) ON DELETE CASCADE
+            );
+          `);
+
             // Table: subscriptions
             await client.query(`
             CREATE TABLE IF NOT EXISTS subscriptions (
@@ -250,6 +268,42 @@ export class PostgresClient {
               ON subscription_installations (installation_id);
             CREATE INDEX IF NOT EXISTS idx_sub_events_subscription_id
               ON subscription_events (subscription_id, ts DESC);
+            CREATE INDEX IF NOT EXISTS idx_dpt_log_ga 
+              ON dpt_change_log(ga, changed_at DESC);
+            CREATE INDEX IF NOT EXISTS idx_dpt_log_datapoint_id 
+              ON dpt_change_log(datapoint_id, changed_at DESC);
+          `);
+
+            // Views for DPT history tracking
+            // View: Get current DPT for each GA
+            await client.query(`
+            CREATE OR REPLACE VIEW v_dpt_current AS
+            SELECT
+              ga,
+              datapoint_id,
+              new_dpt as dpt,
+              changed_at,
+              changed_by
+            FROM dpt_change_log
+            WHERE (ga, changed_at) IN (
+              SELECT ga, MAX(changed_at)
+              FROM dpt_change_log
+              GROUP BY ga
+            );
+          `);
+
+            // View: Get DPT at specific timestamp
+            await client.query(`
+            CREATE OR REPLACE VIEW v_dpt_history AS
+            SELECT
+              ga,
+              datapoint_id,
+              old_dpt,
+              new_dpt,
+              changed_at,
+              LEAD(changed_at) OVER (PARTITION BY ga ORDER BY changed_at) as valid_until
+            FROM dpt_change_log
+            ORDER BY ga, changed_at;
           `);
 
             // Table: database_maintenance_log (Audit log for purge/optimize operations)

@@ -3,12 +3,14 @@
 // KNX Runtime Engine – https://github.com/Noschvie/semantic-knx-gateway.git
 
 import { createLogger } from '../utils/logger.js';
+import { DptHistoryManager } from '../storage/dpt-history.js';
 
 export class SemanticMapper {
     constructor(resourceStore, stateEngine) {
         this.logger = createLogger('SemanticMapper');
         this.resourceStore = resourceStore;
         this.stateEngine = stateEngine;
+        this.dptHistory = stateEngine.dptHistory;
     }
 
     /**
@@ -16,6 +18,48 @@ export class SemanticMapper {
      */
     async mapDatapointsToStateEngine(graph) {
         this.logger.info('Mapping datapoints to state engine...');
+
+        // Collect all mappings from TTL before processing
+        const newMappings = [];
+        for (const datapoint of graph.datapoints) {
+            if (datapoint.groupAddress) {
+                newMappings.push({
+                    ga: this.normalizeGroupAddress(datapoint.groupAddress),
+                    dpt: datapoint.dpt,
+                    id: datapoint.id
+                });
+            }
+        }
+        for (const ga of graph.groupAddresses) {
+            if (ga.address) {
+                newMappings.push({
+                    ga: this.normalizeGroupAddress(ga.address),
+                    dpt: ga.dpt,
+                    id: ga.id
+                });
+            }
+        }
+
+        // Detect DPT conflicts BEFORE applying changes
+        const conflicts = await this.dptHistory.detectDptConflicts(newMappings);
+
+        if (conflicts.length > 0) {
+            this.logger.warn(`[DPT Conflicts] ${conflicts.length} potential conflicts detected:`, conflicts);
+
+            // Log each conflict for monitoring
+            for (const conflict of conflicts) {
+                if (conflict.type === 'DPT_CHANGE_DETECTED') {
+                    this.logger.warn(
+                        `  GA ${conflict.ga}: ${conflict.old_dpt} → ${conflict.new_dpt} ` +
+                        `(will be logged in history)`
+                    );
+                } else if (conflict.type === 'DUPLICATE_DPT_IN_IMPORT') {
+                    this.logger.error(
+                        `  GA ${conflict.ga}: Multiple datapoints with different DPTs: ${conflict.dpts.join(', ')}`
+                    );
+                }
+            }
+        }
 
         let mappedCount = 0;
 

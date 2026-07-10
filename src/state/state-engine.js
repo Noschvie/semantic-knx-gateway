@@ -6,6 +6,7 @@ import { createLogger } from '../utils/logger.js';
 import { EventBus } from './event-bus.js';
 import { EventStore } from '../storage/event-store.js';
 import { StateStore } from '../storage/state-store.js';
+import { DptHistoryManager } from '../storage/dpt-history.js';
 
 export class StateEngine {
     constructor(db) {
@@ -14,6 +15,7 @@ export class StateEngine {
         this.eventBus = new EventBus();
         this.eventStore = new EventStore(db);
         this.stateStore = new StateStore(db);
+        this.dptHistory = new DptHistoryManager(db, this.logger);
         this.datapointMappings = new Map(); // GA -> Datapoint mapping
     }
 
@@ -55,6 +57,13 @@ export class StateEngine {
     async registerDatapoint(ga, mapping) {
         const { datapointId, dpt, name, locationId, deviceId, functionId, metadata } = mapping;
 
+        // Get old mapping to detect DPT changes
+        const oldMappingResult = await this.db.query(
+            'SELECT dpt FROM datapoint_mappings WHERE datapoint_id = $1',
+            [datapointId]
+        );
+        const oldDpt = oldMappingResult.rows[0]?.dpt || null;
+
         const query = `
       INSERT INTO datapoint_mappings (
         datapoint_id, ga, dpt, name, location_id, device_id, function_id, metadata
@@ -76,6 +85,29 @@ export class StateEngine {
             functionId,
             JSON.stringify(metadata || {}),
         ]);
+
+        // Log DPT change if it occurred
+        if (oldDpt && oldDpt !== dpt) {
+            await this.dptHistory.logDptChange(
+                datapointId,
+                ga,
+                oldDpt,
+                dpt,
+                'import',
+                'DPT changed during mapping update'
+            );
+            this.logger.warn(`[DPT Change] GA ${ga}: ${oldDpt} → ${dpt}`);
+        } else if (dpt && !oldDpt) {
+            // First time DPT is assigned
+            await this.dptHistory.logDptChange(
+                datapointId,
+                ga,
+                null,
+                dpt,
+                'import',
+                'Initial DPT assignment'
+            );
+        }
 
         this.datapointMappings.set(ga, { datapointId, dpt, name });
         this.logger.debug(`Registered datapoint: ${ga} -> ${datapointId}`);
