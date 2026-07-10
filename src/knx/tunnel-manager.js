@@ -101,97 +101,14 @@ export class TunnelManager {
                     reject(err);
                 });
 
-                this.connection.on('indication', async(telegram) => {
-                    this.logger.debug({ msg: '📨 RAW indication telegram', telegram });
-
-                    try {
-                        const cemi = telegram?.cEMIMessage;
-
-                        if (!cemi) {
-                            return;
-                        }
-
-                        // ===== SOURCE ADDRESS =====
-                        const srcRaw = cemi?.srcAddress?.get();
-
-                        const src = srcRaw != null
-                            ? `${(srcRaw >> 12) & 0x0F}.${(srcRaw >> 8) & 0x0F}.${srcRaw & 0xFF}`
-                            : '';
-
-                        // ===== GROUP ADDRESS =====
-                        const dstRaw = cemi?.dstAddress?.get();
-
-                        const dest = dstRaw != null
-                            ? `${(dstRaw >> 11) & 0x1F}/${(dstRaw >> 8) & 0x07}/${dstRaw & 0xFF}`
-                            : '';
-
-                        // ===== APCI + VALUE =====
-                        // eslint-disable-next-line no-underscore-dangle
-                        // noinspection JSUnresolvedReference
-                        const apciRaw = cemi?.npdu?._apci ?? 0;
-                        const apciCmd = apciRaw & 0xC0; // Bits 7:6 -> command type
-                        const apciData = apciRaw & 0x3F; // Bits 5:0 -> short data (<= 6 bit)
-
-                        let evt = 'Unknown';
-                        switch (apciCmd) {
-                        case 0x00: evt = 'GroupValue_Read';     break;
-                        case 0x40: evt = 'GroupValue_Response'; break;
-                        case 0x80: evt = 'GroupValue_Write';    break;
-                        }
-
-                        // Read requests have no payload - do not store in state
-                        if (evt === 'GroupValue_Read') {
-                            this.logger.debug({ msg: '📖 GroupValue_Read – skipping state update', dest });
-                            return;
-                        }
-
-                        // ===== VALUE =====
-                        // eslint-disable-next-line no-underscore-dangle
-                        // noinspection JSUnresolvedReference
-                        const npduData = cemi?.npdu?._data;
-
-                        // Cover all possible knxultimate data paths
-                        const dataBytes =
-                            npduData?._data?.data ??   // { _data: { type: 'Buffer', data: [...] } }
-                            npduData?._data ??         // direct Buffer
-                            npduData?.data ??          // { data: [...] }
-                            null;
-
-                        let rawValue;
-
-                        if (!dataBytes || (Array.isArray(dataBytes) && dataBytes.length === 0)) {
-                            // Short telegram (1-bit / 4-bit): value in APCI low bits
-                            rawValue = apciData;
-                        } else if (Array.isArray(dataBytes) || Buffer.isBuffer(dataBytes)) {
-                            const arr = Array.isArray(dataBytes) ? dataBytes : Array.from(dataBytes);
-                            if (arr.length === 1) {
-                                rawValue = arr[0];
-                            } else {
-                                rawValue = Buffer.from(arr);
-                            }
-                        } else {
-                            rawValue = apciData;
-                        }
-
-                        this.logger.debug({
-                            msg: '📨 Parsed KNX telegram',
-                            event: evt,
-                            source: src,
-                            destination: dest,
-                            rawValue,
-                            rawValueIsBuffer: Buffer.isBuffer(rawValue),
-                            dataBytes,
-                        });
-
-                        await this.onTelegram(evt, src, dest, rawValue);
-
-                    } catch (err) {
+                this.connection.on('indication', (telegram) => {
+                    this.handleIndication(telegram).catch((err) => {
                         this.logger.error({
-                            msg: 'Error handling indication telegram',
+                            msg: 'Unhandled error in indication handler',
                             error: err?.message,
                             stack: err?.stack,
                         });
-                    }
+                    });
                 });
 
                 this.connection.Connect();
@@ -286,8 +203,83 @@ export class TunnelManager {
         }
     }
 
-    onError(error) {
-        this.logger.error('KNX Tunnel error:', error);
+    /**
+     * Handle KNX indication telegrams from the bus
+     * Parses cEMI message, extracts addresses and data, then routes to onTelegram
+     */
+    async handleIndication(telegram) {
+        this.logger.debug({ msg: '📨 RAW indication telegram', telegram });
+
+        const cemi = telegram?.cEMIMessage;
+
+        if (!cemi) {
+            return;
+        }
+
+        // ===== SOURCE ADDRESS =====
+        const srcRaw = cemi?.srcAddress?.get();
+
+        const src = srcRaw != null
+            ? `${(srcRaw >> 12) & 0x0F}.${(srcRaw >> 8) & 0x0F}.${srcRaw & 0xFF}`
+            : '';
+
+        // ===== GROUP ADDRESS =====
+        const dstRaw = cemi?.dstAddress?.get();
+
+        const dest = dstRaw != null
+            ? `${(dstRaw >> 11) & 0x1F}/${(dstRaw >> 8) & 0x07}/${dstRaw & 0xFF}`
+            : '';
+
+        // ===== EVENT TYPE (using public API: isGroupRead, isGroupResponse, isGroupWrite) =====
+        let evt = 'Unknown';
+        if (cemi?.npdu?.isGroupRead) {
+            evt = 'GroupValue_Read';
+        } else if (cemi?.npdu?.isGroupResponse) {
+            evt = 'GroupValue_Response';
+        } else if (cemi?.npdu?.isGroupWrite) {
+            evt = 'GroupValue_Write';
+        }
+
+        // Read requests have no payload - do not store in state
+        if (evt === 'GroupValue_Read') {
+            this.logger.debug({ msg: '📖 GroupValue_Read – skipping state update', dest });
+            return;
+        }
+
+        // ===== VALUE (using public API: dataValue instead of _data) =====
+        const dataValue = cemi?.npdu?.dataValue;
+
+        let rawValue;
+
+        if (!dataValue || (Buffer.isBuffer(dataValue) && dataValue.length === 0)) {
+            // Short telegram or no data
+            rawValue = 0;
+        } else if (Buffer.isBuffer(dataValue)) {
+            if (dataValue.length === 1) {
+                rawValue = dataValue[0];
+            } else {
+                rawValue = dataValue;
+            }
+        } else if (Array.isArray(dataValue)) {
+            if (dataValue.length === 1) {
+                rawValue = dataValue[0];
+            } else {
+                rawValue = Buffer.from(dataValue);
+            }
+        } else {
+            rawValue = 0;
+        }
+
+        this.logger.debug({
+            msg: '📨 Parsed KNX telegram',
+            event: evt,
+            source: src,
+            destination: dest,
+            rawValue,
+            rawValueIsBuffer: Buffer.isBuffer(rawValue),
+        });
+
+        await this.onTelegram(evt, src, dest, rawValue);
     }
 
     scheduleReconnect() {
