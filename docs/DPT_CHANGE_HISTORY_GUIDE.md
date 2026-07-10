@@ -11,7 +11,7 @@
 ### **1. Database Schema**
 **File:** `src/storage/postgres.js`
 
-Added new table automatically on startup:
+Added a new table automatically on startup:
 
 ```sql
 CREATE TABLE dpt_change_log (
@@ -150,7 +150,7 @@ const conflicts = await dptHistory.detectDptConflicts(newMappings);
 
 ## 📊 Database Statistics
 
-Get overview of DPT changes:
+Get an overview of DPT changes:
 
 ```bash
 # Check history status
@@ -206,7 +206,7 @@ async updateMapping(datapointId, newMapping) {
 ### **2. TTL Loader**
 **File:** `src/semantic/ttl-loader.js`
 
-When loading new TTL file:
+When loading the new TTL file:
 
 ```javascript
 async loadTtl(filePath) {
@@ -282,7 +282,7 @@ function toDatapointResource(state) {
 
 5. **Monitor & Report**
    - Use `dpt-history-check.sh` periodically
-   - Alert if DPT changes detected
+   - Alert if DPT changes are detected
 
 ---
 
@@ -321,5 +321,3 @@ docker exec timescaledb psql -U knxuser -d knxdb -c "
 - Indices: Lines ~258
 - Migration: `src/storage/migrations/001-add-dpt-history.sql`
 - Diagnostic: `scripts/dpt-history-check.sh`
-
-
