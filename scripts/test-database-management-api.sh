@@ -159,10 +159,8 @@ curl -s -X POST $BASE_URL/optimize \
         "analyze": true
       }
     }
-  }' | jq '.data | {
-    id,
-    type,
-    status: .status,
+  }' | jq '.data.attributes | {
+    status,
     execution: {
       started_at: .execution.started_at,
       started_at_iso: .execution.started_at_iso,
@@ -170,7 +168,7 @@ curl -s -X POST $BASE_URL/optimize \
       completed_at_iso: .execution.completed_at_iso,
       duration_seconds: .execution.duration_seconds
     },
-    results: .results
+    results
   }'
 
 echo ""
@@ -201,10 +199,8 @@ if [[ $REPLY =~ ^[Yy]$ ]]; then
           "analyze": true
         }
       }
-    }' | jq '.data | {
-      id,
-      type,
-      status: .status,
+    }' | jq '.data.attributes | {
+      status,
       execution: {
         started_at: .execution.started_at,
         started_at_iso: .execution.started_at_iso,
@@ -212,7 +208,7 @@ if [[ $REPLY =~ ^[Yy]$ ]]; then
         completed_at_iso: .execution.completed_at_iso,
         duration_seconds: .execution.duration_seconds
       },
-      results: .results
+      results
     }'
   echo ""
   echo "✅ VACUUM FULL completed - App is back online"
