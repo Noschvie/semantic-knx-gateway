@@ -1,6 +1,17 @@
 #!/usr/bin/env bash
-# Database Health Check & Cleanup Script for Semantic KNX Gateway
-# Usage: ./scripts/db-health-check.sh [--cleanup] [--backup]
+
+# Script: db-health-check.sh
+# Description: Diagnose and fix database integrity issues via REST API
+# Usage: ./scripts/db-health-check.sh [--cleanup] [--list-orphaned] [--list-duplicates] [--list-stale]
+#
+# This script is specialized for diagnosis and automated cleanup of data integrity issues.
+# It uses the REST API for consistency and integrates with the monitoring endpoints.
+#
+# Examples:
+#   ./scripts/db-health-check.sh              # Just diagnose
+#   ./scripts/db-health-check.sh --list-orphaned  # Show details
+#   ./scripts/db-health-check.sh --cleanup        # Auto-fix issues
+#   ./scripts/db-health-check.sh --list-orphaned --list-stale  # Multiple details
 
 set -e
 
@@ -8,243 +19,263 @@ set -e
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
 # Configuration
-DB_CONTAINER="${DB_CONTAINER:-timescaledb}"
-DB_USER="${POSTGRES_USERNAME:-knxuser}"
-DB_NAME="${POSTGRES_DB:-knxdb}"
-BACKUP_DIR="./volumes/backups"
+API_BASE="${API_URL:-http://localhost:3000}"
+CLIENT_ID="knx-default-client"
+OAUTH_CLIENT_SECRET="${OAUTH_CLIENT_SECRET:-change-me-in-production}"
 
 # Flags
 DO_CLEANUP=false
-DO_BACKUP=false
+LIST_ORPHANED=false
+LIST_DUPLICATES=false
+LIST_STALE=false
 
 # Parse arguments
 while [[ $# -gt 0 ]]; do
   case $1 in
     --cleanup) DO_CLEANUP=true; shift ;;
-    --backup)  DO_BACKUP=true; shift ;;
+    --list-orphaned) LIST_ORPHANED=true; shift ;;
+    --list-duplicates) LIST_DUPLICATES=true; shift ;;
+    --list-stale) LIST_STALE=true; shift ;;
     *) echo "Unknown option: $1"; exit 1 ;;
   esac
 done
 
-echo "═══════════════════════════════════════════════════════════════"
-echo "🔍 Database Health Check – Semantic KNX Gateway"
-echo "═══════════════════════════════════════════════════════════════"
+echo ""
+echo "═══════════════════════════════════════════════════════════════════════════"
+echo "🔍 DATABASE HEALTH CHECK & DIAGNOSTIC – Semantic KNX Gateway"
+echo "═══════════════════════════════════════════════════════════════════════════"
 echo ""
 
-# Check if container is running
-if ! docker ps | grep -q "$DB_CONTAINER"; then
-  echo -e "${RED}❌ Container '$DB_CONTAINER' is not running${NC}"
+# Step 1: Get OAuth Token
+echo "🔑 Obtaining OAuth Token..."
+TOKEN_RESPONSE=$(curl -s -X POST "$API_BASE/oauth/access" \
+  -H "Content-Type: application/x-www-form-urlencoded" \
+  -d "grant_type=client_credentials&scope=read,delete:database&client_id=$CLIENT_ID&client_secret=$OAUTH_CLIENT_SECRET")
+
+TOKEN=$(echo "$TOKEN_RESPONSE" | jq -r '.access_token // empty')
+
+if [ -z "$TOKEN" ]; then
+  echo -e "${RED}❌ Failed to obtain OAuth token${NC}"
   exit 1
 fi
 
-# Function to run SQL query
-run_sql() {
-  docker exec "$DB_CONTAINER" psql -U "$DB_USER" -d "$DB_NAME" -tc "$1"
-}
-
-# 1. General Statistics
-echo -e "${YELLOW}1. DATABASE STATISTICS${NC}"
-echo "─────────────────────────────────────────────────────────────"
-
-STATS=$(run_sql "
-  SELECT
-    (SELECT COUNT(*) FROM datapoint_mappings) as mappings,
-    (SELECT COUNT(DISTINCT ga) FROM datapoint_mappings) as unique_gas,
-    (SELECT COUNT(*) FROM current_state) as states,
-    (SELECT COUNT(DISTINCT ga) FROM current_state) as state_gas
-")
-
-IFS=' ' read -r MAPPINGS UNIQUE_GAS STATES STATE_GAS <<< "$STATS"
-echo "  Datapoint Mappings: $MAPPINGS entries"
-echo "  Unique GAs (mappings): $UNIQUE_GAS"
-echo "  Current States: $STATES entries"
-echo "  Unique GAs (states): $STATE_GAS"
+echo -e "${GREEN}✓ Token obtained${NC}"
 echo ""
 
-# 2. Orphaned States Check
-echo -e "${YELLOW}2. ORPHANED STATES CHECK${NC}"
-echo "─────────────────────────────────────────────────────────────"
+# Step 2: Get Health Checks
+echo "📡 Fetching health checks from API..."
+HEALTH_RESPONSE=$(curl -s -X GET "$API_BASE/api/v2/stats/health/db-checks" \
+  -H "Authorization: Bearer $TOKEN")
 
-ORPHANED=$(run_sql "
-  SELECT COUNT(*)
-  FROM current_state cs
-  LEFT JOIN datapoint_mappings m ON cs.datapoint_id = m.datapoint_id
-  WHERE m.datapoint_id IS NULL
-" | xargs)
-
-if [ -z "$ORPHANED" ]; then ORPHANED=0; fi
-
-if [ "$ORPHANED" -gt 0 ]; then
-  echo -e "${RED}⚠️  FOUND $ORPHANED orphaned states (states without mappings)${NC}"
-
-  echo "  Details:"
-  run_sql "
-    SELECT
-      '    - ' || cs.datapoint_id || ' (GA ' || cs.ga || ')'
-    FROM current_state cs
-    LEFT JOIN datapoint_mappings m ON cs.datapoint_id = m.datapoint_id
-    WHERE m.datapoint_id IS NULL
-    LIMIT 10
-  " | head -10
-
-  if [ "$ORPHANED" -gt 10 ]; then
-    echo "    ... and $((ORPHANED - 10)) more"
-  fi
-else
-  echo -e "${GREEN}✓ No orphaned states found${NC}"
+if [ -z "$HEALTH_RESPONSE" ]; then
+  echo -e "${RED}❌ Failed to fetch health checks${NC}"
+  exit 1
 fi
+
+echo -e "${GREEN}✓ Health checks retrieved${NC}"
 echo ""
 
-# 3. Duplicate GAs Check
-echo -e "${YELLOW}3. DUPLICATE GROUP ADDRESSES CHECK${NC}"
-echo "─────────────────────────────────────────────────────────────"
+# Extract data
+HEALTH_STATUS=$(echo "$HEALTH_RESPONSE" | jq -r '.status')
+ORPHANED_COUNT=$(echo "$HEALTH_RESPONSE" | jq -r '.checks.orphaned_states.orphaned_count')
+ORPHANED_GAS=$(echo "$HEALTH_RESPONSE" | jq -r '.checks.orphaned_states.affected_gas')
+DUPLICATE_GAS=$(echo "$HEALTH_RESPONSE" | jq -r '.checks.duplicate_gas.duplicate_ga_count')
+STALE_COUNT=$(echo "$HEALTH_RESPONSE" | jq -r '.checks.stale_mappings.stale_count')
+DATA_INTEGRITY_SCORE=$(echo "$HEALTH_RESPONSE" | jq -r '.summary.data_integrity_score')
 
-DUPLICATES=$(run_sql "
-  SELECT COUNT(*)
-  FROM (
-    SELECT ga, COUNT(*) FROM datapoint_mappings GROUP BY ga HAVING COUNT(*) > 1
-  ) t
-" | xargs)
+# ═══════════════════════════════════════════════════════════════════════════════
+# SECTION 1: HEALTH CHECK SUMMARY
+# ═══════════════════════════════════════════════════════════════════════════════
+echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+echo -e "${BLUE}📊 HEALTH CHECK SUMMARY${NC}"
+echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+echo ""
 
-if [ -z "$DUPLICATES" ]; then DUPLICATES=0; fi
-
-if [ "$DUPLICATES" -gt 0 ]; then
-  echo -e "${RED}⚠️  FOUND $DUPLICATES GAs with multiple entries${NC}"
-
-  echo "  Top problematic GAs:"
-  run_sql "
-    SELECT
-      '    GA ' || ga || ': ' || COUNT(*) || 'x (DPTs: ' || STRING_AGG(DISTINCT dpt, ', ') || ')'
-    FROM datapoint_mappings
-    GROUP BY ga
-    HAVING COUNT(*) > 1
-    ORDER BY COUNT(*) DESC
-    LIMIT 5
-  "
+# Determine status indicators
+if [ "$ORPHANED_COUNT" -eq 0 ]; then
+  ORPHANED_STATUS="${GREEN}✓${NC}"
 else
-  echo -e "${GREEN}✓ All GAs are unique${NC}"
+  ORPHANED_STATUS="${YELLOW}⚠️${NC}"
 fi
-echo ""
 
-# 4. Stale Mappings Check
-echo -e "${YELLOW}4. STALE MAPPINGS CHECK${NC}"
-echo "─────────────────────────────────────────────────────────────"
-
-STALE=$(run_sql "
-  SELECT COUNT(*)
-  FROM datapoint_mappings m
-  LEFT JOIN current_state cs ON m.datapoint_id = cs.datapoint_id
-  WHERE cs.datapoint_id IS NULL
-" | xargs)
-
-if [ -z "$STALE" ]; then STALE=0; fi
-
-if [ "$STALE" -gt 0 ]; then
-  echo -e "${YELLOW}ℹ️  Found $STALE mappings without current state${NC}"
-  echo "  (These are old/unused entries, can be cleaned up)"
+if [ "$DUPLICATE_GAS" -eq 0 ]; then
+  DUPLICATE_STATUS="${GREEN}✓${NC}"
 else
-  echo -e "${GREEN}✓ All mappings have current states${NC}"
+  DUPLICATE_STATUS="${RED}⚠️${NC}"
 fi
+
+if [ "$STALE_COUNT" -eq 0 ]; then
+  STALE_STATUS="${GREEN}✓${NC}"
+else
+  STALE_STATUS="${YELLOW}⚠️${NC}"
+fi
+
+echo -e "   ${ORPHANED_STATUS} Orphaned States Check"
+printf "      └─ %d orphaned states (%d GAs affected)\n" "$ORPHANED_COUNT" "$ORPHANED_GAS"
+
+echo ""
+echo -e "   ${DUPLICATE_STATUS} Duplicate Group Addresses Check"
+printf "      └─ %d duplicate GAs found (DATA CORRUPTION RISK!)\n" "$DUPLICATE_GAS"
+
+echo ""
+echo -e "   ${STALE_STATUS} Stale Mappings Check"
+printf "      └─ %d stale mappings (unused, can be cleaned)\n" "$STALE_COUNT"
+
+echo ""
+echo "   Data Integrity Score:   $DATA_INTEGRITY_SCORE%"
+
+if [ "$HEALTH_STATUS" = "HEALTHY" ]; then
+  echo -e "   Overall Status:         ${GREEN}✅ HEALTHY${NC}"
+else
+  echo -e "   Overall Status:         ${YELLOW}⚠️ WARNING${NC}"
+fi
+
 echo ""
 
-# 5. Backup (if requested)
-if [ "$DO_BACKUP" = true ]; then
-  echo -e "${YELLOW}5. DATABASE BACKUP${NC}"
-  echo "─────────────────────────────────────────────────────────────"
+# ═══════════════════════════════════════════════════════════════════════════════
+# SECTION 2: DETAILED INFORMATION (if requested)
+# ═══════════════════════════════════════════════════════════════════════════════
 
-  mkdir -p "$BACKUP_DIR"
-  BACKUP_FILE="$BACKUP_DIR/knx-$(date +%Y%m%d-%H%M%S).sql.gz"
+if [ "$LIST_ORPHANED" = true ]; then
+  echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+  echo -e "${BLUE}📋 DETAILED ORPHANED STATES (up to 50)${NC}"
+  echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+  echo ""
 
-  echo "  Creating backup: $BACKUP_FILE"
-  docker exec "$DB_CONTAINER" pg_dump -U "$DB_USER" "$DB_NAME" | gzip > "$BACKUP_FILE"
-  SIZE=$(du -h "$BACKUP_FILE" | cut -f1)
-  echo -e "  ${GREEN}✓ Backup created ($SIZE)${NC}"
+  ORPHANED_DETAILS=$(curl -s -X GET "$API_BASE/api/v2/stats/health/orphaned-states?limit=50" \
+    -H "Authorization: Bearer $TOKEN")
 
-  # Cleanup old backups (keep 30 days)
-  find "$BACKUP_DIR" -name "knx-*.sql.gz" -mtime +30 -delete
-  echo "  Old backups (>30d) cleaned up"
+  echo "$ORPHANED_DETAILS" | jq -r '.states[] |
+    "   • GA: \(.ga) (DPT: \(.dpt))\n" +
+    "     ID: \(.datapointId) | Source: \(.source) | Value: \(.value)\n" +
+    "     Last Update: \(.lastUpdate)\n"'
+
   echo ""
 fi
 
-# 6. Cleanup (if requested)
-if [ "$DO_CLEANUP" = true ]; then
-  echo -e "${YELLOW}6. CLEANUP OPERATIONS${NC}"
-  echo "─────────────────────────────────────────────────────────────"
+if [ "$LIST_DUPLICATES" = true ]; then
+  echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+  echo -e "${BLUE}🚨 DETAILED DUPLICATE GROUP ADDRESSES${NC}"
+  echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+  echo ""
 
-  CLEANUP_DONE=false
-
-  if [ "$DO_BACKUP" = false ]; then
-    echo -e "${RED}⚠️  Creating backup before cleanup...${NC}"
-    mkdir -p "$BACKUP_DIR"
-    BACKUP_FILE="$BACKUP_DIR/knx-before-cleanup-$(date +%Y%m%d-%H%M%S).sql.gz"
-    docker exec "$DB_CONTAINER" pg_dump -U "$DB_USER" "$DB_NAME" | gzip > "$BACKUP_FILE"
-    echo "  Backup: $BACKUP_FILE"
-  fi
-
-  # Cleanup orphaned states
-  if [ "$ORPHANED" -gt 0 ]; then
-    echo "  Deleting $ORPHANED orphaned states..."
-    run_sql "
-      DELETE FROM current_state cs
-      WHERE NOT EXISTS (
-        SELECT 1 FROM datapoint_mappings m
-        WHERE m.datapoint_id = cs.datapoint_id
-      );
-    " > /dev/null
-
-    REMAINING=$(run_sql "
-      SELECT COUNT(*)
-      FROM current_state cs
-      LEFT JOIN datapoint_mappings m ON cs.datapoint_id = m.datapoint_id
-      WHERE m.datapoint_id IS NULL
-    " | xargs)
-
-    if [ -z "$REMAINING" ]; then REMAINING=0; fi
-
-    if [ "$REMAINING" -eq 0 ]; then
-      echo -e "  ${GREEN}✓ All orphaned states removed${NC}"
-    else
-      echo -e "  ${RED}⚠️  $REMAINING states still orphaned (???)${NC}"
-    fi
-    CLEANUP_DONE=true
-  fi
-
-  # Cleanup stale mappings
-  if [ "$STALE" -gt 0 ]; then
-    echo "  Deleting $STALE stale mappings (without current state)..."
-    run_sql "
-      DELETE FROM datapoint_mappings m
-      WHERE NOT EXISTS (
-        SELECT 1 FROM current_state cs
-        WHERE cs.datapoint_id = m.datapoint_id
-      );
-    " > /dev/null
-    echo -e "  ${GREEN}✓ Stale mappings removed${NC}"
-    CLEANUP_DONE=true
-  fi
-
-  if [ "$CLEANUP_DONE" = true ]; then
-    echo -e "  ${GREEN}✓ Cleanup complete${NC}"
+  if [ "$DUPLICATE_GAS" -eq 0 ]; then
+    echo -e "   ${GREEN}✓ No duplicate GAs found${NC}"
   else
-    echo -e "  ${YELLOW}ℹ️  Nothing to cleanup${NC}"
+    DUPLICATE_DETAILS=$(curl -s -X GET "$API_BASE/api/v2/stats/health/duplicate-gas" \
+      -H "Authorization: Bearer $TOKEN")
+
+    echo "$DUPLICATE_DETAILS" | jq -r '.duplicates[] |
+      "   • GA: \(.ga) (\(.mappingCount) mappings, \(.dptCount) DPT types)\n" +
+      "     DPTs: \(.dpts)\n" +
+      "     Names: \(.names)\n" +
+      "     Devices: \(.deviceIds)\n"'
   fi
+
   echo ""
 fi
 
-# Summary
-echo "═══════════════════════════════════════════════════════════════"
-if [ "$ORPHANED" -eq 0 ] && [ "$DUPLICATES" -eq 0 ]; then
-  echo -e "${GREEN}✅ Database is healthy!${NC}"
-else
-  echo -e "${YELLOW}⚠️  Issues found – review above${NC}"
-  [ "$ORPHANED" -gt 0 ] && echo "   • $ORPHANED orphaned states"
-  [ "$DUPLICATES" -gt 0 ] && echo "   • $DUPLICATES duplicate GAs"
-  [ "$STALE" -gt 0 ] && echo "   • $STALE stale mappings"
+if [ "$LIST_STALE" = true ]; then
+  echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+  echo -e "${BLUE}📭 DETAILED STALE MAPPINGS (up to 50)${NC}"
+  echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
   echo ""
-  echo "  Run with --cleanup to fix:"
-  echo "    ./scripts/db-health-check.sh --cleanup --backup"
+
+  STALE_DETAILS=$(curl -s -X GET "$API_BASE/api/v2/stats/health/stale-mappings?limit=50" \
+    -H "Authorization: Bearer $TOKEN")
+
+  echo "$STALE_DETAILS" | jq -r '.mappings[] |
+    "   • GA: \(.ga) (\(.dpt)) – \(.name)\n" +
+    "     ID: \(.datapointId) | Device: \(.deviceId) | Has State: \(.hasState)\n"'
+
+  echo ""
 fi
-echo "═══════════════════════════════════════════════════════════════"
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# SECTION 3: CLEANUP RECOMMENDATIONS
+# ═══════════════════════════════════════════════════════════════════════════════
+
+if [ "$DO_CLEANUP" = true ]; then
+  echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+  echo -e "${BLUE}🧹 CLEANUP OPERATIONS${NC}"
+  echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+  echo ""
+
+  CLEANUP_NEEDED=false
+  ISSUES_FOUND=""
+
+  if [ "$DUPLICATE_GAS" -gt 0 ]; then
+    echo -e "${RED}❌ Cannot auto-cleanup duplicate GAs (data corruption risk)${NC}"
+    echo "   This requires manual investigation and resolution!"
+    echo ""
+    CLEANUP_NEEDED=true
+    ISSUES_FOUND="$ISSUES_FOUND   • $DUPLICATE_GAS duplicate GAs (manual fix required)\n"
+  fi
+
+  if [ "$ORPHANED_COUNT" -gt 0 ]; then
+    echo -e "${YELLOW}🧹 Would cleanup $ORPHANED_COUNT orphaned states${NC}"
+    echo "   (States without corresponding datapoint mapping)"
+    CLEANUP_NEEDED=true
+    ISSUES_FOUND="$ISSUES_FOUND   • $ORPHANED_COUNT orphaned states (can be auto-cleaned)\n"
+  fi
+
+  if [ "$STALE_COUNT" -gt 0 ]; then
+    echo -e "${YELLOW}🧹 Would cleanup $STALE_COUNT stale mappings${NC}"
+    echo "   (Mappings without current state/unused)"
+    CLEANUP_NEEDED=true
+    ISSUES_FOUND="$ISSUES_FOUND   • $STALE_COUNT stale mappings (can be auto-cleaned)\n"
+  fi
+
+  if [ "$CLEANUP_NEEDED" = false ]; then
+    echo -e "${GREEN}✓ No cleanup needed (database is clean)${NC}"
+  else
+    echo ""
+    echo -e "${YELLOW}⚠️  To actually perform cleanup, use the REST API:${NC}"
+    echo ""
+    echo "   Orphaned States:"
+    echo "      POST /api/v2/database/cleanup/orphaned-states"
+    echo ""
+    echo "   Stale Mappings:"
+    echo "      POST /api/v2/database/cleanup/stale-mappings"
+    echo ""
+    echo "   For Duplicate GAs:"
+    echo "      • Review: GET /api/v2/stats/health/duplicate-gas"
+    echo "      • Manual fix required via PUT /api/v2/datapoints/{id}"
+    echo ""
+  fi
+
+  echo ""
+fi
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# FINAL STATUS
+# ═══════════════════════════════════════════════════════════════════════════════
+
+echo "═══════════════════════════════════════════════════════════════════════════"
+
+# Determine final status
+if [ "$HEALTH_STATUS" = "HEALTHY" ] && [ "$ORPHANED_COUNT" -eq 0 ] && [ "$DUPLICATE_GAS" -eq 0 ] && [ "$STALE_COUNT" -eq 0 ]; then
+  echo -e "${GREEN}✅ Database integrity: PERFECT${NC}"
+  echo "   No issues detected. All data is consistent."
+elif [ "$DUPLICATE_GAS" -gt 0 ]; then
+  echo -e "${RED}🚨 CRITICAL: Data corruption risk detected!${NC}"
+  echo "   $DUPLICATE_GAS duplicate group addresses found"
+  echo "   Investigate immediately with:"
+  echo "      ./scripts/db-health-check.sh --list-duplicates"
+elif [ "$ORPHANED_COUNT" -gt 100 ] || [ "$STALE_COUNT" -gt 100 ]; then
+  echo -e "${YELLOW}⚠️  Database has significant orphaned data${NC}"
+  echo "   Consider running cleanup:"
+  echo "      ./scripts/db-health-check.sh --cleanup"
+elif [ "$ORPHANED_COUNT" -gt 0 ] || [ "$STALE_COUNT" -gt 0 ]; then
+  echo -e "${GREEN}✅ Database is operational${NC}"
+  echo "   Minor cleanup recommended (use --cleanup flag)"
+else
+  echo -e "${GREEN}✅ Database is operational${NC}"
+fi
+
+echo "═══════════════════════════════════════════════════════════════════════════"
+echo ""
