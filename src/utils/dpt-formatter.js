@@ -28,7 +28,7 @@ export function formatDPTValue(value, fallback = 'N/A') {
                 }
                 // Return string representation if no formatted field
                 return String(parsed);
-            } catch (e) {
+            } catch (_e) {
                 // Keep original string if not valid JSON
                 return value;
             }
