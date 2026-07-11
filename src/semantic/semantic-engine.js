@@ -2,7 +2,7 @@
 // Copyright (c) 2026 Noschvie
 // KNX Runtime Engine – https://github.com/Noschvie/semantic-knx-gateway.git
 
-import fs from "fs";
+import fs from 'fs';
 import { createLogger } from '../utils/logger.js';
 import { GraphBuilder } from './graph-builder.js';
 import { ResourceStore } from './resource-store.js';
