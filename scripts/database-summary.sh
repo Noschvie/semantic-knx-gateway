@@ -113,9 +113,9 @@ echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━�
 echo "$TABLES_JSON" | jq -r '.[] |
   (.row_count | tonumber) as $rows |
   (if $rows == 0 then "⚪ " elif $rows < 100 then "🟡 " else "✅ " end) +
-  "\(.name | ljust(30)) • " +
-  ($rows | tostring | rjust(6)) + " rows • " +
-  (.size_pretty | ljust(8)) + " • \(.type)"
+  (.name + (if (.name | length) < 30 then (30 - (.name | length)) * " " else "" end)) + " • " +
+  ((($rows | tostring) as $str | (if ($str | length) < 6 then (6 - ($str | length)) * " " else "" end) + $str)) + " rows • " +
+  (.size_pretty + (if (.size_pretty | length) < 8 then (8 - (.size_pretty | length)) * " " else "" end)) + " • " + .type
 ' | sort
 
 echo ""
