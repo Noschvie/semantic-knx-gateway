@@ -191,7 +191,7 @@ async function toDatapointResourceWithHistoricalDpt(state, dptHistory) {
             if (dptAtCapture && dptAtCapture !== state.dpt) {
                 resource.meta['knx:dptAtCapture'] = dptAtCapture;
             }
-        } catch (err) {
+        } catch (_err) {
             // Silently fail - historical DPT is optional
         }
     }
@@ -419,7 +419,7 @@ export function datapointsRouter(stateEngine, tunnelManager) {
             }
 
             const resources = await Promise.all(
-                unionDatapoints.map(state => toDatapointResourceWithHistoricalDpt(state, dptHistory))
+                unionDatapoints.map(state => toDatapointResourceWithHistoricalDpt(state, dptHistory)),
             );
 
             const filters = parseFilters(req.query);
@@ -446,7 +446,7 @@ export function datapointsRouter(stateEngine, tunnelManager) {
         try {
             const allStates = await stateEngine.getAllStates();
             const enrichedStates = await Promise.all(
-                allStates.map(state => toDatapointResourceWithHistoricalDpt(state, dptHistory))
+                allStates.map(state => toDatapointResourceWithHistoricalDpt(state, dptHistory)),
             );
             res.json({
                 meta: { collection: { total: allStates.length } },
@@ -601,7 +601,7 @@ export function datapointsRouter(stateEngine, tunnelManager) {
 
             // Enrich history items with historical DPT information
             const enrichedItems = await Promise.all(
-                items.map(async (event) => {
+                items.map(async(event) => {
                     const item = {
                         id:         stableUuid(`${datapoint.datapointId}-${event.timestamp}`),
                         type:       'datapoint',
@@ -611,24 +611,24 @@ export function datapointsRouter(stateEngine, tunnelManager) {
                         },
                     };
 
-                     // Add historical DPT if available
-                     try {
-                         const dptAtTime = await dptHistory.getDptAtTime(datapoint.ga, event.timestamp);
-                         if (dptAtTime && dptAtTime !== datapoint.dpt) {
-                             item.meta = { 'knx:dptAtCapture': dptAtTime };
-                         }
-                     } catch (err) {
-                         // Silently fail - historical DPT is optional
-                     }
+                    // Add historical DPT if available
+                    try {
+                        const dptAtTime = await dptHistory.getDptAtTime(datapoint.ga, event.timestamp);
+                        if (dptAtTime && dptAtTime !== datapoint.dpt) {
+                            item.meta = { 'knx:dptAtCapture': dptAtTime };
+                        }
+                    } catch (_err) {
+                        // Silently fail - historical DPT is optional
+                    }
 
-                     return item;
-                 })
-             );
+                    return item;
+                }),
+            );
 
-             res.json({
-                 meta: { collection: { number, size, total } },
-                 data: enrichedItems,
-             });
+            res.json({
+                meta: { collection: { number, size, total } },
+                data: enrichedItems,
+            });
         } catch (error) {
             res.status(500).json(knxError(500, 'Internal Server Error', error.message));
         }
