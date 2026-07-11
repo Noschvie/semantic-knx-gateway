@@ -233,5 +233,245 @@ export function statisticsRouter(stateEngine, db) {
         }
     });
 
+    // GET /api/v2/stats/health/db-checks - Complete database integrity checks
+    router.get('/health/db-checks', bearer('read'), async(req, res) => {
+        try {
+            const now = new Date();
+
+            // 1. ORPHANED STATES CHECK
+            const orphanedStates = await db.query(`
+                SELECT COUNT(*) as count, COUNT(DISTINCT ga) as affected_gas
+                FROM current_state cs
+                LEFT JOIN datapoint_mappings m ON cs.datapoint_id = m.datapoint_id
+                WHERE m.datapoint_id IS NULL
+            `);
+
+            const orphanedCount = parseInt(orphanedStates.rows[0].count || 0);
+            const orphanedGAs = parseInt(orphanedStates.rows[0].affected_gas || 0);
+
+            // 2. DUPLICATE GROUP ADDRESSES CHECK
+            const duplicateGAs = await db.query(`
+                SELECT 
+                    COUNT(*) as duplicate_count,
+                    STRING_AGG(DISTINCT ga, ', ') as affected_gas
+                FROM (
+                    SELECT ga, COUNT(*) as mapping_count
+                    FROM datapoint_mappings
+                    GROUP BY ga
+                    HAVING COUNT(*) > 1
+                ) duplicates
+            `);
+
+            const duplicateMapping = duplicateGAs.rows[0];
+            const duplicateCount = parseInt(duplicateMapping.duplicate_count || 0);
+
+            // 3. STALE MAPPINGS CHECK
+            const staleMappings = await db.query(`
+                SELECT COUNT(*) as count
+                FROM datapoint_mappings m
+                LEFT JOIN current_state cs ON m.datapoint_id = cs.datapoint_id
+                WHERE cs.datapoint_id IS NULL
+            `);
+
+            const staleCount = parseInt(staleMappings.rows[0].count || 0);
+
+            // Get general statistics
+            const stats = await db.query(`
+                SELECT
+                    (SELECT COUNT(*) FROM datapoint_mappings) as total_mappings,
+                    (SELECT COUNT(DISTINCT ga) FROM datapoint_mappings) as unique_gas,
+                    (SELECT COUNT(*) FROM current_state) as total_states
+            `);
+
+            const statsRow = stats.rows[0];
+            const totalMappings = parseInt(statsRow.total_mappings || 0);
+            const uniqueGAs = parseInt(statsRow.unique_gas || 0);
+            const totalStates = parseInt(statsRow.total_states || 0);
+
+            // Determine overall health status
+            const hasIssues = orphanedCount > 0 || duplicateCount > 0 || staleCount > 0;
+            const healthStatus = hasIssues ? 'WARNING' : 'HEALTHY';
+
+            res.json({
+                timestamp: formatTimestamp(now),
+                timestampISO: now.toISOString(),
+                status: healthStatus,
+                checks: {
+                    orphaned_states: {
+                        check: 'ORPHANED STATES CHECK',
+                        description: 'States without corresponding datapoint mapping',
+                        status: orphanedCount === 0 ? '✓' : '⚠️',
+                        orphaned_count: orphanedCount,
+                        affected_gas: orphanedGAs,
+                        severity: orphanedCount === 0 ? 'none' : (orphanedCount > 100 ? 'high' : 'medium'),
+                        recommendation: orphanedCount > 0 ? 'Run cleanup-orphaned-datapoints.sql to remove orphaned states' : 'No action needed',
+                    },
+                    duplicate_gas: {
+                        check: 'DUPLICATE GROUP ADDRESSES CHECK',
+                        description: 'Group addresses with multiple datapoint mappings (data corruption risk)',
+                        status: duplicateCount === 0 ? '✓' : '⚠️',
+                        duplicate_ga_count: duplicateCount,
+                        affected_gas: duplicateMapping.affected_gas || null,
+                        severity: duplicateCount === 0 ? 'none' : 'high',
+                        recommendation: duplicateCount > 0 ? 'Investigate and fix conflicting mappings manually' : 'No action needed',
+                    },
+                    stale_mappings: {
+                        check: 'STALE MAPPINGS CHECK',
+                        description: 'Datapoint mappings without current state (unused)',
+                        status: staleCount === 0 ? '✓' : '⚠️',
+                        stale_count: staleCount,
+                        severity: staleCount === 0 ? 'none' : (staleCount > 50 ? 'high' : 'medium'),
+                        recommendation: staleCount > 0 ? 'Consider removing stale mappings or check if devices are still active' : 'No action needed',
+                    },
+                },
+                summary: {
+                    total_mappings: totalMappings,
+                    unique_gas: uniqueGAs,
+                    total_states: totalStates,
+                    orphaned_states: orphanedCount,
+                    duplicate_gas: duplicateCount,
+                    stale_mappings: staleCount,
+                    data_integrity_score: Math.round(((totalMappings - staleCount) / Math.max(1, totalMappings)) * 100),
+                },
+                notes: 'Run periodic database maintenance to ensure optimal performance and data integrity',
+            });
+        } catch (error) {
+            res.status(500).json({ errors: [{ status: '500', title: 'Internal Server Error', detail: error.message }] });
+        }
+    });
+
+    // GET /api/v2/stats/health/orphaned-states - Detailed orphaned states
+    router.get('/health/orphaned-states', bearer('read'), async(req, res) => {
+        try {
+            const limit = parseLimit(req.query.limit);
+
+            const orphanedStates = await db.query(`
+                SELECT
+                    cs.datapoint_id,
+                    cs.ga,
+                    cs.dpt,
+                    cs.updated_at,
+                    cs.source,
+                    cs.value_decoded
+                FROM current_state cs
+                LEFT JOIN datapoint_mappings m ON cs.datapoint_id = m.datapoint_id
+                WHERE m.datapoint_id IS NULL
+                ORDER BY cs.updated_at DESC
+                LIMIT $1
+            `, [limit]);
+
+            const countResult = await db.query(`
+                SELECT COUNT(*) as count
+                FROM current_state cs
+                LEFT JOIN datapoint_mappings m ON cs.datapoint_id = m.datapoint_id
+                WHERE m.datapoint_id IS NULL
+            `);
+
+            res.json({
+                timestamp: formatTimestamp(new Date()),
+                total_orphaned: parseInt(countResult.rows[0].count || 0),
+                limit,
+                states: orphanedStates.rows.map(row => ({
+                    datapointId: row.datapoint_id,
+                    ga: row.ga,
+                    dpt: row.dpt,
+                    lastUpdate: formatTimestamp(row.updated_at),
+                    lastUpdateISO: row.updated_at,
+                    source: row.source,
+                    value: row.value_decoded,
+                })),
+            });
+        } catch (error) {
+            res.status(500).json({ errors: [{ status: '500', title: 'Internal Server Error', detail: error.message }] });
+        }
+    });
+
+    // GET /api/v2/stats/health/duplicate-gas - Detailed duplicate GA check
+    router.get('/health/duplicate-gas', bearer('read'), async(req, res) => {
+        try {
+            const duplicates = await db.query(`
+                SELECT
+                    ga,
+                    COUNT(*) as mapping_count,
+                    COUNT(DISTINCT dpt) as dpt_count,
+                    STRING_AGG(DISTINCT dpt, ', ') as dpts,
+                    STRING_AGG(DISTINCT name, ' | ') as names,
+                    STRING_AGG(DISTINCT device_id, ', ') as device_ids
+                FROM datapoint_mappings
+                GROUP BY ga
+                HAVING COUNT(*) > 1
+                ORDER BY COUNT(*) DESC
+            `);
+
+            const countResult = await db.query(`
+                SELECT COUNT(*) as count FROM (
+                    SELECT ga FROM datapoint_mappings
+                    GROUP BY ga HAVING COUNT(*) > 1
+                ) duplicates
+            `);
+
+            res.json({
+                timestamp: formatTimestamp(new Date()),
+                total_duplicate_gas: parseInt(countResult.rows[0].count || 0),
+                duplicates: duplicates.rows.map(row => ({
+                    ga: row.ga,
+                    mappingCount: parseInt(row.mapping_count),
+                    dptCount: parseInt(row.dpt_count),
+                    dpts: row.dpts,
+                    names: row.names,
+                    deviceIds: row.device_ids,
+                })),
+                severity: duplicates.rows.length > 0 ? 'HIGH - Data corruption risk!' : 'OK',
+            });
+        } catch (error) {
+            res.status(500).json({ errors: [{ status: '500', title: 'Internal Server Error', detail: error.message }] });
+        }
+    });
+
+    // GET /api/v2/stats/health/stale-mappings - Detailed stale mappings
+    router.get('/health/stale-mappings', bearer('read'), async(req, res) => {
+        try {
+            const limit = parseLimit(req.query.limit);
+
+            const staleMappings = await db.query(`
+                SELECT
+                    m.datapoint_id,
+                    m.ga,
+                    m.dpt,
+                    m.name,
+                    m.device_id,
+                    COALESCE(cs.updated_at, NOW() - INTERVAL '999 years') as last_state_update
+                FROM datapoint_mappings m
+                LEFT JOIN current_state cs ON m.datapoint_id = cs.datapoint_id
+                WHERE cs.datapoint_id IS NULL
+                ORDER BY m.ga
+                LIMIT $1
+            `, [limit]);
+
+            const countResult = await db.query(`
+                SELECT COUNT(*) as count
+                FROM datapoint_mappings m
+                LEFT JOIN current_state cs ON m.datapoint_id = cs.datapoint_id
+                WHERE cs.datapoint_id IS NULL
+            `);
+
+            res.json({
+                timestamp: formatTimestamp(new Date()),
+                total_stale: parseInt(countResult.rows[0].count || 0),
+                limit,
+                mappings: staleMappings.rows.map(row => ({
+                    datapointId: row.datapoint_id,
+                    ga: row.ga,
+                    dpt: row.dpt,
+                    name: row.name,
+                    deviceId: row.device_id,
+                    hasState: row.last_state_update.getFullYear && row.last_state_update.getFullYear() > 2050 ? false : true,
+                })),
+            });
+        } catch (error) {
+            res.status(500).json({ errors: [{ status: '500', title: 'Internal Server Error', detail: error.message }] });
+        }
+    });
+
     return router;
 }
