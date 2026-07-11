@@ -43,7 +43,7 @@ export function createDatabaseRouter(pool) {
     router.get(
         '/info',
         bearer('read'),
-        async (req, res, next) => {
+        async(req, res, next) => {
             try {
                 logger.debug('GET /info requested');
 
@@ -65,7 +65,7 @@ export function createDatabaseRouter(pool) {
                 logger.error('Failed to get database info', { error: err.message });
                 next(err);
             }
-        }
+        },
     );
 
     /**
@@ -83,7 +83,7 @@ export function createDatabaseRouter(pool) {
     router.post(
         '/purge',
         bearer('delete:database'),
-        async (req, res, next) => {
+        async(req, res, next) => {
             try {
                 const { preset, older_than, purge_all, dry_run, confirm } = req.body?.data?.attributes || {};
 
@@ -163,7 +163,7 @@ export function createDatabaseRouter(pool) {
                 logger.error('Failed to execute purge', { error: err.message });
                 next(err);
             }
-        }
+        },
     );
 
     /**
@@ -181,7 +181,7 @@ export function createDatabaseRouter(pool) {
     router.post(
         '/optimize',
         bearer('delete:database'),
-        async (req, res, next) => {
+        async(req, res, next) => {
             try {
                 const { full = false, analyze = true } = req.body?.data?.attributes || {};
 
@@ -209,7 +209,7 @@ export function createDatabaseRouter(pool) {
                 logger.error('Failed to optimize database', { error: err.message });
                 next(err);
             }
-        }
+        },
     );
 
     /**
@@ -228,7 +228,7 @@ export function createDatabaseRouter(pool) {
     router.get(
         '/cleanup-jobs',
         bearer('read'),
-        async (req, res, next) => {
+        async(req, res, next) => {
             try {
                 logger.debug('GET /cleanup-jobs requested', { query: req.query });
 
@@ -253,7 +253,7 @@ export function createDatabaseRouter(pool) {
                 logger.error('Failed to get cleanup jobs', { error: err.message });
                 next(err);
             }
-        }
+        },
     );
 
     /**
@@ -262,7 +262,7 @@ export function createDatabaseRouter(pool) {
      * Simple endpoint to check if the database is responsive
      * (Used for monitoring, doesn't require Bearer token)
      */
-    router.get('/health', async (req, res) => {
+    router.get('/health', async(req, res) => {
         const isHealthy = await dbManager.checkHealth();
         if (isHealthy) {
             res.status(200).json({ status: 'ok', database: 'connected' });
