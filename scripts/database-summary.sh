@@ -113,7 +113,7 @@ echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━�
 echo "$TABLES_JSON" | jq -r 'to_entries[] |
   .key as $name |
   (.value.row_count // 0) as $row_count |
-  (if ($row_count | tonumber) == 0 then "⚪" elif ($row_count | tonumber) < 100 then "🟡" else "✅" end) as $status |
+  (if ($row_count | tonumber) == 0 then "⚪" elif ($row_count | tonumber) <= 200 then "✅" else "🟡" end) as $status |
   (.value.size_pretty // "0 B") as $size |
   (.value.type // "regular") as $type |
   "\($status)|\($name)|\($row_count)|\($size)|\($type)"
