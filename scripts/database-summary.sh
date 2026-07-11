@@ -71,20 +71,20 @@ if [ -z "$DB_INFO" ]; then
 fi
 
 # Extract data with null defaults
-TIMESTAMP=$(echo "$DB_INFO" | jq -r '.data.attributes.timestamp // "N/A"')
-DB_NAME=$(echo "$DB_INFO" | jq -r '.data.attributes.database.name // "unknown"')
-DB_SIZE=$(echo "$DB_INFO" | jq -r '.data.attributes.database.size_pretty // "0 B"')
-DB_SIZE_BYTES=$(echo "$DB_INFO" | jq -r '.data.attributes.database.size_bytes // 0')
-PG_VERSION=$(echo "$DB_INFO" | jq -r '.data.attributes.database.version // "unknown"' | grep -oP 'PostgreSQL \K[0-9.]+' || echo "unknown")
+TIMESTAMP=$(echo "$DB_INFO" | jq -r '(.data.attributes.timestamp // empty | select(. != "null")) // "N/A"')
+DB_NAME=$(echo "$DB_INFO" | jq -r '(.data.attributes.database.name // empty | select(. != "null")) // "unknown"')
+DB_SIZE=$(echo "$DB_INFO" | jq -r '(.data.attributes.database.size_pretty // empty | select(. != "null")) // "0 B"')
+DB_SIZE_BYTES=$(echo "$DB_INFO" | jq -r '((.data.attributes.database.size_bytes // empty) | if type == "number" then . else empty end) // 0')
+PG_VERSION=$(echo "$DB_INFO" | jq -r '(.data.attributes.database.version // empty | select(. != "null")) // "unknown"' | grep -oP 'PostgreSQL \K[0-9.]+' || echo "unknown")
 
-TOTAL_EVENTS=$(echo "$DB_INFO" | jq -r '.data.attributes.events_timeline.total_events // 0')
-COVERAGE_DAYS=$(echo "$DB_INFO" | jq -r '.data.attributes.events_timeline.coverage_days // 0')
-EVENTS_PER_DAY=$(echo "$DB_INFO" | jq -r '.data.attributes.events_timeline.events_per_day_avg // 0')
-EARLIEST=$(echo "$DB_INFO" | jq -r '.data.attributes.events_timeline.earliest_event // "N/A"')
-LATEST=$(echo "$DB_INFO" | jq -r '.data.attributes.events_timeline.latest_event // "N/A"')
+TOTAL_EVENTS=$(echo "$DB_INFO" | jq -r '((.data.attributes.events_timeline.total_events // empty) | if type == "number" then . else empty end) // 0')
+COVERAGE_DAYS=$(echo "$DB_INFO" | jq -r '((.data.attributes.events_timeline.coverage_days // empty) | if type == "number" then . else empty end) // 0')
+EVENTS_PER_DAY=$(echo "$DB_INFO" | jq -r '((.data.attributes.events_timeline.events_per_day_avg // empty) | if type == "number" then . else empty end) // 0')
+EARLIEST=$(echo "$DB_INFO" | jq -r '(.data.attributes.events_timeline.earliest_event // empty | select(. != "null")) // "N/A"')
+LATEST=$(echo "$DB_INFO" | jq -r '(.data.attributes.events_timeline.latest_event // empty | select(. != "null")) // "N/A"')
 
-TOTAL_SUBS=$(echo "$DB_INFO" | jq -r '.data.attributes.subscriptions.total_subscriptions // 0')
-ACTIVE_SUBS=$(echo "$DB_INFO" | jq -r '.data.attributes.subscriptions.active // 0')
+TOTAL_SUBS=$(echo "$DB_INFO" | jq -r '((.data.attributes.subscriptions.total_subscriptions // empty) | if type == "number" then . else empty end) // 0')
+ACTIVE_SUBS=$(echo "$DB_INFO" | jq -r '((.data.attributes.subscriptions.active // empty) | if type == "number" then . else empty end) // 0')
 
 TABLES_JSON=$(echo "$DB_INFO" | jq '.data.attributes.tables')
 
@@ -108,6 +108,19 @@ DATA_INTEGRITY_SCORE=$(echo "$HEALTH_CHECKS" | jq -r '.summary.data_integrity_sc
 
 echo -e "${GREEN}✓ Data retrieved${NC}"
 echo ""
+
+# Replace "null" strings with 0 for numeric fields from all sources
+TOTAL_EVENTS=$([ "$TOTAL_EVENTS" = "null" ] && echo "0" || echo "$TOTAL_EVENTS")
+COVERAGE_DAYS=$([ "$COVERAGE_DAYS" = "null" ] && echo "0" || echo "$COVERAGE_DAYS")
+EVENTS_PER_DAY=$([ "$EVENTS_PER_DAY" = "null" ] && echo "0" || echo "$EVENTS_PER_DAY")
+TOTAL_SUBS=$([ "$TOTAL_SUBS" = "null" ] && echo "0" || echo "$TOTAL_SUBS")
+ACTIVE_SUBS=$([ "$ACTIVE_SUBS" = "null" ] && echo "0" || echo "$ACTIVE_SUBS")
+DB_SIZE_BYTES=$([ "$DB_SIZE_BYTES" = "null" ] && echo "0" || echo "$DB_SIZE_BYTES")
+ORPHANED_COUNT=$([ "$ORPHANED_COUNT" = "null" ] && echo "0" || echo "$ORPHANED_COUNT")
+ORPHANED_GAS=$([ "$ORPHANED_GAS" = "null" ] && echo "0" || echo "$ORPHANED_GAS")
+DUPLICATE_GAS=$([ "$DUPLICATE_GAS" = "null" ] && echo "0" || echo "$DUPLICATE_GAS")
+STALE_MAPPINGS=$([ "$STALE_MAPPINGS" = "null" ] && echo "0" || echo "$STALE_MAPPINGS")
+DATA_INTEGRITY_SCORE=$([ "$DATA_INTEGRITY_SCORE" = "null" ] && echo "0" || echo "$DATA_INTEGRITY_SCORE")
 
 # Sanitize numeric values - ensure they're numbers
 TOTAL_EVENTS=${TOTAL_EVENTS//[!0-9]/}

@@ -95,6 +95,13 @@ echo -e "${BLUE}📊 HEALTH CHECK SUMMARY${NC}"
 echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 echo ""
 
+# Replace "null" strings with 0 for numeric fields
+ORPHANED_COUNT=$([ "$ORPHANED_COUNT" = "null" ] && echo "0" || echo "$ORPHANED_COUNT")
+ORPHANED_GAS=$([ "$ORPHANED_GAS" = "null" ] && echo "0" || echo "$ORPHANED_GAS")
+DUPLICATE_GAS=$([ "$DUPLICATE_GAS" = "null" ] && echo "0" || echo "$DUPLICATE_GAS")
+STALE_COUNT=$([ "$STALE_COUNT" = "null" ] && echo "0" || echo "$STALE_COUNT")
+DATA_INTEGRITY_SCORE=$([ "$DATA_INTEGRITY_SCORE" = "null" ] && echo "0" || echo "$DATA_INTEGRITY_SCORE")
+
 # Determine status indicators
 ORPHANED_COUNT=${ORPHANED_COUNT//[!0-9]/}  # Remove non-numeric chars
 DUPLICATE_GAS=${DUPLICATE_GAS//[!0-9]/}
