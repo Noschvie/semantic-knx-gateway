@@ -308,28 +308,28 @@ export class DPTDecoder {
             second,
             formatted: `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}T${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}:${String(second).padStart(2, '0')}`,
             date: new Date(year, month - 1, day, hour, minute, second),
-         };
-     }
+        };
+    }
 
-     decodeDPT20(value, sub) {
-         // 8-bit enum (unsigned)
-         const raw = this.toNumber(value);
+    decodeDPT20(value, sub) {
+        // 8-bit enum (unsigned)
+        const raw = this.toNumber(value);
 
-         // DPT 20.102 - HVAC Mode Control
-         if (sub === 102) {
-             const hvacModes = {
-                 0: 'auto',
-                 1: 'comfort',
-                 2: 'standby',
-                 3: 'economy',
-                 4: 'buildingProtection',
-             };
-             return hvacModes[raw] || `unknown(${raw})`;
-         }
+        // DPT 20.102 - HVAC Mode Control
+        if (sub === 102) {
+            const hvacModes = {
+                0: 'auto',
+                1: 'comfort',
+                2: 'standby',
+                3: 'economy',
+                4: 'buildingProtection',
+            };
+            return hvacModes[raw] || `unknown(${raw})`;
+        }
 
-         // Default: return raw value
-         return raw;
-     }
+        // Default: return raw value
+        return raw;
+    }
 
     // ==================== DPT Encoders ====================
 
