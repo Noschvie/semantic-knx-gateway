@@ -674,7 +674,9 @@ export class DatabaseManager {
 
             const completedAt = new Date();
             const spaceFreedbytes = sizeBeforeBytes - sizeAfterBytes;
-            const spaceFreePercent = (spaceFreedbytes / sizeBeforeBytes * 100).toFixed(1);
+            const spaceFreePercent = sizeBeforeBytes > 0
+                ? (spaceFreedbytes / sizeBeforeBytes * 100).toFixed(1)
+                : 0;
 
             const executionInfo = {
                  started_at: formatTimestamp(startedAt),

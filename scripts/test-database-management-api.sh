@@ -148,7 +148,7 @@ echo "=========================================="
 echo "ℹ️  This uses VACUUM ANALYZE which runs online (app stays online)"
 echo ""
 
-curl -s -X POST $BASE_URL/optimize \
+OPTIMIZE_RESPONSE=$(curl -s -X POST $BASE_URL/optimize \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/vnd.api+json" \
   -d '{
@@ -159,16 +159,19 @@ curl -s -X POST $BASE_URL/optimize \
         "analyze": true
       }
     }
-  }' | jq '.data.attributes | {
-    status,
-    execution: {
-      started_at: .execution.started_at,
-      started_at_iso: .execution.started_at_iso,
-      completed_at: .execution.completed_at,
-      completed_at_iso: .execution.completed_at_iso,
-      duration_seconds: .execution.duration_seconds
-    },
-    results
+  }')
+
+echo "Raw Response:"
+echo "$OPTIMIZE_RESPONSE" | jq '.'
+
+echo ""
+echo "Formatted Output:"
+echo "$OPTIMIZE_RESPONSE" | jq '.data | {
+    id,
+    type,
+    status: .attributes.status,
+    execution: .attributes.execution,
+    results: .attributes.results
   }'
 
 echo ""
@@ -188,7 +191,7 @@ echo ""
 if [[ $REPLY =~ ^[Yy]$ ]]; then
   echo "🔴 Starting VACUUM FULL - App will go OFFLINE!"
   echo ""
-  curl -s -X POST $BASE_URL/optimize \
+  VACUUM_FULL_RESPONSE=$(curl -s -X POST $BASE_URL/optimize \
     -H "Authorization: Bearer $TOKEN" \
     -H "Content-Type: application/vnd.api+json" \
     -d '{
@@ -199,16 +202,19 @@ if [[ $REPLY =~ ^[Yy]$ ]]; then
           "analyze": true
         }
       }
-    }' | jq '.data.attributes | {
-      status,
-      execution: {
-        started_at: .execution.started_at,
-        started_at_iso: .execution.started_at_iso,
-        completed_at: .execution.completed_at,
-        completed_at_iso: .execution.completed_at_iso,
-        duration_seconds: .execution.duration_seconds
-      },
-      results
+    }')
+
+  echo "Raw Response:"
+  echo "$VACUUM_FULL_RESPONSE" | jq '.'
+
+  echo ""
+  echo "Formatted Output:"
+  echo "$VACUUM_FULL_RESPONSE" | jq '.data | {
+      id,
+      type,
+      status: .attributes.status,
+      execution: .attributes.execution,
+      results: .attributes.results
     }'
   echo ""
   echo "✅ VACUUM FULL completed - App is back online"
