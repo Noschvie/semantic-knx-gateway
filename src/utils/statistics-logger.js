@@ -87,6 +87,13 @@ export class StatisticsLogger {
                 );
             }
 
+            output.push('');
+            output.push('🔍 DATA INTEGRITY CHECKS:');
+            output.push('─────────────────────────────────────────────────────');
+            output.push(`✓ Orphaned States:        ${stats.orphanedStatesCount} orphaned (${stats.orphanedStatesGAs} GAs affected)`);
+            output.push(`✓ Duplicate GAs:          ${stats.duplicateGAsCount} duplicate GAs`);
+            output.push(`✓ Stale Mappings:         ${stats.staleMappingsCount} stale mappings`);
+            output.push(`✓ Data Integrity Score:   ${stats.dataIntegrityScore}%`);
             output.push('════════════════════════════════════════════════════');
             output.push('');
 
@@ -120,6 +127,9 @@ export class StatisticsLogger {
             eventTimes,
             dbSize,
             topGAs,
+            orphanedStates,
+            duplicateGAs,
+            staleMappings,
         ] = await Promise.all([
             this.db.query('SELECT COUNT(*) as count FROM knx_events'),
             this.db.query('SELECT COUNT(*) as count FROM current_state'),
@@ -151,7 +161,34 @@ export class StatisticsLogger {
                 ORDER BY count DESC
                 LIMIT 5
             `, [fifteenMinutesAgo]),
+            this.db.query(`
+                SELECT COUNT(*) as count, COUNT(DISTINCT ga) as affected_gas
+                FROM current_state cs
+                LEFT JOIN datapoint_mappings m ON cs.datapoint_id = m.datapoint_id
+                WHERE m.datapoint_id IS NULL
+            `),
+            this.db.query(`
+                SELECT COUNT(*) as duplicate_count
+                FROM (
+                    SELECT ga, COUNT(*) as mapping_count
+                    FROM datapoint_mappings
+                    GROUP BY ga
+                    HAVING COUNT(*) > 1
+                ) duplicates
+            `),
+            this.db.query(`
+                SELECT COUNT(*) as count
+                FROM datapoint_mappings m
+                LEFT JOIN current_state cs ON m.datapoint_id = cs.datapoint_id
+                WHERE cs.datapoint_id IS NULL
+            `),
         ]);
+
+        const orphanedStatesCount = parseInt(orphanedStates.rows[0].count || 0);
+        const orphanedStatesGAs = parseInt(orphanedStates.rows[0].affected_gas || 0);
+        const duplicateGAsCount = parseInt(duplicateGAs.rows[0].duplicate_count || 0);
+        const staleMappingsCount = parseInt(staleMappings.rows[0].count || 0);
+        const totalMappingsCount = parseInt(totalMappings.rows[0].count || 0);
 
         return {
             totalEvents: parseInt(totalEvents.rows[0].count),
@@ -168,6 +205,11 @@ export class StatisticsLogger {
                 lastSeen: row.last_seen,
                 currentValue: row.current_value,
             })),
+            orphanedStatesCount,
+            orphanedStatesGAs,
+            duplicateGAsCount,
+            staleMappingsCount,
+            dataIntegrityScore: Math.round(((totalMappingsCount - staleMappingsCount) / Math.max(1, totalMappingsCount)) * 100),
         };
     }
 }
