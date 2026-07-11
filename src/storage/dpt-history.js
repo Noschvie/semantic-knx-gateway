@@ -165,7 +165,7 @@ export class DptHistoryManager {
                         ga,
                         type: 'DUPLICATE_DPT_IN_IMPORT',
                         dpts: Array.from(dpts),
-                        count: mappings.length
+                        count: mappings.length,
                     });
                 }
             }
@@ -184,7 +184,7 @@ export class DptHistoryManager {
                                 type: 'DPT_CHANGE_DETECTED',
                                 old_dpt: current.dpt,
                                 new_dpt: newDpt,
-                                lastChangedBy: current.changedBy
+                                lastChangedBy: current.changedBy,
                             });
                         }
                     }
@@ -219,7 +219,7 @@ export class DptHistoryManager {
                 gas_with_changes: 0,
                 datapoints_with_changes: 0,
                 last_change: null,
-                change_authors: null
+                change_authors: null,
             };
         } catch (error) {
             this.logger.error('[DPT History] Failed to get statistics:', error.message);
