@@ -38,13 +38,19 @@ export class DatabaseManager {
      */
     static formatBytes(bytes) {
         const numBytes = parseInt(bytes, 10);
-        if (!numBytes || numBytes === 0) return '0 B';
+        // Check for zero, NaN, or non-finite values
+        if (numBytes === 0 || !Number.isFinite(numBytes)) return '0 B';
         const k = 1024;
         const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
         const absBytes = Math.abs(numBytes);
+        // Ensure absBytes is valid for Math.log (must be > 0)
+        if (absBytes < 1) return '0 B';
         const i = Math.floor(Math.log(absBytes) / Math.log(k));
+        // Safety check: ensure i is within bounds
+        const safeI = Math.max(0, Math.min(i, sizes.length - 1));
         const sign = numBytes < 0 ? '-' : '';
-        return sign + parseFloat((absBytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+        const value = parseFloat((absBytes / Math.pow(k, safeI)).toFixed(1));
+        return sign + value + ' ' + sizes[safeI];
     }
 
     /**
