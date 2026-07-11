@@ -12,7 +12,13 @@ Unreleased
 - **Improved GitHub Workflows** — Enhanced CI/CD pipeline configuration:
   - **Dependency Audit Workflow**: Upgraded to latest action versions (checkout@v7, setup-node@v6), increased security level to `high`, and improved error handling
   - **Dependabot Configuration**: Enhanced with better labels, explicit commit message formatting, automatic rebase strategy, and staggered scheduling (npm on Monday, GitHub Actions on Tuesday)
-  - **Create Release Workflow**: Updated to latest action versions for consistency
+  - **Create Release Workflow**: Updated to the latest action versions for consistency
+
+- **Database Management API – Test Suite** — Comprehensive test coverage for database maintenance endpoints:
+  - Automated test script in `scripts/test-database-management-api.sh`
+  - Tests for all Phase 1 & 2 endpoints: health checks, database statistics, cleanup jobs, event purging, and optimization
+  - Detailed documentation in `docs/DATABASE_MANAGEMENT_API_TESTS.md`
+  - Includes operational impact assessment and performance considerations
 
 - **KNX Connection Resilience & Automatic Reconnection** — Robust handling of network interruptions:
 
@@ -32,7 +38,7 @@ Unreleased
 
   **Health Check:**
   - Periodic health check every 30 seconds (constant `HEALTH_CHECK_INTERVAL_MS`)
-  - Detects silent connection losses (a connection object still exists but no longer responsive)
+  - Detects silent connection losses (a connection object still exists but is no longer responsive)
   - Triggers automatic reconnection flow on detection
 
   **Event Emission:**
@@ -75,7 +81,7 @@ Unreleased
 
 - **Connection Constants** — Centralized configuration for KNX reconnection:
   - `HEALTH_CHECK_INTERVAL_MS = 30000` — Health check every 30 seconds
-  - `INITIAL_RECONNECT_DELAY_MS = 2000` — Start with 2 second backoff
+  - `INITIAL_RECONNECT_DELAY_MS = 2000` — Start with 2-second backoff
   - `MAX_RECONNECT_DELAY_MS = 30000` — Cap backoff at 30 seconds
   - `MAX_RECONNECT_ATTEMPTS = 10` — Switch to persistent mode after 10 attempts
   - `PERSISTENT_RECONNECT_INTERVAL_MS = 30000` — Persistent retry every 30 seconds
@@ -96,7 +102,7 @@ Unreleased
   - `getDptHistory(ga)` — Fetch complete change history for a group address
   - `detectDptConflicts(newMappings)` — Detect conflicts before applying new mappings:
     - **Type 1**: DPT changes for existing group addresses (warns before applying)
-    - **Type 2**: Multiple datapoints with different DPTs for same GA in import (error condition)
+    - **Type 2**: Multiple datapoints with different DPTs for the same GA in import (error condition)
   - `getStatistics()` — Aggregate statistics (total changes, affected GAs, last change timestamp)
   
   **State Engine Integration** (`src/state/state-engine.js`):
@@ -113,7 +119,7 @@ Unreleased
   - Constructor remains clean and simple (no dependencies injected)
   - Works independently as an RDF parsing utility
   - DPT conflict detection is handled by `SemanticMapper` using `DptHistoryManager.detectDptConflicts()`
-  - Backward compatible with existing codebase
+  - Backward compatible with the existing codebase
   
   **Diagnostic Tools:**
   - `scripts/dpt-history-check.sh` — Check table status, view statistics, verify consistency
@@ -192,7 +198,7 @@ Unreleased
   - `GET /api/v2/database/info` — Real-time database statistics and health metrics:
     - Database size, version, backend capabilities
     - Per-table statistics (rows, sizes, indexes)
-    - Event timeline (earliest/latest event, coverage, average events/day)
+    - Event timeline (the earliest/latest event, coverage, average events/day)
     - TimescaleDB hypertable compression info (chunk count, compression ratio)
     - Subscription counts (total, active, expired)
     - Backend capability flags (VACUUM support, compression support, dry-run support, presets)
@@ -212,7 +218,7 @@ Unreleased
     - **VACUUM FULL (optional)**: Maximum space reclamation (100%), requires **maintenance window** (system goes offline 10-30 minutes)
     - **Parameters**: `full: boolean`, `analyze: boolean` (update query planner stats)
     - **Response (202 Accepted)**: Space freed (bytes/pretty), method used, downtime warning for VACUUM FULL
-    - **Critical Warning**: VACUUM FULL causes API downtime; never schedule automatically in production
+    - **Critical Warning**: VACUUM FULL causes API downtime; never schedules automatically in production
     - **Authentication**: Bearer token with `delete:database` scope
   
   **Tier 3: Audit**
@@ -224,7 +230,7 @@ Unreleased
   - `GET /api/v2/database/health` — Simple database connectivity check (no authentication required)
 
 - **Database Maintenance Audit Log** – New persistent table `database_maintenance_log`:
-  - Tracks all purge and optimize operations with full audit trail
+  - Tracks all purge and optimize operations with a full audit trail
   - Stores: operation type, preset, parameters, execution timestamps, status, results (JSONB)
   - Indexed on status and created_at for efficient queries
   - User attribution via `executed_by` field
@@ -263,7 +269,7 @@ Unreleased
 
 ### Added
 - **Release Workflow automation** – GitHub Actions workflow (`create-release.yml`) and
-  Node.js script (`update-changelog-for-release.js`) to automate release process:
+  Node.js script (`update-changelog-for-release.js`) to automate a release process:
   - Manual workflow trigger with version input (e.g., `v2026.07.07`)
   - Automatic CHANGELOG.md update (Unreleased → dated section)
   - Automatic merge `development` → `main`
