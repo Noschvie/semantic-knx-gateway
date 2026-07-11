@@ -3,6 +3,7 @@
 // KNX Runtime Engine – https://github.com/Noschvie/semantic-knx-gateway.git
 
 import { createLogger } from '../utils/logger.js';
+import { formatTimestamp } from '../utils/timezone.js';
 
 /**
  * DatabaseManager - High-level database maintenance operations
@@ -236,8 +237,10 @@ export class DatabaseManager {
                 };
             }
 
+            const now = new Date();
             return {
-                timestamp: new Date().toISOString(),
+                timestamp: formatTimestamp(now),
+                timestampISO: now.toISOString(),
                 database: {
                     name: dbSize.database_name,
                     size_bytes: this.#parseInt(dbSize.size_bytes),
@@ -580,8 +583,10 @@ export class DatabaseManager {
                 dry_run: false,
                 preset,
                 execution: {
-                    started_at: startedAt.toISOString(),
-                    completed_at: completedAt.toISOString(),
+                    started_at: formatTimestamp(startedAt),
+                    started_at_iso: startedAt.toISOString(),
+                    completed_at: formatTimestamp(completedAt),
+                    completed_at_iso: completedAt.toISOString(),
                     duration_seconds: Math.round((completedAt - startedAt) / 1000),
                 },
                 results: results.knx_events,
@@ -663,8 +668,10 @@ export class DatabaseManager {
             const results = {
                 status: 'completed',
                 execution: {
-                    started_at: startedAt.toISOString(),
-                    completed_at: completedAt.toISOString(),
+                    started_at: formatTimestamp(startedAt),
+                    started_at_iso: startedAt.toISOString(),
+                    completed_at: formatTimestamp(completedAt),
+                    completed_at_iso: completedAt.toISOString(),
                     duration_seconds: Math.round((completedAt - startedAt) / 1000),
                 },
                 results: {
@@ -770,8 +777,10 @@ export class DatabaseManager {
                     params: row.params || {},
                     dry_run: row.dry_run || false,
                     executed_by: row.executed_by,
-                    created_at: row.created_at?.toISOString(),
-                    completed_at: row.completed_at?.toISOString(),
+                    created_at: formatTimestamp(row.created_at),
+                    created_at_iso: row.created_at?.toISOString(),
+                    completed_at: row.completed_at ? formatTimestamp(row.completed_at) : null,
+                    completed_at_iso: row.completed_at?.toISOString(),
                     duration_seconds: row.completed_at && row.started_at
                         ? Math.round((row.completed_at - row.started_at) / 1000)
                         : null,
