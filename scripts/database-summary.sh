@@ -70,21 +70,21 @@ if [ -z "$DB_INFO" ]; then
   exit 1
 fi
 
-# Extract data
-TIMESTAMP=$(echo "$DB_INFO" | jq -r '.data.attributes.timestamp')
-DB_NAME=$(echo "$DB_INFO" | jq -r '.data.attributes.database.name')
-DB_SIZE=$(echo "$DB_INFO" | jq -r '.data.attributes.database.size_pretty')
-DB_SIZE_BYTES=$(echo "$DB_INFO" | jq -r '.data.attributes.database.size_bytes')
-PG_VERSION=$(echo "$DB_INFO" | jq -r '.data.attributes.database.version' | grep -oP 'PostgreSQL \K[0-9.]+' || echo "unknown")
+# Extract data with null defaults
+TIMESTAMP=$(echo "$DB_INFO" | jq -r '.data.attributes.timestamp // "N/A"')
+DB_NAME=$(echo "$DB_INFO" | jq -r '.data.attributes.database.name // "unknown"')
+DB_SIZE=$(echo "$DB_INFO" | jq -r '.data.attributes.database.size_pretty // "0 B"')
+DB_SIZE_BYTES=$(echo "$DB_INFO" | jq -r '.data.attributes.database.size_bytes // 0')
+PG_VERSION=$(echo "$DB_INFO" | jq -r '.data.attributes.database.version // "unknown"' | grep -oP 'PostgreSQL \K[0-9.]+' || echo "unknown")
 
-TOTAL_EVENTS=$(echo "$DB_INFO" | jq -r '.data.attributes.events_timeline.total_events')
-COVERAGE_DAYS=$(echo "$DB_INFO" | jq -r '.data.attributes.events_timeline.coverage_days')
-EVENTS_PER_DAY=$(echo "$DB_INFO" | jq -r '.data.attributes.events_timeline.events_per_day_avg')
-EARLIEST=$(echo "$DB_INFO" | jq -r '.data.attributes.events_timeline.earliest_event')
-LATEST=$(echo "$DB_INFO" | jq -r '.data.attributes.events_timeline.latest_event')
+TOTAL_EVENTS=$(echo "$DB_INFO" | jq -r '.data.attributes.events_timeline.total_events // 0')
+COVERAGE_DAYS=$(echo "$DB_INFO" | jq -r '.data.attributes.events_timeline.coverage_days // 0')
+EVENTS_PER_DAY=$(echo "$DB_INFO" | jq -r '.data.attributes.events_timeline.events_per_day_avg // 0')
+EARLIEST=$(echo "$DB_INFO" | jq -r '.data.attributes.events_timeline.earliest_event // "N/A"')
+LATEST=$(echo "$DB_INFO" | jq -r '.data.attributes.events_timeline.latest_event // "N/A"')
 
-TOTAL_SUBS=$(echo "$DB_INFO" | jq -r '.data.attributes.subscriptions.total_subscriptions')
-ACTIVE_SUBS=$(echo "$DB_INFO" | jq -r '.data.attributes.subscriptions.active')
+TOTAL_SUBS=$(echo "$DB_INFO" | jq -r '.data.attributes.subscriptions.total_subscriptions // 0')
+ACTIVE_SUBS=$(echo "$DB_INFO" | jq -r '.data.attributes.subscriptions.active // 0')
 
 TABLES_JSON=$(echo "$DB_INFO" | jq '.data.attributes.tables')
 
@@ -99,15 +99,39 @@ LAST_JOB_TIME=$(echo "$CLEANUP_JOBS" | jq -r '.data[0].attributes.completed_at_i
 HEALTH_CHECKS=$(curl -s -X GET "http://localhost:3000/api/v2/stats/health/db-checks" \
   -H "Authorization: Bearer $TOKEN")
 
-HEALTH_STATUS=$(echo "$HEALTH_CHECKS" | jq -r '.status')
-ORPHANED_COUNT=$(echo "$HEALTH_CHECKS" | jq -r '.checks.orphaned_states.orphaned_count')
-ORPHANED_GAS=$(echo "$HEALTH_CHECKS" | jq -r '.checks.orphaned_states.affected_gas')
-DUPLICATE_GAS=$(echo "$HEALTH_CHECKS" | jq -r '.checks.duplicate_gas.duplicate_ga_count')
-STALE_MAPPINGS=$(echo "$HEALTH_CHECKS" | jq -r '.checks.stale_mappings.stale_count')
-DATA_INTEGRITY_SCORE=$(echo "$HEALTH_CHECKS" | jq -r '.summary.data_integrity_score')
+HEALTH_STATUS=$(echo "$HEALTH_CHECKS" | jq -r '.status // "UNKNOWN"')
+ORPHANED_COUNT=$(echo "$HEALTH_CHECKS" | jq -r '.checks.orphaned_states.orphaned_count // 0')
+ORPHANED_GAS=$(echo "$HEALTH_CHECKS" | jq -r '.checks.orphaned_states.affected_gas // 0')
+DUPLICATE_GAS=$(echo "$HEALTH_CHECKS" | jq -r '.checks.duplicate_ga.duplicate_ga_count // 0')
+STALE_MAPPINGS=$(echo "$HEALTH_CHECKS" | jq -r '.checks.stale_mappings.stale_count // 0')
+DATA_INTEGRITY_SCORE=$(echo "$HEALTH_CHECKS" | jq -r '.summary.data_integrity_score // 0')
 
 echo -e "${GREEN}✓ Data retrieved${NC}"
 echo ""
+
+# Sanitize numeric values - ensure they're numbers
+TOTAL_EVENTS=${TOTAL_EVENTS//[!0-9]/}
+COVERAGE_DAYS=${COVERAGE_DAYS//[!0-9]/}
+EVENTS_PER_DAY=${EVENTS_PER_DAY//[!0-9]/}
+TOTAL_SUBS=${TOTAL_SUBS//[!0-9]/}
+ACTIVE_SUBS=${ACTIVE_SUBS//[!0-9]/}
+DB_SIZE_BYTES=${DB_SIZE_BYTES//[!0-9]/}
+ORPHANED_COUNT=${ORPHANED_COUNT//[!0-9]/}
+ORPHANED_GAS=${ORPHANED_GAS//[!0-9]/}
+DUPLICATE_GAS=${DUPLICATE_GAS//[!0-9]/}
+STALE_MAPPINGS=${STALE_MAPPINGS//[!0-9]/}
+
+# Set defaults for empty values
+TOTAL_EVENTS=${TOTAL_EVENTS:-0}
+COVERAGE_DAYS=${COVERAGE_DAYS:-0}
+EVENTS_PER_DAY=${EVENTS_PER_DAY:-0}
+TOTAL_SUBS=${TOTAL_SUBS:-0}
+ACTIVE_SUBS=${ACTIVE_SUBS:-0}
+DB_SIZE_BYTES=${DB_SIZE_BYTES:-0}
+ORPHANED_COUNT=${ORPHANED_COUNT:-0}
+ORPHANED_GAS=${ORPHANED_GAS:-0}
+DUPLICATE_GAS=${DUPLICATE_GAS:-0}
+STALE_MAPPINGS=${STALE_MAPPINGS:-0}
 
 # ════════════════════════════════════════════════════════════════════════════════
 # SECTION 1: SYSTEM INFORMATION
