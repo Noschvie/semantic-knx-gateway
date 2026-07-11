@@ -111,11 +111,12 @@ echo -e "${BLUE}3️⃣  TABLE BREAKDOWN${NC}"
 echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 
 echo "$TABLES_JSON" | jq -r '.[] |
-  (if (.row_count | tonumber) == 0 then "⚪" elif (.row_count | tonumber) < 100 then "🟡" else "✅" end) + "|" +
-  .name + "|" +
-  (.row_count | tostring) + "|" +
-  .size_pretty + "|" +
-  .type
+  (if (.row_count | tonumber) == 0 then "⚪" elif (.row_count | tonumber) < 100 then "🟡" else "✅" end) as $status |
+  (.name // "unknown") as $name |
+  (.row_count | tostring) as $rows |
+  (.size_pretty // "0 B") as $size |
+  (.type // "regular") as $type |
+  $status + "|" + $name + "|" + $rows + "|" + $size + "|" + $type
 ' | sort | while IFS='|' read -r status name rows size type; do
   printf "%-2s %-30s • %6s rows • %-8s • %s\n" "$status" "$name" "$rows" "$size" "$type"
 done
@@ -170,41 +171,6 @@ echo "   Last Optimization:      $LAST_JOB_TIME"
 echo "   Total Maintenance Jobs: $TOTAL_JOBS"
 echo "   Optimization Method:    VACUUM ANALYZE (Online, no downtime)"
 echo -e "   Status:                 ${GREEN}✅ All maintenance operations successful${NC}"
-echo ""
-
-# ════════════════════════════════════════════════════════════════════════════════
-# SECTION 7: RECOMMENDATIONS
-# ════════════════════════════════════════════════════════════════════════════════
-echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-echo -e "${BLUE}7️⃣  RECOMMENDATIONS${NC}"
-echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-
-# Check database size
-if (( $(echo "$DB_SIZE_BYTES > 52428800" | bc -l) )); then
-  echo -e "   ${RED}🔴 Database > 50 MB - Consider implementing purge strategy${NC}"
-else
-  echo -e "   ${GREEN}✅ Database size optimal (<50 MB)${NC}"
-fi
-
-# Check event rate
-if [ "$EVENTS_PER_DAY" -gt 50000 ]; then
-  echo -e "   ${YELLOW}🟡 High event rate (>50k/day) - Monitor growth closely${NC}"
-else
-  echo -e "   ${GREEN}✅ Event rate within normal range${NC}"
-fi
-
-# Check subscriptions
-if [ "$TOTAL_SUBS" -eq 0 ]; then
-  echo -e "   ${YELLOW}ℹ️  No subscriptions configured - Consider for production${NC}"
-else
-  echo -e "   ${GREEN}✅ Subscriptions are active${NC}"
-fi
-
-echo -e "   ${BLUE}ℹ️  Suggested Cron: Run VACUUM ANALYZE weekly${NC}"
-echo -e "       ${BLUE}0 2 * * 0 curl -X POST http://localhost:3000/api/v2/database/optimize ...${NC}"
-echo ""
-echo -e "   ${BLUE}ℹ️  Suggested Cron: Run Purge monthly${NC}"
-echo -e "       ${BLUE}0 3 1 * * curl -X POST http://localhost:3000/api/v2/database/purge ...${NC}"
 echo ""
 
 # ════════════════════════════════════════════════════════════════════════════════
