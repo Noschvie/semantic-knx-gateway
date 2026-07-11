@@ -26,7 +26,7 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       # Enable QEMU for cross-platform emulation (required for ARM builds on x86 runners)
       - name: Set up QEMU
