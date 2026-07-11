@@ -308,13 +308,13 @@ export class TunnelManager {
                 MAX_RECONNECT_DELAY_MS
             );
             this.logger.info(
-                `⏳ Reconnecting in ${delay}ms (attempt ${this.reconnectAttempts}/${this.maxReconnectAttempts})`
+                `⏳ Reconnecting in ${delay}ms (attempt ${this.reconnectAttempts}/${this.maxReconnectAttempts})`,
             );
         } else {
             // After maxReconnectAttempts, use persistent interval (30s)
             delay = PERSISTENT_RECONNECT_INTERVAL_MS;
             this.logger.warn(
-                `⏳ Persistent reconnect: trying again in ${delay}ms (attempt ${this.reconnectAttempts})`
+                `⏳ Persistent reconnect: trying again in ${delay}ms (attempt ${this.reconnectAttempts})`,
             );
         }
 
@@ -362,7 +362,7 @@ export class TunnelManager {
             this.telegramQueue.push(telegram);
             this.logger.warn(
                 `📋 KNX write queued (not connected): ${groupAddress} = ${value} ` +
-                `(queue: ${this.telegramQueue.length}/${this.telegramQueue.maxSize})`
+                `(queue: ${this.telegramQueue.length}/${this.telegramQueue.maxSize})`,
             );
             return;
         }
