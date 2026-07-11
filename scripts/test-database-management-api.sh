@@ -1,5 +1,6 @@
 #!/bin/bash
 
+# Script test-database-management-api.sh
 # Test Script for Database Management API
 # Tests: GET /info, GET /health, GET /cleanup-jobs, POST /purge, POST /optimize
 
@@ -70,6 +71,8 @@ echo ""
 
 curl -s -X GET $BASE_URL/info \
   -H "Authorization: Bearer $TOKEN" | jq '.data.attributes | {
+    timestamp,
+    timestampISO,
     database,
     tables: (.tables | to_entries | map({name: .key, size_pretty: .value.size_pretty, row_count: .value.row_count}) | sort_by(.name)),
     events_timeline,
@@ -156,7 +159,19 @@ curl -s -X POST $BASE_URL/optimize \
         "analyze": true
       }
     }
-  }' | jq '.'
+  }' | jq '.data | {
+    id,
+    type,
+    status: .status,
+    execution: {
+      started_at: .execution.started_at,
+      started_at_iso: .execution.started_at_iso,
+      completed_at: .execution.completed_at,
+      completed_at_iso: .execution.completed_at_iso,
+      duration_seconds: .execution.duration_seconds
+    },
+    results: .results
+  }'
 
 echo ""
 echo ""
@@ -186,7 +201,19 @@ if [[ $REPLY =~ ^[Yy]$ ]]; then
           "analyze": true
         }
       }
-    }' | jq '.'
+    }' | jq '.data | {
+      id,
+      type,
+      status: .status,
+      execution: {
+        started_at: .execution.started_at,
+        started_at_iso: .execution.started_at_iso,
+        completed_at: .execution.completed_at,
+        completed_at_iso: .execution.completed_at_iso,
+        duration_seconds: .execution.duration_seconds
+      },
+      results: .results
+    }'
   echo ""
   echo "✅ VACUUM FULL completed - App is back online"
 else
@@ -203,7 +230,17 @@ echo "=========================================="
 echo ""
 
 curl -s -X GET "$BASE_URL/cleanup-jobs?days=1&limit=10&status=completed" \
-  -H "Authorization: Bearer $TOKEN" | jq '.'
+  -H "Authorization: Bearer $TOKEN" | jq '.data[] | {
+    id,
+    status: .attributes.status,
+    strategy: .attributes.strategy,
+    created_at: .attributes.created_at,
+    created_at_iso: .attributes.created_at_iso,
+    completed_at: .attributes.completed_at,
+    completed_at_iso: .attributes.completed_at_iso,
+    duration_seconds: .attributes.duration_seconds,
+    statistics: .attributes.statistics
+  }'
 
 echo ""
 echo ""
@@ -216,6 +253,8 @@ echo ""
 
 curl -s -X GET $BASE_URL/info \
   -H "Authorization: Bearer $TOKEN" | jq '.data.attributes | {
+    timestamp,
+    timestampISO,
     database: .database,
     events_timeline,
     subscriptions
@@ -225,6 +264,3 @@ echo ""
 echo "=========================================="
 echo "✅ All tests completed!"
 echo "=========================================="
-
-
-
