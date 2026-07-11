@@ -9,6 +9,11 @@ Unreleased
 ----------
 
 ### Added
+- **Improved GitHub Workflows** — Enhanced CI/CD pipeline configuration:
+  - **Dependency Audit Workflow**: Upgraded to latest action versions (checkout@v7, setup-node@v6), increased security level to `high`, and improved error handling
+  - **Dependabot Configuration**: Enhanced with better labels, explicit commit message formatting, automatic rebase strategy, and staggered scheduling (npm on Monday, GitHub Actions on Tuesday)
+  - **Create Release Workflow**: Updated to latest action versions for consistency
+
 - **KNX Connection Resilience & Automatic Reconnection** — Robust handling of network interruptions:
 
   **Automatic Reconnection Strategy:**
