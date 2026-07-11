@@ -3,7 +3,7 @@
 # ─────────────────────────────────────────────
 # Stage 1: Build (esbuild – bundle src/ only)
 # ─────────────────────────────────────────────
-FROM --platform=$BUILDPLATFORM node:24-alpine AS builder
+FROM --platform=$BUILDPLATFORM node:26-alpine AS builder
 
 WORKDIR /app
 
@@ -24,7 +24,7 @@ RUN npx esbuild src/index.js \
 # ─────────────────────────────────────────────
 # Stage 2: Runtime
 # ─────────────────────────────────────────────
-FROM node:24-alpine
+FROM node:26-alpine
 
 WORKDIR /app
 
