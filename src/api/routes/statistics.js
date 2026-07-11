@@ -465,7 +465,7 @@ export function statisticsRouter(stateEngine, db) {
                     dpt: row.dpt,
                     name: row.name,
                     deviceId: row.device_id,
-                    hasState: row.last_state_update.getFullYear && row.last_state_update.getFullYear() > 2050 ? false : true,
+                    hasState: !(row.last_state_update && row.last_state_update.getFullYear() > 2050),
                 })),
             });
         } catch (error) {
