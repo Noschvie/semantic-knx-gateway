@@ -94,7 +94,7 @@ export class StateEngine {
                 oldDpt,
                 dpt,
                 'import',
-                'DPT changed during mapping update'
+                'DPT changed during mapping update',
             );
             this.logger.warn(`[DPT Change] GA ${ga}: ${oldDpt} → ${dpt}`);
         } else if (dpt && !oldDpt) {
@@ -105,7 +105,7 @@ export class StateEngine {
                 null,
                 dpt,
                 'import',
-                'Initial DPT assignment'
+                'Initial DPT assignment',
             );
         }
 
