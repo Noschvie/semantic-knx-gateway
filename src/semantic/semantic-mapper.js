@@ -3,7 +3,6 @@
 // KNX Runtime Engine – https://github.com/Noschvie/semantic-knx-gateway.git
 
 import { createLogger } from '../utils/logger.js';
-import { DptHistoryManager } from '../storage/dpt-history.js';
 
 export class SemanticMapper {
     constructor(resourceStore, stateEngine) {
@@ -26,7 +25,7 @@ export class SemanticMapper {
                 newMappings.push({
                     ga: this.normalizeGroupAddress(datapoint.groupAddress),
                     dpt: datapoint.dpt,
-                    id: datapoint.id
+                    id: datapoint.id,
                 });
             }
         }
@@ -35,7 +34,7 @@ export class SemanticMapper {
                 newMappings.push({
                     ga: this.normalizeGroupAddress(ga.address),
                     dpt: ga.dpt,
-                    id: ga.id
+                    id: ga.id,
                 });
             }
         }
@@ -51,11 +50,11 @@ export class SemanticMapper {
                 if (conflict.type === 'DPT_CHANGE_DETECTED') {
                     this.logger.warn(
                         `  GA ${conflict.ga}: ${conflict.old_dpt} → ${conflict.new_dpt} ` +
-                        `(will be logged in history)`
+                        '(will be logged in history)',
                     );
                 } else if (conflict.type === 'DUPLICATE_DPT_IN_IMPORT') {
                     this.logger.error(
-                        `  GA ${conflict.ga}: Multiple datapoints with different DPTs: ${conflict.dpts.join(', ')}`
+                        `  GA ${conflict.ga}: Multiple datapoints with different DPTs: ${conflict.dpts.join(', ')}`,
                     );
                 }
             }
@@ -176,7 +175,7 @@ export class SemanticMapper {
      * Enrich a telegram with semantic information
      */
     async enrichTelegram(telegram) {
-        const { ga, datapointId } = telegram;
+        const { datapointId } = telegram;
 
         // Get datapoint resource
         const datapoint = await this.resourceStore.getResource(datapointId);
