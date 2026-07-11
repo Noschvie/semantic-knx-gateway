@@ -8,6 +8,7 @@ import { createRequire } from 'module';
 import { createLogger } from '../utils/logger.js';
 import { TelegramDecoder } from './telegram-decoder.js';
 import { TelegramQueue } from './telegram-queue.js';
+import { createTunnelOptions } from './tunnel-options.js';
 
 const require = createRequire(import.meta.url);
 const { KNXClient } = require('knxultimate');
@@ -51,17 +52,26 @@ export class TunnelManager {
 
         this.isConnecting = true;
 
-        const options = {
-            ipAddr: process.env.KNX_GATEWAY_IP,
-            ipPort: parseInt(process.env.KNX_GATEWAY_PORT, 10),
-            physAddr: process.env.KNX_GATEWAY_PHYS_ADDR,
-            hostProtocol: 'TunnelUDP',
-            // Suppress ACKs for LDataReq (reduces telegram traffic during many read requests)
-            suppress_ack_ldatareq: true,
-            loglevel: 'error',
-        };
+        // Options are built by tunnel-options.js, which decides between
+        // Classic KNXnet/IP and KNX IP Secure based on environment
+        // variables (KNX_SECURE, KNX_HOST_PROTOCOL, KNX_KEYRING_FILE,
+        // KNX_KEYRING_PASSWORD). See KNX_IP_Secure_Integration_Specification.md.
+        let options;
+        try {
+            options = createTunnelOptions(this.logger);
+        } catch (error) {
+            this.isConnecting = false;
+            this.logger.error({
+                msg: '❌ Invalid KNX tunnel configuration',
+                error: error.message,
+            });
+            return Promise.reject(error);
+        }
 
-        this.logger.info(`Connecting to KNX Gateway at ${options.ipAddr}:${options.ipPort}`);
+        this.logger.info(
+            `Connecting to KNX Gateway at ${options.ipAddr}:${options.ipPort} ` +
+            `(${options.hostProtocol}${options.isSecureKNXEnabled ? ', Secure' : ''})`
+        );
 
         return new Promise((resolve, reject) => {
             try {
@@ -77,7 +87,11 @@ export class TunnelManager {
                     clearTimeout(timeout);
                     this.isConnecting = false;
 
-                    this.logger.info('KNX connected');
+                    if (options.isSecureKNXEnabled) {
+                        this.logger.info('✅ KNX connected — Secure session established');
+                    } else {
+                        this.logger.info('KNX connected');
+                    }
                     this.logger.info('Registered events:', Object.keys(this.connection._events || {}));
 
                     this.onConnected();
