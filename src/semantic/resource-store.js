@@ -231,7 +231,7 @@ export class ResourceStore {
      */
     async searchResources(query, type = null, limit = 100) {
         const params = [`%${query}%`, limit];
-        const typeClause = type ? `AND type = $3` : '';
+        const typeClause = type ? 'AND type = $3' : '';
         if (type) params.splice(1, 0, type); // insert type before limit
 
         const sql = `
