@@ -28,8 +28,8 @@ export class StateStore {
         const { ga, value, dpt, source, timestamp } = state;
 
         // Handle Buffer objects properly
-        let valueForJson = value;
-        let valueForText = null;
+        let valueForJson;
+        let valueForText;
 
         if (value && typeof value === 'object' && value.type === 'Buffer' && Array.isArray(value.data)) {
             // Store raw buffer as hex string for text representation
