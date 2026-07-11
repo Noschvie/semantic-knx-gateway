@@ -132,8 +132,14 @@ export class TunnelManager {
         // Start health check
         this.startHealthCheck();
 
-        // Process queued outgoing telegrams
-        this.processQueuedTelegrams();
+        // Process queued outgoing telegrams (fire-and-forget, logs errors internally)
+        this.processQueuedTelegrams().catch((err) => {
+            this.logger.error({
+                msg: 'Unexpected error in processQueuedTelegrams',
+                error: err?.message,
+                stack: err?.stack,
+            });
+        });
     }
 
     onDisconnected() {
@@ -419,6 +425,8 @@ export class TunnelManager {
         this.healthCheckTimer = setInterval(() => {
             if (!this.isConnected || !this.connection) {
                 this.logger.warn('⚠️ Health check: Connection lost detected');
+                // Ensure timer is stopped before calling onDisconnected
+                this.stopHealthCheck();
                 this.onDisconnected();
                 return;
             }
