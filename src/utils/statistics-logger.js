@@ -162,7 +162,7 @@ export class StatisticsLogger {
                 LIMIT 5
             `, [fifteenMinutesAgo]),
             this.db.query(`
-                SELECT COUNT(*) as count, COUNT(DISTINCT ga) as affected_gas
+                SELECT COUNT(*) as count, COUNT(DISTINCT cs.ga) as affected_gas
                 FROM current_state cs
                 LEFT JOIN datapoint_mappings m ON cs.datapoint_id = m.datapoint_id
                 WHERE m.datapoint_id IS NULL

@@ -240,7 +240,7 @@ export function statisticsRouter(stateEngine, db) {
 
             // 1. ORPHANED STATES CHECK
             const orphanedStates = await db.query(`
-                SELECT COUNT(*) as count, COUNT(DISTINCT ga) as affected_gas
+                SELECT COUNT(*) as count, COUNT(DISTINCT cs.ga) as affected_gas
                 FROM current_state cs
                 LEFT JOIN datapoint_mappings m ON cs.datapoint_id = m.datapoint_id
                 WHERE m.datapoint_id IS NULL
