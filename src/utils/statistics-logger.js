@@ -5,11 +5,13 @@
 import { createLogger } from './logger.js';
 import { formatTimestamp } from './timezone.js';
 import { formatDPTValue } from './dpt-formatter.js';
+import { StatisticsStore } from '../storage/statistics-store.js';
 
 export class StatisticsLogger {
     constructor(db) {
         this.logger = createLogger('StatisticsLogger');
         this.db = db;
+        this.store = new StatisticsStore(db);
         this.interval = null;
         this.intervalMinutes = 15;
         this.lastEventCount = 0;
@@ -112,104 +114,55 @@ export class StatisticsLogger {
     }
 
     /**
-     * Gather all statistics
+     * Gather all statistics using StatisticsStore abstraction
      */
     async getStats() {
         const fifteenMinutesAgo = new Date(Date.now() - this.intervalMinutes * 60 * 1000);
 
-        // Run all queries in parallel
+        // Run all queries in parallel through StatisticsStore
         const [
             totalEvents,
             totalStates,
             totalMappings,
             totalResources,
             uniqueGAs,
-            eventTimes,
+            eventTimeline,
             dbSize,
             topGAs,
             orphanedStates,
             duplicateGAs,
             staleMappings,
+            integrityScore,
         ] = await Promise.all([
-            this.db.query('SELECT COUNT(*) as count FROM knx_events'),
-            this.db.query('SELECT COUNT(*) as count FROM current_state'),
-            this.db.query('SELECT COUNT(*) as count FROM datapoint_mappings'),
-            this.db.query('SELECT COUNT(*) as count FROM semantic_resources'),
-            this.db.query('SELECT COUNT(DISTINCT ga) as count FROM current_state'),
-            this.db.query(`
-                SELECT
-                    MIN(ts) as oldest,
-                    MAX(ts) as latest
-                FROM knx_events
-            `),
-            this.db.query('SELECT pg_size_pretty(pg_database_size(current_database())) as size'),
-            this.db.query(`
-                SELECT
-                    e.ga,
-                    COUNT(*) as count,
-                    MAX(e.ts) as last_seen,
-                    (
-                        SELECT cs.value_decoded
-                        FROM current_state cs
-                        WHERE cs.ga = e.ga
-                        ORDER BY cs.updated_at DESC
-                        LIMIT 1
-                    ) as current_value
-                FROM knx_events e
-                WHERE e.ts >= $1
-                GROUP BY e.ga
-                ORDER BY count DESC
-                LIMIT 5
-            `, [fifteenMinutesAgo]),
-            this.db.query(`
-                SELECT COUNT(*) as count, COUNT(DISTINCT cs.ga) as affected_gas
-                FROM current_state cs
-                LEFT JOIN datapoint_mappings m ON cs.datapoint_id = m.datapoint_id
-                WHERE m.datapoint_id IS NULL
-            `),
-            this.db.query(`
-                SELECT COUNT(*) as duplicate_count
-                FROM (
-                    SELECT ga, COUNT(*) as mapping_count
-                    FROM datapoint_mappings
-                    GROUP BY ga
-                    HAVING COUNT(*) > 1
-                ) duplicates
-            `),
-            this.db.query(`
-                SELECT COUNT(*) as count
-                FROM datapoint_mappings m
-                LEFT JOIN current_state cs ON m.datapoint_id = cs.datapoint_id
-                WHERE cs.datapoint_id IS NULL
-            `),
+            this.store.getTotalEventCount(),
+            this.store.getTotalStateCount(),
+            this.store.getTotalMappingCount(),
+            this.store.getTotalResourceCount(),
+            this.store.getUniqueGroupAddressCount(),
+            this.store.getEventTimeline(),
+            this.store.getDatabaseSize(),
+            this.store.getTopActiveGroupAddresses(fifteenMinutesAgo, 5),
+            this.store.getOrphanedStatesInfo(),
+            this.store.getDuplicateGroupAddressCount(),
+            this.store.getStaleMappingCount(),
+            this.store.getDataIntegrityScore(),
         ]);
 
-        const orphanedStatesCount = parseInt(orphanedStates.rows[0].count || 0);
-        const orphanedStatesGAs = parseInt(orphanedStates.rows[0].affected_gas || 0);
-        const duplicateGAsCount = parseInt(duplicateGAs.rows[0].duplicate_count || 0);
-        const staleMappingsCount = parseInt(staleMappings.rows[0].count || 0);
-        const totalMappingsCount = parseInt(totalMappings.rows[0].count || 0);
-
         return {
-            totalEvents: parseInt(totalEvents.rows[0].count),
-            totalStates: parseInt(totalStates.rows[0].count),
-            totalMappings: parseInt(totalMappings.rows[0].count),
-            totalResources: parseInt(totalResources.rows[0].count),
-            uniqueGAs: parseInt(uniqueGAs.rows[0].count),
-            oldestEventTime: eventTimes.rows[0]?.oldest,
-            lastEventTime: eventTimes.rows[0]?.latest,
-            dbSize: dbSize.rows[0].size,
-            topGAs: topGAs.rows.map(row => ({
-                ga: row.ga,
-                count: parseInt(row.count),
-                lastSeen: row.last_seen,
-                currentValue: row.current_value,
-            })),
-            orphanedStatesCount,
-            orphanedStatesGAs,
-            duplicateGAsCount,
-            staleMappingsCount,
-            dataIntegrityScore: Math.round(((totalMappingsCount - staleMappingsCount) / Math.max(1, totalMappingsCount)) * 100),
+            totalEvents,
+            totalStates,
+            totalMappings,
+            totalResources,
+            uniqueGAs,
+            oldestEventTime: eventTimeline.oldest,
+            lastEventTime: eventTimeline.latest,
+            dbSize,
+            topGAs,
+            orphanedStatesCount: orphanedStates.count,
+            orphanedStatesGAs: orphanedStates.affectedGAs,
+            duplicateGAsCount: duplicateGAs,
+            staleMappingsCount: staleMappings,
+            dataIntegrityScore: integrityScore,
         };
     }
 }
