@@ -38,19 +38,30 @@ export class DatabaseManager {
      * @returns {string} Formatted size (e.g. "2.7 GB")
      */
     static formatBytes(bytes) {
+        // Handle null, undefined, or non-numeric values
+        if (bytes === null || bytes === undefined) return '0 B';
+        
         const numBytes = parseInt(bytes, 10);
+        
         // Check for zero, NaN, or non-finite values
-        if (numBytes === 0 || !Number.isFinite(numBytes)) return '0 B';
+        if (!Number.isFinite(numBytes) || numBytes === 0) return '0 B';
+        
         const k = 1024;
         const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
         const absBytes = Math.abs(numBytes);
+        
         // Ensure absBytes is valid for Math.log (must be > 0)
         if (absBytes < 1) return '0 B';
+        
         const i = Math.floor(Math.log(absBytes) / Math.log(k));
         // Safety check: ensure i is within bounds
         const safeI = Math.max(0, Math.min(i, sizes.length - 1));
         const sign = numBytes < 0 ? '-' : '';
         const value = parseFloat((absBytes / Math.pow(k, safeI)).toFixed(1));
+        
+        // Extra safety check for the final result
+        if (!Number.isFinite(value)) return '0 B';
+        
         return sign + value + ' ' + sizes[safeI];
     }
 
@@ -665,35 +676,33 @@ export class DatabaseManager {
             const spaceFreedbytes = sizeBeforeBytes - sizeAfterBytes;
             const spaceFreePercent = (spaceFreedbytes / sizeBeforeBytes * 100).toFixed(1);
 
-            const results = {
-                status: 'completed',
-                execution: {
-                    started_at: formatTimestamp(startedAt),
-                    started_at_iso: startedAt.toISOString(),
-                    completed_at: formatTimestamp(completedAt),
-                    completed_at_iso: completedAt.toISOString(),
-                    duration_seconds: Math.round((completedAt - startedAt) / 1000),
-                },
-                results: {
-                    size_before_bytes: sizeBeforeBytes,
-                    size_before_pretty: DatabaseManager.formatBytes(sizeBeforeBytes),
-                    size_after_bytes: sizeAfterBytes,
-                    size_after_pretty: DatabaseManager.formatBytes(sizeAfterBytes),
-                    space_freed_bytes: spaceFreedbytes,
-                    space_freed_pretty: DatabaseManager.formatBytes(spaceFreedbytes),
-                    space_freed_percent: parseFloat(spaceFreePercent),
-                    method: vacuumCommand,
-                    tables_optimized: ['knx_events', 'current_state', 'subscription_events'],
-                    downtime_warning: full ? `⚠️ VACUUM FULL: System was offline for ${Math.round((completedAt - startedAt) / 1000)} seconds` : null,
-                },
-            };
+            const executionInfo = {
+                 started_at: formatTimestamp(startedAt),
+                 started_at_iso: startedAt.toISOString(),
+                 completed_at: formatTimestamp(completedAt),
+                 completed_at_iso: completedAt.toISOString(),
+                 duration_seconds: Math.round((completedAt - startedAt) / 1000),
+             };
+
+             const optimizationResults = {
+                 size_before_bytes: sizeBeforeBytes,
+                 size_before_pretty: DatabaseManager.formatBytes(sizeBeforeBytes),
+                 size_after_bytes: sizeAfterBytes,
+                 size_after_pretty: DatabaseManager.formatBytes(sizeAfterBytes),
+                 space_freed_bytes: spaceFreedbytes,
+                 space_freed_pretty: DatabaseManager.formatBytes(spaceFreedbytes),
+                 space_freed_percent: parseFloat(spaceFreePercent),
+                 method: vacuumCommand,
+                 tables_optimized: ['knx_events', 'current_state', 'subscription_events'],
+                 downtime_warning: full ? `⚠️ VACUUM FULL: System was offline for ${Math.round((completedAt - startedAt) / 1000)} seconds` : null,
+             };
 
             // Update job as completed
             await client.query(
                 `UPDATE database_maintenance_log 
                  SET status = $1, completed_at = $2, results = $3
                  WHERE id = $4`,
-                ['completed', completedAt, JSON.stringify(results.results), jobId]
+                ['completed', completedAt, JSON.stringify(optimizationResults), jobId]
             );
 
             this.logger.info('✅ Optimize operation completed', {
@@ -706,7 +715,9 @@ export class DatabaseManager {
             return {
                 id: jobId,
                 type: 'optimize-result',
-                ...results,
+                status: 'completed',
+                execution: executionInfo,
+                results: optimizationResults,
             };
         } catch (err) {
             this.logger.error('Failed to optimize database', { error: err.message, jobId });
