@@ -191,7 +191,7 @@ export class SubscriptionStore {
      */
     async countActive({ includeExpired = false } = {}) {
         const query = includeExpired
-            ? `SELECT COUNT(*)::int AS count FROM subscriptions WHERE active = TRUE`
+            ? 'SELECT COUNT(*)::int AS count FROM subscriptions WHERE active = TRUE'
             : `SELECT COUNT(*)::int AS count
                FROM subscriptions
                WHERE active = TRUE
