@@ -38,7 +38,7 @@ export class TelegramQueue {
             dropped = this.items.shift();
             this.logger?.warn(
                 `📋 Queue full (${this.maxSize}), dropping oldest: ` +
-                `${dropped.groupAddress} = ${dropped.value}`
+                `${dropped.groupAddress} = ${dropped.value}`,
             );
         }
 
