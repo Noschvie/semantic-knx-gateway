@@ -18,7 +18,7 @@ import { locationsRouter } from './routes/locations.js';
 import { installationsRouter } from './routes/installations.js';
 import { nodeRouter } from './routes/node.js';
 import { sitesRouter } from './routes/sites.js';
-import { statsRouter } from './routes/stats.js';
+import { statisticsRouter } from './routes/statistics.js';
 import { subscriptionsRouter } from './routes/subscriptions.js';
 import { CallbackDispatcher } from './routes/subscription-dispatcher.js';
 import { oauthRouter } from './routes/oauth-router.js';
@@ -411,7 +411,7 @@ export class RestAPI {
         this.app.use(`${API_BASE}/sites`, sitesRouter(this.semanticEngine));
         this.app.use(`${API_BASE}/subscriptions`, subscriptionsRouter(this.subscriptionStore, this.stateEngine));
 
-        this.app.use(`${API_BASE}/stats`, statsRouter(this.stateEngine, this.db));
+        this.app.use(`${API_BASE}/stats`, statisticsRouter(this.stateEngine, this.db));
         this.app.use(`${API_BASE}/events`, eventsRouter(this.stateEngine, this.db));
         this.app.use(`${API_BASE}/semantic`, semanticRouter(this.semanticEngine));
         this.app.use(`${API_BASE}/database`, createDatabaseRouter(this.db));

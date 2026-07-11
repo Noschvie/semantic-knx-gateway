@@ -7,7 +7,7 @@ import { formatTimestamp } from '../../utils/timezone.js';
 import { formatDPTValue } from '../../utils/dpt-formatter.js';
 import { bearer } from '../middleware/oauth-bearer.js';
 
-// ── Vendor-Extension: Stats Endpoints ────────────────────────────────────────
+// ── Vendor-Extension: Statistics Endpoints ────────────────────────────────────────
 // These endpoints are NOT defined in the KNX IoT spec.
 // Registered under /api/v2/stats/...
 
@@ -21,7 +21,7 @@ function parseLimit(raw, defaultVal = 20, max = 1000) {
     return isNaN(n) ? defaultVal : Math.min(max, Math.max(1, n));
 }
 
-export function statsRouter(stateEngine, db) {
+export function statisticsRouter(stateEngine, db) {
     const router = Router();
 
     // GET /api/v2/stats - Database statistics

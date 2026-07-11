@@ -260,7 +260,7 @@ When adding new endpoints, ask:
 - **KNX IoT API Specification:** Defines Spec endpoints (e.g., `/api/v2/datapoints`)
 - **Timezone Utilities:** `src/utils/timezone.js`
 - **Database Manager:** `src/storage/database-manager.js` (vendor extension examples)
-- **Stats Router:** `src/api/routes/stats.js` (first implementation of dual timestamps)
+- **Statistics Router:** `src/api/routes/statistics.js` (first implementation of dual timestamps)
 
 ---
 
