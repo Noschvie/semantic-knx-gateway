@@ -111,12 +111,14 @@ echo -e "${BLUE}3️⃣  TABLE BREAKDOWN${NC}"
 echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 
 echo "$TABLES_JSON" | jq -r '.[] |
-  (.row_count | tonumber) as $rows |
-  (if $rows == 0 then "⚪ " elif $rows < 100 then "🟡 " else "✅ " end) +
-  (.name + (if (.name | length) < 30 then (30 - (.name | length)) * " " else "" end)) + " • " +
-  ((($rows | tostring) as $str | (if ($str | length) < 6 then (6 - ($str | length)) * " " else "" end) + $str)) + " rows • " +
-  (.size_pretty + (if (.size_pretty | length) < 8 then (8 - (.size_pretty | length)) * " " else "" end)) + " • " + .type
-' | sort
+  (if (.row_count | tonumber) == 0 then "⚪" elif (.row_count | tonumber) < 100 then "🟡" else "✅" end) + "|" +
+  .name + "|" +
+  (.row_count | tostring) + "|" +
+  .size_pretty + "|" +
+  .type
+' | sort | while IFS='|' read -r status name rows size type; do
+  printf "%-2s %-30s • %6s rows • %-8s • %s\n" "$status" "$name" "$rows" "$size" "$type"
+done
 
 echo ""
 
