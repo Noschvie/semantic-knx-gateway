@@ -615,14 +615,14 @@ export class DatabaseManager {
                 );
             } catch (logErr) {
                 this.logger.error('Failed to log purge failure', { error: logErr.message });
-             }
-             throw err;
-         } finally {
-             if (client) {
-                 client.release();
-             }
-         }
-     }
+            }
+            throw err;
+        } finally {
+            if (client) {
+                client.release();
+            }
+        }
+    }
 
     /**
      * Optimize a database using VACUUM
@@ -679,25 +679,25 @@ export class DatabaseManager {
                 : 0;
 
             const executionInfo = {
-                 started_at: formatTimestamp(startedAt),
-                 started_at_iso: startedAt.toISOString(),
-                 completed_at: formatTimestamp(completedAt),
-                 completed_at_iso: completedAt.toISOString(),
-                 duration_seconds: Math.round((completedAt - startedAt) / 1000),
-             };
+                started_at: formatTimestamp(startedAt),
+                started_at_iso: startedAt.toISOString(),
+                completed_at: formatTimestamp(completedAt),
+                completed_at_iso: completedAt.toISOString(),
+                duration_seconds: Math.round((completedAt - startedAt) / 1000),
+            };
 
-             const optimizationResults = {
-                 size_before_bytes: sizeBeforeBytes,
-                 size_before_pretty: DatabaseManager.formatBytes(sizeBeforeBytes),
-                 size_after_bytes: sizeAfterBytes,
-                 size_after_pretty: DatabaseManager.formatBytes(sizeAfterBytes),
-                 space_freed_bytes: spaceFreedbytes,
-                 space_freed_pretty: DatabaseManager.formatBytes(spaceFreedbytes),
-                 space_freed_percent: parseFloat(spaceFreePercent),
-                 method: vacuumCommand,
-                 tables_optimized: ['knx_events', 'current_state', 'subscription_events'],
-                 downtime_warning: full ? `⚠️ VACUUM FULL: System was offline for ${Math.round((completedAt - startedAt) / 1000)} seconds` : null,
-             };
+            const optimizationResults = {
+                size_before_bytes: sizeBeforeBytes,
+                size_before_pretty: DatabaseManager.formatBytes(sizeBeforeBytes),
+                size_after_bytes: sizeAfterBytes,
+                size_after_pretty: DatabaseManager.formatBytes(sizeAfterBytes),
+                space_freed_bytes: spaceFreedbytes,
+                space_freed_pretty: DatabaseManager.formatBytes(spaceFreedbytes),
+                space_freed_percent: parseFloat(spaceFreePercent),
+                method: vacuumCommand,
+                tables_optimized: ['knx_events', 'current_state', 'subscription_events'],
+                downtime_warning: full ? `⚠️ VACUUM FULL: System was offline for ${Math.round((completedAt - startedAt) / 1000)} seconds` : null,
+            };
 
             // Update job as completed
             await client.query(
@@ -822,9 +822,9 @@ export class DatabaseManager {
      * @returns {Promise<boolean>} true if a database is connected, false otherwise
      */
     async checkHealth() {
-         let client;
-         try {
-             client = await this.pool.connect();
+        let client;
+        try {
+            client = await this.pool.connect();
             await client.query('SELECT NOW()');
             return true;
         } catch (err) {
@@ -852,7 +852,7 @@ export class DatabaseManager {
         try {
             const result = await client.query(`SELECT COUNT(*) as count FROM ${tableName}`);
             return this.#parseInt(result.rows[0].count);
-        } catch (err) {
+        } catch (_err) {
             return 0;
         }
     }
@@ -874,12 +874,12 @@ export class DatabaseManager {
                                 0
                             ),
                             1
-                        )::text || ':1',
-                        'N/A'
-                    ) as ratio;
-            `, [tableName]);
+                         )::text || ':1',
+                         'N/A'
+                     ) as ratio;
+             `, [tableName]);
             return result.rows[0]?.ratio || 'N/A';
-        } catch (err) {
+        } catch (_err) {
             return 'N/A';
         }
     }
