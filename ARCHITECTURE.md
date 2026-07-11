@@ -442,3 +442,11 @@ The `.knxproj` format is complex, version-dependent, and not publicly specified.
 ### Why TimescaleDB?
 
 Telegram history is an append-only, time-indexed workload. TimescaleDB hypertables give automatic time partitioning and compression on top of standard PostgreSQL, without requiring a separate database technology. The rest of the schema (subscriptions, resource metadata) is plain relational SQL in the same instance.
+
+---
+
+## API Design Standards
+
+For detailed guidance on API response formatting, timestamp conventions, and field naming across both spec-compliant and vendor endpoints, see:
+
+- [**API Timestamp Convention**](./docs/API_TIMESTAMP_CONVENTION.md) — KNX Spec endpoints (UTC only) vs. Vendor extensions (dual local + ISO)
