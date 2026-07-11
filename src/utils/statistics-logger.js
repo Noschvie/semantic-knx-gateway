@@ -6,9 +6,9 @@ import { createLogger } from './logger.js';
 import { formatTimestamp } from './timezone.js';
 import { formatDPTValue } from './dpt-formatter.js';
 
-export class StatsLogger {
+export class StatisticsLogger {
     constructor(db) {
-        this.logger = createLogger('StatsLogger');
+        this.logger = createLogger('StatisticsLogger');
         this.db = db;
         this.interval = null;
         this.intervalMinutes = 15;

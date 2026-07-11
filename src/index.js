@@ -11,7 +11,7 @@ import { StateEngine } from './state/state-engine.js';
 import { PostgresClient } from './storage/postgres.js';
 import { SemanticEngine } from './semantic/semantic-engine.js';
 import { RestAPI } from './api/rest-api.js';
-import { StatsLogger } from './utils/stats-logger.js';
+import { StatisticsLogger } from './utils/statistics-logger.js';
 
 dotenv.config();
 
@@ -82,7 +82,7 @@ class SemanticKNXRuntime {
 
             // Phase 6: Statistics Logger (periodic)
             this.logger.info('Phase 5: Starting Statistics Logger...');
-            this.statsLogger = new StatsLogger(this.db);
+            this.statsLogger = new StatisticsLogger(this.db);
             this.statsLogger.start();
 
             this.logger.info('=====================================');
