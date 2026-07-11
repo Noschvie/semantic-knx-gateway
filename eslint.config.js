@@ -22,7 +22,7 @@ export default [
             'space-before-function-paren': ['error', 'never'],
             'eol-last': ['error', 'always'],
             'no-unused-vars': ['error', { varsIgnorePattern: '^_', argsIgnorePattern: '^_' }],
-            'no-unused-private-class-members': ['error', { allowUnusedMembersStartingWithUnderscore: true }],
+            'no-unused-private-class-members': 'error',
         },
     },
 ];
