@@ -30,7 +30,7 @@ jobs:
 
       # Enable QEMU for cross-platform emulation (required for ARM builds on x86 runners)
       - name: Set up QEMU
-        uses: docker/setup-qemu-action@v3
+        uses: docker/setup-qemu-action@v4
 
       # Enable Docker Buildx (required for multi-platform builds)
       - name: Set up Docker Buildx
