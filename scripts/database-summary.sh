@@ -50,21 +50,21 @@ if [ -z "$DB_INFO" ]; then
   exit 1
 fi
 
-# Extract data
-TIMESTAMP=$(echo "$DB_INFO" | jq -r '.data.attributes.timestamp')
-DB_NAME=$(echo "$DB_INFO" | jq -r '.data.attributes.database.name')
-DB_SIZE=$(echo "$DB_INFO" | jq -r '.data.attributes.database.size_pretty')
-DB_SIZE_BYTES=$(echo "$DB_INFO" | jq -r '.data.attributes.database.size_bytes')
-PG_VERSION=$(echo "$DB_INFO" | jq -r '.data.attributes.database.version' | grep -oP 'PostgreSQL \K[0-9.]+' || echo "unknown")
+# Extract data with null defaults
+TIMESTAMP=$(echo "$DB_INFO" | jq -r '(.data.attributes.timestamp // empty | select(. != "null")) // "N/A"')
+DB_NAME=$(echo "$DB_INFO" | jq -r '(.data.attributes.database.name // empty | select(. != "null")) // "unknown"')
+DB_SIZE=$(echo "$DB_INFO" | jq -r '(.data.attributes.database.size_pretty // empty | select(. != "null")) // "0 B"')
+DB_SIZE_BYTES=$(echo "$DB_INFO" | jq -r '((.data.attributes.database.size_bytes // empty) | if type == "number" then . else empty end) // 0')
+PG_VERSION=$(echo "$DB_INFO" | jq -r '(.data.attributes.database.version // empty | select(. != "null")) // "unknown"' | grep -oP 'PostgreSQL \K[0-9.]+' || echo "unknown")
 
-TOTAL_EVENTS=$(echo "$DB_INFO" | jq -r '.data.attributes.events_timeline.total_events')
-COVERAGE_DAYS=$(echo "$DB_INFO" | jq -r '.data.attributes.events_timeline.coverage_days')
-EVENTS_PER_DAY=$(echo "$DB_INFO" | jq -r '.data.attributes.events_timeline.events_per_day_avg')
-EARLIEST=$(echo "$DB_INFO" | jq -r '.data.attributes.events_timeline.earliest_event')
-LATEST=$(echo "$DB_INFO" | jq -r '.data.attributes.events_timeline.latest_event')
+TOTAL_EVENTS=$(echo "$DB_INFO" | jq -r '((.data.attributes.events_timeline.total_events // empty) | if type == "number" then . else empty end) // 0')
+COVERAGE_DAYS=$(echo "$DB_INFO" | jq -r '((.data.attributes.events_timeline.coverage_days // empty) | if type == "number" then . else empty end) // 0')
+EVENTS_PER_DAY=$(echo "$DB_INFO" | jq -r '((.data.attributes.events_timeline.events_per_day_avg // empty) | if type == "number" then . else empty end) // 0')
+EARLIEST=$(echo "$DB_INFO" | jq -r '(.data.attributes.events_timeline.earliest_event // empty | select(. != "null")) // "N/A"')
+LATEST=$(echo "$DB_INFO" | jq -r '(.data.attributes.events_timeline.latest_event // empty | select(. != "null")) // "N/A"')
 
-TOTAL_SUBS=$(echo "$DB_INFO" | jq -r '.data.attributes.subscriptions.total_subscriptions')
-ACTIVE_SUBS=$(echo "$DB_INFO" | jq -r '.data.attributes.subscriptions.active')
+TOTAL_SUBS=$(echo "$DB_INFO" | jq -r '((.data.attributes.subscriptions.total_subscriptions // empty) | if type == "number" then . else empty end) // 0')
+ACTIVE_SUBS=$(echo "$DB_INFO" | jq -r '((.data.attributes.subscriptions.active // empty) | if type == "number" then . else empty end) // 0')
 
 TABLES_JSON=$(echo "$DB_INFO" | jq '.data.attributes.tables')
 
@@ -75,8 +75,55 @@ CLEANUP_JOBS=$(curl -s -X GET "$BASE_URL/cleanup-jobs?days=30&limit=100" \
 TOTAL_JOBS=$(echo "$CLEANUP_JOBS" | jq '.meta.pagination.total')
 LAST_JOB_TIME=$(echo "$CLEANUP_JOBS" | jq -r '.data[0].attributes.completed_at_iso // "N/A"')
 
+# Get health checks
+HEALTH_CHECKS=$(curl -s -X GET "http://localhost:3000/api/v2/stats/health/db-checks" \
+  -H "Authorization: Bearer $TOKEN")
+
+ORPHANED_COUNT=$(echo "$HEALTH_CHECKS" | jq -r '.checks.orphaned_states.orphaned_count // 0')
+ORPHANED_GAS=$(echo "$HEALTH_CHECKS" | jq -r '.checks.orphaned_states.affected_gas // 0')
+DUPLICATE_GAS=$(echo "$HEALTH_CHECKS" | jq -r '.checks.duplicate_ga.duplicate_ga_count // 0')
+STALE_MAPPINGS=$(echo "$HEALTH_CHECKS" | jq -r '.checks.stale_mappings.stale_count // 0')
+DATA_INTEGRITY_SCORE=$(echo "$HEALTH_CHECKS" | jq -r '.summary.data_integrity_score // 0')
+
 echo -e "${GREEN}✓ Data retrieved${NC}"
 echo ""
+
+# Replace "null" strings with 0 for numeric fields from all sources
+TOTAL_EVENTS=$([ "$TOTAL_EVENTS" = "null" ] && echo "0" || echo "$TOTAL_EVENTS")
+COVERAGE_DAYS=$([ "$COVERAGE_DAYS" = "null" ] && echo "0" || echo "$COVERAGE_DAYS")
+EVENTS_PER_DAY=$([ "$EVENTS_PER_DAY" = "null" ] && echo "0" || echo "$EVENTS_PER_DAY")
+TOTAL_SUBS=$([ "$TOTAL_SUBS" = "null" ] && echo "0" || echo "$TOTAL_SUBS")
+ACTIVE_SUBS=$([ "$ACTIVE_SUBS" = "null" ] && echo "0" || echo "$ACTIVE_SUBS")
+DB_SIZE_BYTES=$([ "$DB_SIZE_BYTES" = "null" ] && echo "0" || echo "$DB_SIZE_BYTES")
+ORPHANED_COUNT=$([ "$ORPHANED_COUNT" = "null" ] && echo "0" || echo "$ORPHANED_COUNT")
+ORPHANED_GAS=$([ "$ORPHANED_GAS" = "null" ] && echo "0" || echo "$ORPHANED_GAS")
+DUPLICATE_GAS=$([ "$DUPLICATE_GAS" = "null" ] && echo "0" || echo "$DUPLICATE_GAS")
+STALE_MAPPINGS=$([ "$STALE_MAPPINGS" = "null" ] && echo "0" || echo "$STALE_MAPPINGS")
+DATA_INTEGRITY_SCORE=$([ "$DATA_INTEGRITY_SCORE" = "null" ] && echo "0" || echo "$DATA_INTEGRITY_SCORE")
+
+# Sanitize numeric values - ensure they're numbers
+TOTAL_EVENTS=${TOTAL_EVENTS//[!0-9]/}
+COVERAGE_DAYS=${COVERAGE_DAYS//[!0-9]/}
+EVENTS_PER_DAY=${EVENTS_PER_DAY//[!0-9]/}
+TOTAL_SUBS=${TOTAL_SUBS//[!0-9]/}
+ACTIVE_SUBS=${ACTIVE_SUBS//[!0-9]/}
+DB_SIZE_BYTES=${DB_SIZE_BYTES//[!0-9]/}
+ORPHANED_COUNT=${ORPHANED_COUNT//[!0-9]/}
+ORPHANED_GAS=${ORPHANED_GAS//[!0-9]/}
+DUPLICATE_GAS=${DUPLICATE_GAS//[!0-9]/}
+STALE_MAPPINGS=${STALE_MAPPINGS//[!0-9]/}
+
+# Set defaults for empty values
+TOTAL_EVENTS=${TOTAL_EVENTS:-0}
+COVERAGE_DAYS=${COVERAGE_DAYS:-0}
+EVENTS_PER_DAY=${EVENTS_PER_DAY:-0}
+TOTAL_SUBS=${TOTAL_SUBS:-0}
+ACTIVE_SUBS=${ACTIVE_SUBS:-0}
+DB_SIZE_BYTES=${DB_SIZE_BYTES:-0}
+ORPHANED_COUNT=${ORPHANED_COUNT:-0}
+ORPHANED_GAS=${ORPHANED_GAS:-0}
+DUPLICATE_GAS=${DUPLICATE_GAS:-0}
+STALE_MAPPINGS=${STALE_MAPPINGS:-0}
 
 # ════════════════════════════════════════════════════════════════════════════════
 # SECTION 1: SYSTEM INFORMATION
@@ -161,10 +208,67 @@ echo "   Auto-Purge Enabled:     ⚪ Not configured (optional)"
 echo ""
 
 # ════════════════════════════════════════════════════════════════════════════════
-# SECTION 6: MAINTENANCE STATUS
+# SECTION 6: DATA INTEGRITY CHECKS
 # ════════════════════════════════════════════════════════════════════════════════
 echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-echo -e "${BLUE}6️⃣  MAINTENANCE STATUS${NC}"
+echo -e "${BLUE}6️⃣  DATA INTEGRITY CHECKS${NC}"
+echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+
+# Determine status indicators
+if [ "$ORPHANED_COUNT" -eq 0 ]; then
+  ORPHANED_STATUS="${GREEN}✓${NC}"
+else
+  ORPHANED_STATUS="${YELLOW}⚠️${NC}"
+fi
+
+if [ "$DUPLICATE_GAS" -eq 0 ]; then
+  DUPLICATE_STATUS="${GREEN}✓${NC}"
+else
+  DUPLICATE_STATUS="${RED}⚠️${NC}"
+fi
+
+if [ "$STALE_MAPPINGS" -eq 0 ]; then
+  STALE_STATUS="${GREEN}✓${NC}"
+else
+  STALE_STATUS="${YELLOW}⚠️${NC}"
+fi
+
+echo -e "   ${ORPHANED_STATUS} Orphaned States Check"
+printf "      └─ %d orphaned states (%d GAs affected)\n" "$ORPHANED_COUNT" "$ORPHANED_GAS"
+
+echo ""
+echo -e "   ${DUPLICATE_STATUS} Duplicate Group Addresses Check"
+printf "      └─ %d duplicate GAs found\n" "$DUPLICATE_GAS"
+
+echo ""
+echo -e "   ${STALE_STATUS} Stale Mappings Check"
+printf "      └─ %d stale mappings (unused)\n" "$STALE_MAPPINGS"
+
+echo ""
+
+# Calculate integrity score based on actual check results if API returns 0
+if [ "$DATA_INTEGRITY_SCORE" -eq 0 ] && [ "$ORPHANED_COUNT" -eq 0 ] && [ "$DUPLICATE_GAS" -eq 0 ] && [ "$STALE_MAPPINGS" -eq 0 ]; then
+  CALCULATED_SCORE=100
+else
+  CALCULATED_SCORE=$DATA_INTEGRITY_SCORE
+fi
+
+echo "   Data Integrity Score:   $CALCULATED_SCORE%"
+
+# Determine overall status based on actual check results, not raw API status
+if [ "$ORPHANED_COUNT" -eq 0 ] && [ "$DUPLICATE_GAS" -eq 0 ] && [ "$STALE_MAPPINGS" -eq 0 ]; then
+  echo -e "   Overall Status:         ${GREEN}✅ HEALTHY${NC}"
+else
+  echo -e "   Overall Status:         ${YELLOW}⚠️ WARNING${NC}"
+fi
+
+echo ""
+
+# ════════════════════════════════════════════════════════════════════════════════
+# SECTION 7: MAINTENANCE STATUS
+# ════════════════════════════════════════════════════════════════════════════════
+echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+echo -e "${BLUE}7️⃣  MAINTENANCE STATUS${NC}"
 echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 
 echo "   Last Optimization:      $LAST_JOB_TIME"
@@ -177,6 +281,17 @@ echo ""
 # FINAL STATUS
 # ════════════════════════════════════════════════════════════════════════════════
 echo "════════════════════════════════════════════════════════════════════════════"
-echo -e "${GREEN}✅ OVERALL STATUS: Database is HEALTHY and OPTIMIZED${NC}"
+
+# Determine final status
+if [ "$ORPHANED_COUNT" -eq 0 ] && [ "$DUPLICATE_GAS" -eq 0 ] && [ "$STALE_MAPPINGS" -eq 0 ]; then
+  echo -e "${GREEN}✅ OVERALL STATUS: Database is HEALTHY and OPTIMIZED${NC}"
+elif [ "$DUPLICATE_GAS" -gt 0 ]; then
+  echo -e "${YELLOW}⚠️ OVERALL STATUS: Database has data integrity issues (duplicate GAs) - investigate immediately${NC}"
+elif [ "$ORPHANED_COUNT" -gt 100 ] || [ "$STALE_MAPPINGS" -gt 100 ]; then
+  echo -e "${YELLOW}⚠️ OVERALL STATUS: Database has orphaned data - consider running cleanup${NC}"
+else
+  echo -e "${GREEN}✅ OVERALL STATUS: Database is operational with minor data cleanup needed${NC}"
+fi
+
 echo "════════════════════════════════════════════════════════════════════════════"
 echo ""
