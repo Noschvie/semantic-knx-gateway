@@ -97,8 +97,7 @@ if [ "$MODE" = "api" ]; then
   STATE_GAS=$(echo "$HEALTH_DATA" | jq -r '.summary.unique_gas_states // 0')
 
   ORPHANED=$(echo "$HEALTH_DATA" | jq -r '.summary.orphaned_states // 0')
-  ORPHANED_GAS=$(echo "$HEALTH_DATA" | jq -r '.checks.orphaned_states.affected_gas // 0')
-  DUPLICATES=$(echo "$HEALTH_DATA" | jq -r '.summary.duplicate_gas // 0')
+  DUPLICATES=$(echo "$HEALTH_DATA" | jq -r '.summary.duplicate_ga // 0')
   STALE=$(echo "$HEALTH_DATA" | jq -r '.summary.stale_mappings // 0')
 else
   # Local mode: use SQL queries
