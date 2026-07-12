@@ -9,6 +9,11 @@
 # Optional: override read GA:               KNX_TEST_GA_READ=1/1/1 ./test-knx-iot.sh
 # Optional: override write GA:              KNX_TEST_GA_WRITE=1/1/1 ./test-knx-iot.sh
 # Optional: skip write test:                SKIP_WRITE=true ./test-knx-iot.sh
+#
+# Enhanced test messages to distinguish between:
+#   - GA exists in DB/TTL ✅
+#   - GA exists BUT has NO current_state ⚠️  (clearly marked)
+#   - GA missing completely ❌
 
 API_URL="${API_URL:-http://localhost:3000}"
 KNX_IOT="$API_URL/api/v2"
@@ -20,6 +25,7 @@ FAIL=0
 
 ok()   { echo "   ✅ $1"; ((PASS++)); }
 fail() { echo "   ❌ $1"; ((FAIL++)); }
+warn() { echo "   ⚠️  $1"; }
 
 check() {
   local label="$1"
@@ -28,6 +34,18 @@ check() {
     ok "$label: $value"
   else
     fail "$label"
+  fi
+}
+
+# Check for missing current_state (GA exists but no value)
+check_state() {
+  local label="$1"
+  local value="$2"
+  if [ -n "$value" ] && [ "$value" != "null" ]; then
+    ok "$label (current state): $value"
+  else
+    warn "$label → GA EXISTS IN DB, BUT: no current_state (value is missing)"
+    ((FAIL++))
   fi
 }
 
@@ -107,7 +125,17 @@ echo ""
 
 echo "2c. Stats states..."
 STATS_ST=$(curl -s -H "$AUTH_READ" "$KNX_IOT/stats/states")
-check "state count" "$(echo "$STATS_ST" | jq -r '.count // "0"')"
+STATE_COUNT=$(echo "$STATS_ST" | jq -r '.summary.total_states // "0"')
+OLDEST_UPDATE=$(echo "$STATS_ST" | jq -r '.summary.oldest_update // "N/A"')
+NEWEST_UPDATE=$(echo "$STATS_ST" | jq -r '.summary.newest_update // "N/A"')
+if [ "$STATE_COUNT" -gt 0 ] 2>/dev/null; then
+  ok "current_state records: $STATE_COUNT datapoints with active states"
+  ok "  └─ oldest update: $OLDEST_UPDATE"
+  ok "  └─ newest update: $NEWEST_UPDATE"
+else
+  warn "current_state records: 0 (no current states recorded in database)"
+  ((FAIL++))
+fi
 echo ""
 
 echo "2d. Top active datapoints (top 5)..."
@@ -141,7 +169,7 @@ echo ""
 echo "4b. Single datapoint ($DP_ID)..."
 DP_SINGLE=$(curl -s -H "$AUTH_READ" "$KNX_IOT/datapoints/$DP_ID")
 check "title"         "$(echo "$DP_SINGLE" | jq -r '.data.attributes.title')"
-check "value"         "$(echo "$DP_SINGLE" | jq -r '.data.attributes.value // "null (no value)"')"
+check_state "Datapoint $DP_ID" "$(echo "$DP_SINGLE" | jq -r '.data.attributes.value')"
 check "valueType"     "$(echo "$DP_SINGLE" | jq -r '.data.attributes.valueType')"
 check "datapointType" "$(echo "$DP_SINGLE" | jq -r '.data.attributes.datapointType[0]')"
 echo ""
@@ -160,7 +188,12 @@ echo ""
 echo "4e. Timeseries for first datapoint..."
 TS=$(curl -s -H "$AUTH_READ" "$KNX_IOT/datapoints/$DP_ID/timeseries")
 TS_COUNT=$(echo "$TS" | jq '.data | length')
-check "timeseries entries" "${TS_COUNT:-0}"
+if [ "$TS_COUNT" -gt 0 ] 2>/dev/null; then
+  ok "timeseries history: $TS_COUNT entries found"
+else
+  warn "timeseries history: empty (no historical events recorded for this datapoint)"
+  ((FAIL++))
+fi
 echo ""
 
 echo "4f. Datapoints filter by group address..."
@@ -170,11 +203,19 @@ if [ -n "$FIRST_GA" ] && [ "$FIRST_GA" != "null" ]; then
   DP_BY_GA=$(curl -sg --globoff -H "$AUTH_READ" "$KNX_IOT/datapoints?filter[ga]=$FIRST_GA")
   DP_BY_GA_COUNT=$(echo "$DP_BY_GA" | jq '.meta.collection.total // (.data | length) // 0')
   if [ "${DP_BY_GA_COUNT}" -gt 0 ] 2>/dev/null; then
-    ok "GA $FIRST_GA found via filter[ga]: $DP_BY_GA_COUNT entry/entries"
-    check "GA $FIRST_GA name" "$(echo "$DP_BY_GA" | jq -r '.data[0].attributes.title // "null"')"
-    check "GA $FIRST_GA UUID" "$(echo "$DP_BY_GA" | jq -r '.data[0].id // "null"')"
+    ok "GA $FIRST_GA: found $DP_BY_GA_COUNT datapoint(s) in database"
+    check "  └─ Name" "$(echo "$DP_BY_GA" | jq -r '.data[0].attributes.title // "null"')"
+    check "  └─ UUID" "$(echo "$DP_BY_GA" | jq -r '.data[0].id // "null"')"
+    # Check if current state exists
+    STATE_VALUE=$(echo "$DP_BY_GA" | jq -r '.data[0].attributes.value // empty')
+    if [ -n "$STATE_VALUE" ] && [ "$STATE_VALUE" != "null" ]; then
+      ok "  └─ Current state (value): $STATE_VALUE"
+    else
+      warn "  └─ ⚠️  NO CURRENT STATE → GA exists in DB/TTL, but no current_state value recorded"
+      ((FAIL++))
+    fi
   else
-    fail "GA $FIRST_GA not found via filter[ga]"
+    fail "GA $FIRST_GA not found in database"
   fi
 else
   ok "no datapoint with GA in collection – filter[ga] test skipped"
