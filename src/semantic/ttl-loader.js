@@ -222,11 +222,15 @@ export class TTLLoader {
         const siteLabel = siteNode ? this.#getLabel(dataset, siteNode) : 'Site';
         const topology = { site: siteLabel, buildings: [] };
 
+        let buildingCount = 0, floorCount = 0, roomCount = 0, deviceCount = 0;
+
         for (const bQuad of dataset.match(siteNode, LOC.hasBuilding)) {
+            buildingCount++;
             const building = bQuad.object;
             const buildingEntry = { name: this.#getLabel(dataset, building), floors: [] };
 
             for (const fQuad of dataset.match(building, LOC.hasFloor)) {
+                floorCount++;
                 const floor = fQuad.object;
                 const floorEntry = { name: this.#getLabel(dataset, floor), rooms: [] };
 
@@ -235,7 +239,10 @@ export class TTLLoader {
                     ...[...dataset.match(floor, LOC.hasSpace)].map((q) => q.object.value),
                 ]);
 
+                this.logger.debug(`Floor "${floorEntry.name}": found ${roomUris.size} rooms`);
+
                 for (const roomUri of roomUris) {
+                    roomCount++;
                     const room = rdf.namedNode(roomUri);
                     const roomEntry = {
                         name: this.#getLabel(dataset, room),
@@ -244,6 +251,7 @@ export class TTLLoader {
                     };
 
                     for (const eQuad of dataset.match(room, LOC.containsEquipment)) {
+                        deviceCount++;
                         const info = this.#getDeviceInfo(dataset, eQuad.object);
                         roomEntry.devices.push(info);
                         deviceMap.set(info.uri, {
@@ -252,6 +260,7 @@ export class TTLLoader {
                             floor: floorEntry.name,
                             building: buildingEntry.name,
                         });
+                        this.logger.debug(`Device "${info.label}" (${info.uri}) → physAddr: ${info.physAddr}, manufacturer: ${info.manufacturer}`);
                     }
 
                     roomEntry.devices.sort((a, b) => this.#sortPhys(a.physAddr, b.physAddr));
@@ -265,7 +274,8 @@ export class TTLLoader {
             topology.buildings.push(buildingEntry);
         }
 
-        // Group Addresses
+        this.logger.info(`TTL Parse Summary: ${buildingCount} buildings, ${floorCount} floors, ${roomCount} rooms, ${deviceCount} devices found`);
+
         const groupAddresses = [];
 
         for (const gaQuad of dataset.match(null, KNX.groupAddress)) {
