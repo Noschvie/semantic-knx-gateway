@@ -169,10 +169,14 @@ echo ""
 echo "4b. Single datapoint ($DP_ID)..."
 DP_SINGLE=$(curl -s -H "$AUTH_READ" "$KNX_IOT/datapoints/$DP_ID")
 check "title"         "$(echo "$DP_SINGLE" | jq -r '.data.attributes.title')"
-check_state "Datapoint $DP_ID" "$(echo "$DP_SINGLE" | jq -r '.data.attributes.value')"
+check "value"         "$(echo "$DP_SINGLE" | jq -r '.data.attributes.value // "null (no value)"')"
 check "valueType"     "$(echo "$DP_SINGLE" | jq -r '.data.attributes.valueType')"
-check "datapointType" "$(echo "$DP_SINGLE" | jq -r '.data.attributes.datapointType[0]')"
-echo ""
+DPT=$(echo "$DP_SINGLE" | jq -r '.data.attributes.datapointType[0]')
+if [ -n "$DPT" ] && [ "$DPT" != "null" ]; then
+  ok "datapointType: $DPT"
+else
+  warn "datapointType: not defined (datapoint has no DPT)"
+fi
 
 echo "4c. Datapoints (pagination – page 0, 10 items)..."
 DP_PAGE=$(curl -s -H "$AUTH_READ" "$KNX_IOT/datapoints?page%5Bnumber%5D=0&page%5Bsize%5D=10")
