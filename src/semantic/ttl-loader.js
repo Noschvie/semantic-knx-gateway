@@ -219,16 +219,16 @@ export class TTLLoader {
 
         // Topology
         const siteNode = [...dataset.match(null, LOC.hasBuilding)][0]?.subject;
-        const siteLabel = siteNode ? this.getLabel(dataset, siteNode) : 'Site';
+        const siteLabel = siteNode ? this.#getLabel(dataset, siteNode) : 'Site';
         const topology = { site: siteLabel, buildings: [] };
 
         for (const bQuad of dataset.match(siteNode, LOC.hasBuilding)) {
             const building = bQuad.object;
-            const buildingEntry = { name: this.getLabel(dataset, building), floors: [] };
+            const buildingEntry = { name: this.#getLabel(dataset, building), floors: [] };
 
             for (const fQuad of dataset.match(building, LOC.hasFloor)) {
                 const floor = fQuad.object;
-                const floorEntry = { name: this.getLabel(dataset, floor), rooms: [] };
+                const floorEntry = { name: this.#getLabel(dataset, floor), rooms: [] };
 
                 const roomUris = new Set([
                     ...[...dataset.match(floor, LOC.hasRoom)].map((q) => q.object.value),
@@ -238,7 +238,7 @@ export class TTLLoader {
                 for (const roomUri of roomUris) {
                     const room = rdf.namedNode(roomUri);
                     const roomEntry = {
-                        name: this.getLabel(dataset, room),
+                        name: this.#getLabel(dataset, room),
                         devices: [],
                         groupAddresses: [],
                     };
@@ -325,7 +325,7 @@ export class TTLLoader {
 
             const title =
                 [...dataset.match(fnNode, DC.title)][0]?.object?.value
-                ?? this.getLabel(dataset, fnNode);
+                ?? this.#getLabel(dataset, fnNode);
 
             const functionPoints = [];
             const groupAddressesForFunction = [];
