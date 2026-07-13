@@ -229,46 +229,95 @@ export class TTLLoader {
             const building = bQuad.object;
             const buildingEntry = { name: this.#getLabel(dataset, building), floors: [] };
 
-            for (const fQuad of dataset.match(building, LOC.hasFloor)) {
-                floorCount++;
-                const floor = fQuad.object;
-                const floorEntry = { name: this.#getLabel(dataset, floor), rooms: [] };
+            // Try to get floors first
+            const floorQuads = [...dataset.match(building, LOC.hasFloor)];
 
-                const roomUris = new Set([
-                    ...[...dataset.match(floor, LOC.hasRoom)].map((q) => q.object.value),
-                    ...[...dataset.match(floor, LOC.hasSpace)].map((q) => q.object.value),
-                ]);
+            if (floorQuads.length > 0) {
+                // Structure: Building → hasFloor → Floor → hasRoom
+                for (const fQuad of floorQuads) {
+                    floorCount++;
+                    const floor = fQuad.object;
+                    const floorEntry = { name: this.#getLabel(dataset, floor), rooms: [] };
 
-                this.logger.debug(`Floor "${floorEntry.name}": found ${roomUris.size} rooms`);
+                    const roomUris = new Set([
+                        ...[...dataset.match(floor, LOC.hasRoom)].map((q) => q.object.value),
+                        ...[...dataset.match(floor, LOC.hasSpace)].map((q) => q.object.value),
+                    ]);
 
-                for (const roomUri of roomUris) {
-                    roomCount++;
-                    const room = rdf.namedNode(roomUri);
-                    const roomEntry = {
-                        name: this.#getLabel(dataset, room),
-                        devices: [],
-                        groupAddresses: [],
-                    };
+                    this.logger.debug(`Floor "${floorEntry.name}": found ${roomUris.size} rooms`);
 
-                    for (const eQuad of dataset.match(room, LOC.containsEquipment)) {
-                        deviceCount++;
-                        const info = this.#getDeviceInfo(dataset, eQuad.object);
-                        roomEntry.devices.push(info);
-                        deviceMap.set(info.uri, {
-                            ...info,
-                            room: roomEntry.name,
-                            floor: floorEntry.name,
-                            building: buildingEntry.name,
-                        });
-                        this.logger.debug(`Device "${info.label}" (${info.uri}) → physAddr: ${info.physAddr}, manufacturer: ${info.manufacturer}`);
+                    for (const roomUri of roomUris) {
+                        roomCount++;
+                        const room = rdf.namedNode(roomUri);
+                        const roomEntry = {
+                            name: this.#getLabel(dataset, room),
+                            devices: [],
+                            groupAddresses: [],
+                        };
+
+                        for (const eQuad of dataset.match(room, LOC.containsEquipment)) {
+                            deviceCount++;
+                            const info = this.#getDeviceInfo(dataset, eQuad.object);
+                            roomEntry.devices.push(info);
+                            deviceMap.set(info.uri, {
+                                ...info,
+                                room: roomEntry.name,
+                                floor: floorEntry.name,
+                                building: buildingEntry.name,
+                            });
+                            this.logger.debug(`Device "${info.label}" (${info.uri}) → physAddr: ${info.physAddr}, manufacturer: ${info.manufacturer}`);
+                        }
+
+                        roomEntry.devices.sort((a, b) => this.#sortPhys(a.physAddr, b.physAddr));
+                        floorEntry.rooms.push(roomEntry);
                     }
 
-                    roomEntry.devices.sort((a, b) => this.#sortPhys(a.physAddr, b.physAddr));
-                    floorEntry.rooms.push(roomEntry);
+                    floorEntry.rooms.sort((a, b) => a.name.localeCompare(b.name));
+                    buildingEntry.floors.push(floorEntry);
                 }
+            } else {
+                // Fallback: Structure without floors (Building → hasRoom/hasSpace directly)
+                const roomUris = new Set([
+                    ...[...dataset.match(building, LOC.hasRoom)].map((q) => q.object.value),
+                    ...[...dataset.match(building, LOC.hasSpace)].map((q) => q.object.value),
+                ]);
 
-                floorEntry.rooms.sort((a, b) => a.name.localeCompare(b.name));
-                buildingEntry.floors.push(floorEntry);
+                this.logger.debug(`Building "${buildingEntry.name}": found ${roomUris.size} rooms (no floor hierarchy)`);
+
+                if (roomUris.size > 0) {
+                    // Create a default floor for rooms without floor hierarchy
+                    const defaultFloor = { name: 'Ground', rooms: [] };
+                    floorCount++;
+
+                    for (const roomUri of roomUris) {
+                        roomCount++;
+                        const room = rdf.namedNode(roomUri);
+                        const roomEntry = {
+                            name: this.#getLabel(dataset, room),
+                            devices: [],
+                            groupAddresses: [],
+                        };
+
+                        for (const eQuad of dataset.match(room, LOC.containsEquipment)) {
+                            deviceCount++;
+                            const info = this.#getDeviceInfo(dataset, eQuad.object);
+                            roomEntry.devices.push(info);
+                            deviceMap.set(info.uri, {
+                                ...info,
+                                room: roomEntry.name,
+                                floor: defaultFloor.name,
+                                building: buildingEntry.name,
+                            });
+                            this.logger.debug(`Device "${info.label}" (${info.uri}) → physAddr: ${info.physAddr}, manufacturer: ${info.manufacturer}`);
+                        }
+
+                        roomEntry.devices.sort((a, b) => this.#sortPhys(a.physAddr, b.physAddr));
+                        defaultFloor.rooms.push(roomEntry);
+                    }
+
+                    defaultFloor.rooms.sort((a, b) => a.name.localeCompare(b.name));
+                    buildingEntry.floors.push(defaultFloor);
+                }
             }
 
             topology.buildings.push(buildingEntry);
