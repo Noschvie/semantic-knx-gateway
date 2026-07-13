@@ -23,16 +23,6 @@ export class TTLLoader {
     // Address Conversion
 
     /**
-     * Converts a hex address to a physical address in format X.X.XXX
-     * @param {string} hex - Hexadecimal address
-     * @returns {string} Physical address
-     */
-    #toPhysAddress(hex) {
-        const n = parseInt(hex, 16);
-        return `${(n >> 12) & 0x0f}.${(n >> 8) & 0x0f}.${n & 0xff}`;
-    }
-
-    /**
      * Normalizes physical address from various formats (hex, dot-notation, invalid)
      * Handles mixed formats commonly found in ETS exports:
      * - Hex format: "116A" → "1.1.26"
