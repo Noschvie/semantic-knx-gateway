@@ -27,9 +27,56 @@ export class TTLLoader {
      * @param {string} hex - Hexadecimal address
      * @returns {string} Physical address
      */
-    toPhysAddress(hex) {
+    #toPhysAddress(hex) {
         const n = parseInt(hex, 16);
         return `${(n >> 12) & 0x0f}.${(n >> 8) & 0x0f}.${n & 0xff}`;
+    }
+
+    /**
+     * Normalizes physical address from various formats (hex, dot-notation, invalid)
+     * Handles mixed formats commonly found in ETS exports:
+     * - Hex format: "116A" → "1.1.26"
+     * - Already converted: "1.1.26" → "1.1.26" (pass-through)
+     * - Invalid formats like "1.1.-" → null (skip device)
+     *
+     * @param {string} addr - Address in any format
+     * @returns {string|null} Normalized address (X.X.XXX) or null if invalid
+     */
+    #normalizePhysAddress(addr) {
+        if (!addr) return null;
+
+        addr = String(addr).trim();
+
+        // Check if already in dot notation (X.X.XXX)
+        if (/^\d+\.\d+\.\d+$/.test(addr)) {
+            const parts = addr.split('.').map(Number);
+            // Validate ranges: area (0-15), line (0-15), device (0-255)
+            if (parts[0] <= 15 && parts[1] <= 15 && parts[2] <= 255) {
+                return addr;
+            }
+            return null;
+        }
+
+        // Skip invalid patterns like "1.1.-"
+        if (addr.includes('-')) {
+            return null;
+        }
+
+        // Try hex format (4 hex digits, e.g. "116A")
+        if (/^[0-9A-Fa-f]{4}$/.test(addr)) {
+            const n = parseInt(addr, 16);
+            if (isNaN(n)) return null;
+            return `${(n >> 12) & 0x0f}.${(n >> 8) & 0x0f}.${n & 0xff}`;
+        }
+
+        // Try hex with 0x prefix
+        if (/^0x[0-9A-Fa-f]{4}$/i.test(addr)) {
+            const n = parseInt(addr, 16);
+            if (isNaN(n)) return null;
+            return `${(n >> 12) & 0x0f}.${(n >> 8) & 0x0f}.${n & 0xff}`;
+        }
+
+        return null;
     }
 
     /**
@@ -37,7 +84,7 @@ export class TTLLoader {
      * @param {string|number} dec - Decimal address
      * @returns {string} Group address
      */
-    toGroupAddress(dec) {
+    #toGroupAddress(dec) {
         const n = parseInt(dec);
         return `${(n >> 11) & 0x1f}/${(n >> 8) & 0x07}/${n & 0xff}`;
     }
@@ -48,7 +95,7 @@ export class TTLLoader {
      * @param {string} b - Second address
      * @returns {number} Sort value
      */
-    sortPhys(a, b) {
+    #sortPhys(a, b) {
         const pa = (a ?? '9.9.999').split('.').map(Number);
         const pb = (b ?? '9.9.999').split('.').map(Number);
         return pa[0] - pb[0] || pa[1] - pb[1] || pa[2] - pb[2];
@@ -62,7 +109,7 @@ export class TTLLoader {
      * @param {Object} node - RDF Node
      * @returns {string} Label
      */
-    getLabel(dataset, node) {
+    #getLabel(dataset, node) {
         return (
             [...dataset.match(node, DC.title)][0]?.object?.value ||
             [...dataset.match(node, RDFS.label)][0]?.object?.value ||
@@ -77,7 +124,7 @@ export class TTLLoader {
      * @param {Object} device - Device Node
      * @returns {Object} Device Info Object
      */
-    getDeviceInfo(dataset, device) {
+    #getDeviceInfo(dataset, device) {
         const hexAddr = [...dataset.match(device, KNX.individualAddress)][0]?.object?.value;
         const productUri = [...dataset.match(device, CORE.hasProduct)][0]?.object?.value;
 
@@ -94,9 +141,9 @@ export class TTLLoader {
 
         return {
             uri: device.value.split('#').pop(),
-            label: [...dataset.match(device, DC.title)][0]?.object?.value ?? this.getLabel(dataset, device),
+            label: [...dataset.match(device, DC.title)][0]?.object?.value ?? this.#getLabel(dataset, device),
             description: [...dataset.match(device, DC.description)][0]?.object?.value ?? '',
-            physAddr: hexAddr ? this.toPhysAddress(hexAddr) : null,
+            physAddr: hexAddr ? this.#normalizePhysAddress(hexAddr) : null,
             serial: [...dataset.match(device, CORE.serialNumber)][0]?.object?.value ?? '',
             state: [...dataset.match(device, CORE.state)][0]?.object?.value ?? '',
             lastDl: [...dataset.match(device, CORE.lastDownloaded)][0]?.object?.value ?? '',
@@ -111,7 +158,7 @@ export class TTLLoader {
      * @param {string} uri - URI String
      * @returns {string|null} Device ID or null
      */
-    extractDeviceId(uri) {
+    #extractDeviceId(uri) {
         const m = uri.match(/DI-\d+/);
         return m ? m[0] : null;
     }
@@ -124,7 +171,7 @@ export class TTLLoader {
      * @param {string} filePath - Path to TTL file
      * @returns {Promise<Object>} RDF Dataset
      */
-    async loadDataset(filePath) {
+    async #loadDataset(filePath) {
         await fsAsync.access(filePath);
         const stats = await fsAsync.stat(filePath);
         this.logger.info(`Loading TTL: ${filePath} (${(stats.size / 1024 / 1024).toFixed(1)} MB)`);
@@ -145,7 +192,7 @@ export class TTLLoader {
      * @returns {Promise<Array>} Array of group addresses
      */
     async loadTTL(filePath) {
-        const dataset = await this.loadDataset(filePath);
+        const dataset = await this.#loadDataset(filePath);
         const { groupAddresses } = await this.parse(dataset);
         this.logger.info(`✅ ${groupAddresses.length} group addresses resolved`);
         return groupAddresses;
@@ -157,7 +204,7 @@ export class TTLLoader {
      * @returns {Promise<Object>} Object with topology, groupAddresses, deviceMap
      */
     async loadTTLFull(filePath) {
-        const dataset = await this.loadDataset(filePath);
+        const dataset = await this.#loadDataset(filePath);
         return this.parse(dataset);
     }
 
@@ -167,7 +214,7 @@ export class TTLLoader {
      * @returns {Promise<Object>} RDF Dataset
      */
     async loadTTLAsDataset(filePath) {
-        return this.loadDataset(filePath);
+        return this.#loadDataset(filePath);
     }
 
     // ── Parsing ──────────────────────────────────────────────────────────────
@@ -207,7 +254,7 @@ export class TTLLoader {
                     };
 
                     for (const eQuad of dataset.match(room, LOC.containsEquipment)) {
-                        const info = this.getDeviceInfo(dataset, eQuad.object);
+                        const info = this.#getDeviceInfo(dataset, eQuad.object);
                         roomEntry.devices.push(info);
                         deviceMap.set(info.uri, {
                             ...info,
@@ -217,7 +264,7 @@ export class TTLLoader {
                         });
                     }
 
-                    roomEntry.devices.sort((a, b) => this.sortPhys(a.physAddr, b.physAddr));
+                    roomEntry.devices.sort((a, b) => this.#sortPhys(a.physAddr, b.physAddr));
                     floorEntry.rooms.push(roomEntry);
                 }
 
@@ -241,7 +288,7 @@ export class TTLLoader {
 
             const connectedDevices = [];
             for (const gQuad of dataset.match(gaNode, CORE.groups)) {
-                const devId = this.extractDeviceId(gQuad.object.value);
+                const devId = this.#extractDeviceId(gQuad.object.value);
                 if (devId && deviceMap.has(devId)) {
                     const d = deviceMap.get(devId);
                     connectedDevices.push({
@@ -256,7 +303,7 @@ export class TTLLoader {
 
             groupAddresses.push({
                 uri: gaNode.value.split('#').pop(),
-                address: this.toGroupAddress(gaQuad.object.value),
+                address: this.#toGroupAddress(gaQuad.object.value),
                 decimal: gaQuad.object.value,
                 title,
                 dpt,
