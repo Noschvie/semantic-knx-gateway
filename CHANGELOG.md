@@ -9,6 +9,40 @@ Unreleased
 ----------
 
 ### Added
+- **TTL Loader Topology Enhancements** — Improved RDF parsing and device organization (since July 9):
+  - **Enhanced Floor & Room Handling**: Automatic fallback for non-hierarchical structures (Building → Room without Floor)
+  - **Device Collection Improvements**: More robust device URI extraction and context tracking
+  - **Topology Logging**: Comprehensive logging for building, floor, room, and device counts for debugging
+  - **Label Retrieval Refactoring**: Centralized private `#getLabel()` method using RDF namespaces (DC.title, RDFS.label, KNX.label)
+  - **Address Normalization**: Enhanced `#normalizePhysAddress()` supporting hex, dot-notation, and invalid format handling
+  - **Improved Debugging**: Debug-level logging for device mapping to rooms/floors/buildings
+  
+  **Files Modified:**
+  - `src/semantic/ttl-loader.js` — Phase 1 (device collection), Phase 2 (topology building), private methods refactoring
+
+- **Enhanced KNX IoT Test Suite** — Improved validation and error handling:
+  - `scripts/test-knx-iot.sh` — Enhanced datapoint validation with comprehensive error handling
+  - Better state change verification and messaging for test outcomes
+  - Improved test result reporting for API integration testing
+
+- **Database Statistics & Health Monitoring** — Encapsulated statistics operations:
+  - **New `StatisticsStore` Class** (`src/storage/statistics-store.js`): Encapsulated database statistics operations
+  - **Integration**: Integrated into `StatisticsLogger` for unified statistics handling
+  - **Data Integrity Checks**: Null value handling, sanitization, and comprehensive validation
+  - **Enhanced Database Summary**: Improved null handling in aggregation queries with default values
+  - **Health Check Script Enhancements**:
+    - Local mode support for direct database queries
+    - API integration for health check verification
+    - Better error handling and data validation
+  - **Scripts Updated:**
+    - `scripts/database-summary.sh` — Improved API URL handling, JSON validation
+    - `scripts/db-health-check.sh` — Typo fixes, enhanced duplicate GA count retrieval
+  
+  **Benefits:**
+  - ✅ More reliable database monitoring and statistics collection
+  - ✅ Better error recovery and null value handling
+  - ✅ Improved observability for database state and health
+
 - **Improved GitHub Workflows** — Enhanced CI/CD pipeline configuration:
   - **Dependency Audit Workflow**: Upgraded to latest action versions (checkout@v7, setup-node@v6), increased security level to `high`, and improved error handling
   - **Dependabot Configuration**: Enhanced with better labels, explicit commit message formatting, automatic rebase strategy, and staggered scheduling (npm on Monday, GitHub Actions on Tuesday)
@@ -186,6 +220,18 @@ Unreleased
   - DPT logging occurs in `StateEngine.registerDatapoint()` when mapping is registered
   - Uses `DptHistoryManager.getDptAtTime()` to look up historical DPT for responses
   - Non-blocking: gracefully handles missing history (optional enhancement)
+
+### Changed
+- **Code Refactoring & Quality Improvements** (since July 9):
+  - **TTL Loader Private Methods**: Refactored to use private field syntax (`#getLabel()`, `#getDeviceInfo()`, etc.) for better encapsulation
+  - **Removed Unused Methods**: Eliminated unused hex-to-physical address conversion method
+  - **Consistency Fixes**: Fixed misplaced commas and inconsistent string formatting in:
+    - `src/knx/tunnel-manager.js`
+    - `src/storage/subscription-store.js`
+    - `src/state/state-engine.js`
+    - `src/state/state-store.js`
+  - **Logic Simplification**: Simplified `hasState` logic in `src/storage/statistics.js` for better readability
+  - **Database Query Alias Corrections**: Updated orphaned states query to use the correct table alias for affected GAs count
 
 2026-07-09
 ----------
