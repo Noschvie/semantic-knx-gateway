@@ -217,12 +217,28 @@ export class TTLLoader {
     async parse(dataset) {
         const deviceMap = new Map(); // uri-Fragment → deviceInfo + room/floor context
 
+        // ─── PHASE 1: Collect all Devices (regardless of hierarchy) ─────────────────
+        this.logger.debug('Phase 1: Collecting all devices...');
+        const allDevicesQuads = [...dataset.match(null, RDF.type, CORE.Device)];
+
+        for (const dQuad of allDevicesQuads) {
+            const device = dQuad.subject;
+            const info = this.#getDeviceInfo(dataset, device);
+            deviceMap.set(info.uri, info);
+            this.logger.debug(`Collected device: "${info.label}" (${info.uri}) → physAddr: ${info.physAddr}, manufacturer: ${info.manufacturer}`);
+        }
+
+        this.logger.info(`Found ${deviceMap.size} total devices in TTL`);
+
+        // ─── PHASE 2: Build Topology (Building → Floors → Rooms) ──────────────────
+        this.logger.debug('Phase 2: Building topology...');
+
         // Topology
         const siteNode = [...dataset.match(null, LOC.hasBuilding)][0]?.subject;
         const siteLabel = siteNode ? this.#getLabel(dataset, siteNode) : 'Site';
         const topology = { site: siteLabel, buildings: [] };
 
-        let buildingCount = 0, floorCount = 0, roomCount = 0, deviceCount = 0;
+        let buildingCount = 0, floorCount = 0, roomCount = 0;
 
         for (const bQuad of dataset.match(siteNode, LOC.hasBuilding)) {
             buildingCount++;
@@ -255,17 +271,21 @@ export class TTLLoader {
                             groupAddresses: [],
                         };
 
+                        // Find devices in this room (via containsEquipment)
                         for (const eQuad of dataset.match(room, LOC.containsEquipment)) {
-                            deviceCount++;
-                            const info = this.#getDeviceInfo(dataset, eQuad.object);
-                            roomEntry.devices.push(info);
-                            deviceMap.set(info.uri, {
-                                ...info,
-                                room: roomEntry.name,
-                                floor: floorEntry.name,
-                                building: buildingEntry.name,
-                            });
-                            this.logger.debug(`Device "${info.label}" (${info.uri}) → physAddr: ${info.physAddr}, manufacturer: ${info.manufacturer}`);
+                            const deviceUri = eQuad.object.value.split('#').pop();
+                            if (deviceMap.has(deviceUri)) {
+                                const info = deviceMap.get(deviceUri);
+                                roomEntry.devices.push(info);
+                                // Update deviceMap with room/floor/building context
+                                deviceMap.set(info.uri, {
+                                    ...info,
+                                    room: roomEntry.name,
+                                    floor: floorEntry.name,
+                                    building: buildingEntry.name,
+                                });
+                                this.logger.debug(`  Device in room: "${info.label}" (${info.uri})`);
+                            }
                         }
 
                         roomEntry.devices.sort((a, b) => this.#sortPhys(a.physAddr, b.physAddr));
@@ -299,16 +319,18 @@ export class TTLLoader {
                         };
 
                         for (const eQuad of dataset.match(room, LOC.containsEquipment)) {
-                            deviceCount++;
-                            const info = this.#getDeviceInfo(dataset, eQuad.object);
-                            roomEntry.devices.push(info);
-                            deviceMap.set(info.uri, {
-                                ...info,
-                                room: roomEntry.name,
-                                floor: defaultFloor.name,
-                                building: buildingEntry.name,
-                            });
-                            this.logger.debug(`Device "${info.label}" (${info.uri}) → physAddr: ${info.physAddr}, manufacturer: ${info.manufacturer}`);
+                            const deviceUri = eQuad.object.value.split('#').pop();
+                            if (deviceMap.has(deviceUri)) {
+                                const info = deviceMap.get(deviceUri);
+                                roomEntry.devices.push(info);
+                                deviceMap.set(info.uri, {
+                                    ...info,
+                                    room: roomEntry.name,
+                                    floor: defaultFloor.name,
+                                    building: buildingEntry.name,
+                                });
+                                this.logger.debug(`  Device in room: "${info.label}" (${info.uri})`);
+                            }
                         }
 
                         roomEntry.devices.sort((a, b) => this.#sortPhys(a.physAddr, b.physAddr));
@@ -323,7 +345,7 @@ export class TTLLoader {
             topology.buildings.push(buildingEntry);
         }
 
-        this.logger.info(`TTL Parse Summary: ${buildingCount} buildings, ${floorCount} floors, ${roomCount} rooms, ${deviceCount} devices found`);
+        this.logger.info(`TTL Parse Summary: ${buildingCount} buildings, ${floorCount} floors, ${roomCount} rooms, ${deviceMap.size} devices found`);
 
         const groupAddresses = [];
 
