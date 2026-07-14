@@ -1,22 +1,29 @@
 # DATABASE MANAGEMENT API
 
-**Feature Documentation & Implementation Guide**
+**Feature Documentation & Implementation Guide — Operational Focus**
 
-Version: 1.3
+Version: 1.4
 Status: ✅ Implemented & Tested / Ready for Production
-Date: 2026-07-10
+Date: 2026-07-14
 
 ---
 
 ## 📋 Overview
 
-This document describes the planned **Database Management API** for the Semantic KNX Runtime Engine. It provides:
+This document describes the **Database Management API** for the Semantic KNX Runtime Engine from an **operational perspective**. It provides:
 
 1. **Database Statistics Endpoint** — Real-time metrics on database size, element counts, and time coverage
 2. **Cleanup & Maintenance Endpoints** — Safe data retention and archival operations
 3. **Monitoring & Reporting** — History of cleanup operations and database health
 
 This is a **vendor extension** not defined in the KNX IoT specification, registered under `/api/v2/database/...`.
+
+### Complementary Documentation
+
+- **[DATAPOINT_EVENT_MANAGER.md](./DATAPOINT_EVENT_MANAGER.md)** — Developer-focused storage orchestration layer design
+  - Explains how telegrams are persisted (transaction model, retry logic)
+  - API surface for querying historical data programmatically
+  - Integration with StateEngine and DAOs
 
 ---
 

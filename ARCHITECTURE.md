@@ -36,6 +36,18 @@ The engine is built as a single Node.js process, structured in four clearly sepa
 │  └──────────────────────────────────────────────┘   │
 │                                                     │
 │  ┌──────────────────────────────────────────────┐   │
+│  │ Storage Orchestration Layer                  │   │
+│  │  DatapointEventManager                       │   │
+│  │  (Transaction Coordinator & Metrics)         │   │
+│  └──────────────────────────────────────────────┘   │
+│                │         │           │              │
+│                ▼         ▼           ▼              │
+│  ┌──────────────────────────────────────────────┐   │
+│  │ Storage Layer (DAOs)                         │   │
+│  │  EventStore · StateStore · DptHistory        │   │
+│  └──────────────────────────────────────────────┘   │
+│                                                     │
+│  ┌──────────────────────────────────────────────┐   │
 │  │ API Layer                                    │   │
 │  │  KNX IoT REST API · WebSocket · MQTT         │   │
 │  └──────────────────────────────────────────────┘   │
@@ -55,13 +67,13 @@ The engine is built as a single Node.js process, structured in four clearly sepa
 
 Handles all communication with the physical KNX/IP interface.
 
-- **Tunnel Manager** — manages the KNXnet/IP tunnelling connection via [KNXUltimate](https://github.com/Supergiovane/KNXUltimate), included as an npm dependency running directly in the same Node.js process. Handles connection lifecycle, reconnect logic, and send/receive of raw telegrams.
+- **Tunnel Manager** — manages the KNXnet/IP tunneling connection via [KNXUltimate](https://github.com/Supergiovane/KNXUltimate), included as a npm dependency running directly in the same Node.js process. Handles connection lifecycle, reconnect logic, and send/receive of raw telegrams.
 - **Telegram Decoder** — parses incoming L_DATA frames and extracts group address, APCI, and raw payload.
 - **DPT Decoder** — decodes raw payloads to typed values according to the datapoint type (DPT) defined in the semantic model.
 
-> **Note on KNXnet/IP Tunnelling vs. Routing**
+> **Note on KNXnet/IP Tunneling vs. Routing**
 >
-> The engine uses KNXnet/IP Tunnelling exclusively. Tunnelling operates over unicast UDP and uses `TUNNELLING_ACK` at the IP protocol level for per-frame acknowledgement. This is distinct from L_DATA.con, which is a TP bus-level primitive. KNXnet/IP Routing (UDP Multicast) is not used — it is fire-and-forget with no IP-level acknowledgement and requires a KNX IP Router on the installation, which is not assumed here.
+> The engine uses KNXnet/IP Tunneling exclusively. Tunneling operates over unicast UDP and uses `TUNNELLING_ACK` at the IP protocol level for per-frame acknowledgement. This is distinct from L_DATA.con, which is a TP bus-level primitive. KNXnet/IP Routing (UDP Multicast) is not used — it is fire-and-forget with no IP-level acknowledgement and requires a KNX IP Router on the installation, which is not assumed here.
 
 ---
 
@@ -238,6 +250,22 @@ Links a subscription to the node (at most one per subscription).
 | `node_id` | `TEXT` | Node UUID |
 | `expand` | `BOOLEAN` | If true, include all installations hosted at the node |
 
+#### `audit_events` — Audit Trail (TimescaleDB Hypertable)
+
+Immutable log of all datapoint event processing operations. Populated by the `DatapointEventManager` during telegram ingestion.
+
+| Column | Type | Description |
+|--------|------|-------------|
+| `ts` | `TIMESTAMPTZ` | Event timestamp (partition key) |
+| `event_type` | `TEXT` | Event type (`telegram_processed`, `state_updated`, `error`, `retry`) |
+| `datapoint_id` | `TEXT` | Affected datapoint UUID (nullable if GA unresolved) |
+| `ga` | `TEXT` | KNX group address (nullable) |
+| `data` | `JSONB` | Full event payload (telegram + metadata) |
+
+Index on `(datapoint_id, ts DESC)` and `(event_type, ts DESC)`.
+
+---
+
 #### `subscription_events` — TimescaleDB Hypertable
 
 Delivery log for outbound subscription notifications. Partitioned by day.
@@ -292,7 +320,7 @@ The engine initializes its components in a fixed order to ensure each layer has 
 
 3. KNX Runtime Layer
    └── Tunnel Manager (KNXUltimate) — opens KNXnet/IP tunnelling connection to KNX/IP interface
-   └── Telegram Decoder            — begins listening for incoming L_DATA frames
+   └── Telegram Decoder             — begins listening for incoming L_DATA frames
 
 4. API Layer
    └── REST API server             — binds to API_PORT, all endpoints become available
@@ -450,3 +478,11 @@ Telegram history is an append-only, time-indexed workload. TimescaleDB hypertabl
 For detailed guidance on API response formatting, timestamp conventions, and field naming across both spec-compliant and vendor endpoints, see:
 
 - [**API Timestamp Convention**](./docs/API_TIMESTAMP_CONVENTION.md) — KNX Spec endpoints (UTC only) vs. Vendor extensions (dual local + ISO)
+
+---
+
+## Storage Orchestration Layer
+
+The **DatapointEventManager** provides a unified abstraction for persisting incoming KNX telegrams with full semantic context and transaction support. For detailed architecture, API design, and implementation guidance, see:
+
+- [**DatapointEventManager Design**](./docs/DATAPOINT_EVENT_MANAGER.md) — Storage orchestration layer specification
