@@ -3,7 +3,7 @@
 ## 1. Purpose
 
 This document specifies the design and implementation of optional **KNX
-IP Secure** support for the KNX Runtime Engine. The objective is to
+IP Secure** support for the KNX Runtime Engine. The goal is to
 extend the existing `TunnelManager` without affecting the application
 logic or existing KNX/IP functionality.
 
@@ -35,7 +35,7 @@ The implementation shall:
 -   require no modifications to the StateEngine
 -   require no modifications to the TelegramDecoder
 -   require no modifications to the TelegramQueue
--   allow switching between Classic and Secure by configuration only
+-   it allows switching between Classic and Secure by configuration only
 -   remain fully backward compatible
 
 ------------------------------------------------------------------------
@@ -120,7 +120,7 @@ The existing runtime behaviour shall remain unchanged.
 
 ## 8. KNXUltimate Integration
 
-When Secure mode is enabled the following options shall be configured:
+When Secure mode is enabled, the following options shall be configured:
 
 -   `isSecureKNXEnabled`
 -   `secureTunnelConfig`
