@@ -59,10 +59,15 @@ check_api() {
 # Get OAuth access token
 get_access_token() {
     local scope="$1"
-    local response=$(curl -sf -X POST "$API_URL/oauth/access" \
+    local response
+
+    response=$(curl -sf -X POST "$API_URL/oauth/access" \
         -H 'Content-Type: application/x-www-form-urlencoded' \
         -u "$OAUTH_CLIENT:$OAUTH_SECRET" \
-        -d "grant_type=client_credentials&scope=$scope")
+        -d "grant_type=client_credentials&scope=$scope") || {
+        error "Failed to fetch OAuth token"
+        return 1
+    }
 
     echo "$response" | jq -r '.access_token'
 }
