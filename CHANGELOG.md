@@ -9,6 +9,50 @@ Unreleased
 ----------
 
 ### Added
+- **KNX IP Secure Tunneling Integration** — Enterprise-grade encrypted KNX communication:
+  
+  **Architecture & Security:**
+  - Full support for KNX IP Secure (encrypted, authenticated tunneling per spec KNX/IP 1.0a §3.9)
+  - Delegation of all cryptographic work to KNXUltimate library (KNXClient handles a secure session establishment)
+  - Environment variable-based mode selection: `KNX_SECURE=true/false` for zero-code switching
+  
+  **TunnelOptions Module** (`src/knx/tunnel-options.js`):
+  - `createTunnelOptions(logger)` function evaluates `KNX_SECURE`, `KNX_HOST_PROTOCOL`, `KNX_KEYRING_FILE`, `KNX_KEYRING_PASSWORD`
+  - **Classic Mode (default)**: No behavioral change, fully backward compatible
+  - **Secure Mode**: Requires an ETS keyring file and password; forces TunnelTCP transport
+  - Fail-fast validation: errors are thrown immediately if required env vars are missing /invalid (before a connection attempt)
+  - Returns fully initialized KNXClient options object ready for a tunnel establishment
+  
+  **Integration with TunnelManager:**
+  - `tunnel-manager.js` calls `createTunnelOptions()` in `connect()` method (line 61)
+  - Automatic mode detection logged on connection: "Classic (TunnelUDP)" or "Secure (TunnelTCP)"
+  - The success message differs for Secure: "✅ KNX connected — Secure session established" vs. "KNX connected"
+  - All reconnection logic (health check, queue processing) works identically in both modes
+  
+  **Environment Variables:**
+  - `KNX_SECURE`: Set to `true` to enable KNX IP Secure (default: `false`)
+  - `KNX_HOST_PROTOCOL`: Transport protocol (`TunnelUDP` or `TunnelTCP`, default: `TunnelUDP`)
+  - `KNX_KEYRING_FILE`: Path to ETS keyring file (`.knxkeys`) — required if `KNX_SECURE=true`
+  - `KNX_KEYRING_PASSWORD`: Password protecting the keyring — required if `KNX_SECURE=true`
+  - All documented in updated `env.example`
+  
+  **Documentation:**
+  - Comprehensive integration specification in `docs/specifications/KNX_IP_Secure_Integration_Specification.md`
+  - Architecture overview, spec references, implementation details, and security rationale
+  - Configuration troubleshooting guide and operational runbook
+  
+  **Testing:**
+  - Unit tests in `test/unit/test-tunnel-options.js` covering mode selection, validation, and error handling
+  - Integration tests in `test/integration/knx-secure.test.sh` for end-to-end connectivity
+  - Test utilities and scripts in `scripts/run-unit-tests.sh` and `scripts/test-knx-secure-integration.sh`
+  
+  **Benefits:**
+  - ✅ Enterprise-ready security for sensitive KNX deployments
+  - ✅ Zero-breaking-change adoption: existing classic deployments unaffected
+  - ✅ Seamless mode switching via environment variables (no code changes)
+  - ✅ Full reuse of reconnection resilience (auto-reconnect, queue, health check) in both modes
+  - ✅ Fail-fast validation prevents runtime connection failures
+  
 - **TTL Loader Topology Enhancements** — Improved RDF parsing and device organization (since July 9):
   - **Enhanced Floor & Room Handling**: Automatic fallback for non-hierarchical structures (Building → Room without Floor)
   - **Device Collection Improvements**: More robust device URI extraction and context tracking
