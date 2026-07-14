@@ -1,0 +1,190 @@
+#!/usr/bin/env bash
+
+# support user renaming of script
+SCRIPT=$(basename "$0")
+
+# should not run as root
+[ "$EUID" -eq 0 ] && echo "$SCRIPT should NOT be run using sudo" && exit 1
+
+# assumptions that can be overridden
+IOTSTACK=${IOTSTACK:-"$HOME/IOTstack"}
+
+# the project name is the all-lower-case form of the folder name
+PROJECT=$(basename ${IOTSTACK,,})
+
+# useful function
+isStackUp() {
+   if COUNT=$( \
+      curl -s --unix-socket /var/run/docker.sock http://localhost/containers/json | \
+      jq -c ".[].Labels.\"com.docker.compose.project\"" | \
+      grep -c "\"$1\"$" \
+   ) ; then
+      if [ $COUNT -gt 0 ] ; then
+         return 0
+      fi
+   fi
+   return 1
+}
+
+USAGE=0
+
+case "$#" in
+
+  0 )
+    RUNTAG=${1:-$(date +"%Y-%m-%d_%H%M").$HOSTNAME}
+    BY_HOST_DIR=$HOSTNAME
+    ;;
+
+  1 )
+    # anything that looks like an option (- -h --help)?
+    if [ ${1::1} == "-" ] ; then
+       USAGE=1
+    else
+       RUNTAG="$1"
+       BY_HOST_DIR=$HOSTNAME
+    fi
+    ;;
+
+  2 )
+    RUNTAG="$1"
+    BY_HOST_DIR="$2"
+    ;;
+
+  *)
+    USAGE=1
+    ;;
+
+esac
+
+if [ $USAGE -ne 0 ] ; then
+   echo "Usage: $SCRIPT {runtag} {by_host_dir}"
+   echo "where:"
+   echo "  runtag defaults to $(date +"%Y-%m-%d_%H%M").$HOSTNAME)"
+   echo "  by_host_dir defaults to $HOSTNAME"
+   exit 1
+fi
+
+# check dependencies
+if [ -z "$(which shyaml)" -o -z "$(which curl)" -o -z "$(which jq)" ] ; then
+   echo "Missing dependencies. Please re-run install_scripts.sh."
+   exit 1
+fi
+
+# the configuration file is at
+CONFIG_YML="$HOME/.config/iotstack_backup/config.yml"
+
+# does the configuration file exist?
+if [ -e "$CONFIG_YML" ] ; then
+   CLOUD_METHOD=$(shyaml get-value backup.method  < "$CONFIG_YML")
+   CLOUD_PREFIX=$(shyaml get-value backup.prefix  < "$CONFIG_YML")
+   CLOUD_OPTIONS=$(shyaml -q get-value backup.options  < "$CONFIG_YML")
+   LOCAL_RETAIN=$(shyaml get-value backup.retain  < "$CONFIG_YML")
+else
+   echo "Warning: Configuration file not found: $CONFIG_YML"
+fi
+
+# apply defaults if not set from configuration file
+CLOUD_METHOD=${CLOUD_METHOD:-"SCP"}
+CLOUD_PREFIX=${CLOUD_PREFIX:-"myuser@myhost.mydomain.com:/path/to/backup/directory/on/myhost"}
+LOCAL_RETAIN=${LOCAL_RETAIN:-"8"}
+
+# form the cloud path
+CLOUD_PATH="$CLOUD_PREFIX/$BY_HOST_DIR"
+
+# assumptions
+BACKUPSDIR="$IOTSTACK/backups"
+COMPOSENAME="docker-compose.yml"
+COMPOSE="$IOTSTACK/$COMPOSENAME"
+LOGNAME="backup-log"
+LOGFILE="$RUNTAG.$LOGNAME.txt"
+
+# check the key assumptions
+if ! [ -d "$IOTSTACK" -a -e "$COMPOSE" ] ; then
+   echo "Error: One of the following does not exist:"
+   echo "   $IOTSTACK"
+   echo "   $COMPOSE"
+   echo "This may indicate a problem with your installation."
+   exit 1
+fi
+
+# check IOTstack seems to be running
+if ! isStackUp "$PROJECT" ; then
+   echo "Warning: $PROJECT does not seem to be running. The general backup"
+   echo "         will work but backups for database and other special-case"
+   echo "         containers will be skipped."
+fi
+
+# make sure the backups directory exists, has correct ownership & mode
+[ -d "$BACKUPSDIR" ] || mkdir -m 755 -p "$BACKUPSDIR"
+[ $(stat -c "%U:%G" "$BACKUPSDIR") = "$USER:$USER" ] || sudo chown $USER:$USER "$BACKUPSDIR"
+[ $(stat -c "%a" "$BACKUPSDIR") = "755" ] || sudo chmod 755 "$BACKUPSDIR"
+
+# move into the backups directory
+cd "$BACKUPSDIR"
+
+# ensure that the log exists and redirect to it
+touch "$LOGFILE"
+exec >> "$LOGFILE"
+exec 2>> "$LOGFILE"
+
+echo "----- Starting $SCRIPT at $(date) -----"
+echo "       RUNTAG = $RUNTAG"
+echo " CLOUD_METHOD = $CLOUD_METHOD"
+echo "CLOUD_OPTIONS = $CLOUD_OPTIONS"
+echo " CLOUD_PREFIX = $CLOUD_PREFIX"
+echo "   CLOUD_PATH = $CLOUD_PATH"
+echo ""
+
+# record images in use (ukkopahis suggestion on Discord)
+docker image ls --all --digests --no-trunc
+
+# perform the backups
+iotstack_backup_general "$BACKUPSDIR" "$RUNTAG"
+iotstack_backup_influxdb "$BACKUPSDIR" "$RUNTAG"
+iotstack_backup_influxdb2 "$BACKUPSDIR" "$RUNTAG"
+iotstack_backup_nextcloud "$BACKUPSDIR" "$RUNTAG"
+iotstack_backup_mariadb "$BACKUPSDIR" "$RUNTAG"
+iotstack_backup_postgres "$BACKUPSDIR" "$RUNTAG"
+iotstack_backup_wordpress "$BACKUPSDIR" "$RUNTAG"
+iotstack_backup_gitea "$BACKUPSDIR" "$RUNTAG"
+
+# copy the files (keep in mind that log entries written after the
+# log is copied to the remote will only be in the local log).
+case "$CLOUD_METHOD" in
+
+  "RCLONE" )
+    rclone sync -v $CLOUD_OPTIONS \
+       "$BACKUPSDIR" \
+       "$CLOUD_PATH" \
+       --exclude "$LOGFILE" \
+       --exclude "influxdb/**"
+    ;;
+
+  "RSYNC" )
+    # note that the slash after "$BACKUPSDIR" is required!
+    rsync -vrt $CLOUD_OPTIONS --delete \
+      --exclude="$LOGFILE" \
+      --exclude=influxdb \
+      "$BACKUPSDIR"/ \
+      "$CLOUD_PATH"
+    ;;
+
+  "SCP" )
+    scp $CLOUD_OPTIONS "$RUNTAG".* "$CLOUD_PATH"
+    ;;
+
+  *)
+    echo "Warning: $CLOUD_METHOD backup method is not supported"
+    echo "Warning: The only backup files are the ones in $BACKUPSDIR"
+    ;;
+
+esac
+
+# cleanup: containers - "influx" not "influxdb" - then logs as a special case
+for C in "general" "influx" "influxdb2" "nextcloud" "mariadb" "postgres" "wordpress"; do
+   ls -t1 *."$C-backup".* 2>/dev/null | tail -n +$LOCAL_RETAIN | xargs rm -f
+done
+ls -t1 *."$LOGNAME".* 2>/dev/null | tail -n +$LOCAL_RETAIN | xargs rm -f
+
+
+echo "----- Finished $SCRIPT at $(date) -----"
