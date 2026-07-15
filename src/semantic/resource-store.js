@@ -160,9 +160,7 @@ export class ResourceStore {
         const locations = await this.getResourcesByType('location');
 
         // Build hierarchy tree
-        const tree = this.buildHierarchyTree(locations);
-
-        return tree;
+        return this.buildHierarchyTree(locations);
     }
 
     /**
