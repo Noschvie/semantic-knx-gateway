@@ -454,11 +454,11 @@ export class PostgresClient {
             await client.query('BEGIN');
             return {
                 query: (text, params) => client.query(text, params),
-                commit: async () => {
+                commit: async() => {
                     await client.query('COMMIT');
                     client.release();
                 },
-                rollback: async () => {
+                rollback: async() => {
                     await client.query('ROLLBACK');
                     client.release();
                 },
