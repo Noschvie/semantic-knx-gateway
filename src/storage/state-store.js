@@ -13,7 +13,7 @@ export class StateStore {
     /**
      * Normalize a value from DB – convert Buffer-objects to hex strings
      */
-    normalizeValue(value) {
+    #normalizeValue(value) {
         if (value === null || value === undefined) return value;
         if (typeof value === 'object' && value.type === 'Buffer' && Array.isArray(value.data)) {
             return Buffer.from(value.data).toString('hex');
@@ -196,7 +196,7 @@ export class StateStore {
             datapointId: row.datapoint_id,
             ga: row.ga,
             name: row.name ?? null,
-            value: this.normalizeValue(row.value),
+            value: this.#normalizeValue(row.value),
             dpt: row.dpt,
             updatedAt: row.updated_at,
             source: row.source,
