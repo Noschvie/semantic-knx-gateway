@@ -40,7 +40,7 @@ export class DptHistoryManager {
             );
 
             this.logger.info(
-                `[DPT Change] GA ${ga}: ${oldDpt || 'none'} → ${newDpt} (${changedBy})`
+                `[DPT Change] GA ${ga}: ${oldDpt || 'none'} → ${newDpt} (${changedBy})`,
             );
         } catch (error) {
             this.logger.error(`[DPT History] Failed to log change for ${ga}:`, error.message);

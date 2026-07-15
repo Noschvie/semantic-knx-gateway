@@ -31,7 +31,7 @@ export class StatisticsStore {
             const result = await this.db.query('SELECT COUNT(*) as count FROM knx_events');
             return this.#parseInt(result.rows[0].count);
         } catch (err) {
-            this.logger.error('Failed to get total event count', {error: err.message});
+            this.logger.error('Failed to get total event count', { error: err.message });
             return 0;
         }
     }
@@ -45,7 +45,7 @@ export class StatisticsStore {
             const result = await this.db.query('SELECT COUNT(*) as count FROM current_state');
             return this.#parseInt(result.rows[0].count);
         } catch (err) {
-            this.logger.error('Failed to get total state count', {error: err.message});
+            this.logger.error('Failed to get total state count', { error: err.message });
             return 0;
         }
     }
@@ -59,7 +59,7 @@ export class StatisticsStore {
             const result = await this.db.query('SELECT COUNT(*) as count FROM datapoint_mappings');
             return this.#parseInt(result.rows[0].count);
         } catch (err) {
-            this.logger.error('Failed to get total mapping count', {error: err.message});
+            this.logger.error('Failed to get total mapping count', { error: err.message });
             return 0;
         }
     }
@@ -73,7 +73,7 @@ export class StatisticsStore {
             const result = await this.db.query('SELECT COUNT(*) as count FROM semantic_resources');
             return this.#parseInt(result.rows[0].count);
         } catch (err) {
-            this.logger.error('Failed to get total resource count', {error: err.message});
+            this.logger.error('Failed to get total resource count', { error: err.message });
             return 0;
         }
     }
@@ -87,7 +87,7 @@ export class StatisticsStore {
             const result = await this.db.query('SELECT COUNT(DISTINCT ga) as count FROM current_state');
             return this.#parseInt(result.rows[0].count);
         } catch (err) {
-            this.logger.error('Failed to get unique GA count', {error: err.message});
+            this.logger.error('Failed to get unique GA count', { error: err.message });
             return 0;
         }
     }
@@ -108,8 +108,8 @@ export class StatisticsStore {
                 latest: result.rows[0]?.latest || null,
             };
         } catch (err) {
-            this.logger.error('Failed to get event timeline', {error: err.message});
-            return {oldest: null, latest: null};
+            this.logger.error('Failed to get event timeline', { error: err.message });
+            return { oldest: null, latest: null };
         }
     }
 
@@ -122,7 +122,7 @@ export class StatisticsStore {
             const result = await this.db.query('SELECT pg_size_pretty(pg_database_size(current_database())) as size');
             return result.rows[0]?.size || 'N/A';
         } catch (err) {
-            this.logger.error('Failed to get database size', {error: err.message});
+            this.logger.error('Failed to get database size', { error: err.message });
             return 'N/A';
         }
     }
@@ -159,7 +159,7 @@ export class StatisticsStore {
                 currentValue: row.current_value,
             }));
         } catch (err) {
-            this.logger.error('Failed to get top active group addresses', {error: err.message});
+            this.logger.error('Failed to get top active group addresses', { error: err.message });
             return [];
         }
     }
@@ -182,8 +182,8 @@ export class StatisticsStore {
                 affectedGAs: this.#parseInt(result.rows[0]?.affected_gas || 0),
             };
         } catch (err) {
-            this.logger.error('Failed to get orphaned states info', {error: err.message});
-            return {count: 0, affectedGAs: 0};
+            this.logger.error('Failed to get orphaned states info', { error: err.message });
+            return { count: 0, affectedGAs: 0 };
         }
     }
 
@@ -202,7 +202,7 @@ export class StatisticsStore {
             `);
             return this.#parseInt(result.rows[0]?.duplicate_count || 0);
         } catch (err) {
-            this.logger.error('Failed to get duplicate GA count', {error: err.message});
+            this.logger.error('Failed to get duplicate GA count', { error: err.message });
             return 0;
         }
     }
@@ -222,7 +222,7 @@ export class StatisticsStore {
             `);
             return this.#parseInt(result.rows[0]?.count || 0);
         } catch (err) {
-            this.logger.error('Failed to get stale mapping count', {error: err.message});
+            this.logger.error('Failed to get stale mapping count', { error: err.message });
             return 0;
         }
     }
@@ -246,7 +246,7 @@ export class StatisticsStore {
             const staleCount = await this.getStaleMappingCount();
             return Math.round(((totalMappings - staleCount) / totalMappings) * 100);
         } catch (err) {
-            this.logger.error('Failed to calculate data integrity score', {error: err.message});
+            this.logger.error('Failed to calculate data integrity score', { error: err.message });
             return 0;
         }
     }
@@ -316,10 +316,10 @@ export class StatisticsStore {
                 dbSize: dbSize.rows[0]?.size || 'N/A',
             };
         } catch (err) {
-            this.logger.error('Failed to get all stats', {error: err.message});
+            this.logger.error('Failed to get all stats', { error: err.message });
             return {
-                counts: {events: 0, states: 0, datapointMappings: 0, semanticResources: 0},
-                eventRange: {firstEvent: null, lastEvent: null},
+                counts: { events: 0, states: 0, datapointMappings: 0, semanticResources: 0 },
+                eventRange: { firstEvent: null, lastEvent: null },
                 topGroupAddresses: [],
                 dbSize: 'N/A',
             };
@@ -370,8 +370,8 @@ export class StatisticsStore {
                 byType: byType.rows,
             };
         } catch (err) {
-            this.logger.error('Failed to get event statistics', {error: err.message});
-            return {summary: {}, hourly: [], byType: []};
+            this.logger.error('Failed to get event statistics', { error: err.message });
+            return { summary: {}, hourly: [], byType: [] };
         }
     }
 
@@ -413,8 +413,8 @@ export class StatisticsStore {
                 byDpt: byDpt.rows,
             };
         } catch (err) {
-            this.logger.error('Failed to get state statistics', {error: err.message});
-            return {summary: {}, byDpt: []};
+            this.logger.error('Failed to get state statistics', { error: err.message });
+            return { summary: {}, byDpt: [] };
         }
     }
 
@@ -457,7 +457,7 @@ export class StatisticsStore {
                 dpt: row.dpt,
             }));
         } catch (err) {
-            this.logger.error('Failed to get top active datapoints', {error: err.message});
+            this.logger.error('Failed to get top active datapoints', { error: err.message });
             return [];
         }
     }
@@ -525,7 +525,7 @@ export class StatisticsStore {
                     : 100,
             };
         } catch (err) {
-            this.logger.error('Failed to get health check details', {error: err.message});
+            this.logger.error('Failed to get health check details', { error: err.message });
             return {
                 orphanedCount: 0,
                 orphanedGAs: 0,
@@ -581,8 +581,8 @@ export class StatisticsStore {
                 })),
             };
         } catch (err) {
-            this.logger.error('Failed to get detailed orphaned states', {error: err.message});
-            return {totalOrphaned: 0, states: []};
+            this.logger.error('Failed to get detailed orphaned states', { error: err.message });
+            return { totalOrphaned: 0, states: [] };
         }
     }
 
@@ -625,8 +625,8 @@ export class StatisticsStore {
                 })),
             };
         } catch (err) {
-            this.logger.error('Failed to get detailed duplicate GAs', {error: err.message});
-            return {totalDuplicateGAs: 0, duplicates: []};
+            this.logger.error('Failed to get detailed duplicate GAs', { error: err.message });
+            return { totalDuplicateGAs: 0, duplicates: [] };
         }
     }
 
@@ -671,8 +671,8 @@ export class StatisticsStore {
                 })),
             };
         } catch (err) {
-            this.logger.error('Failed to get detailed stale mappings', {error: err.message});
-            return {totalStale: 0, mappings: []};
+            this.logger.error('Failed to get detailed stale mappings', { error: err.message });
+            return { totalStale: 0, mappings: [] };
         }
     }
 
@@ -785,7 +785,7 @@ export class StatisticsStore {
                 },
             };
         } catch (err) {
-            this.logger.error('Failed to get anomalies', {error: err.message, dpt, delta});
+            this.logger.error('Failed to get anomalies', { error: err.message, dpt, delta });
             return {
                 meta: { collection: { total: 0, returned: 0 }, query: { dpt, delta } },
                 data: [],
@@ -905,7 +905,7 @@ export class StatisticsStore {
                 },
             };
         } catch (err) {
-            this.logger.error('Failed to get NULL patterns', {error: err.message, dpts});
+            this.logger.error('Failed to get NULL patterns', { error: err.message, dpts });
             return {
                 meta: { period_hours: 24 },
                 temporal_patterns: { description: '', synchronized: false, pattern: [] },
@@ -1066,7 +1066,7 @@ export class StatisticsStore {
                 },
             };
         } catch (err) {
-            this.logger.error('Failed to get datapoint summary', {error: err.message, datapointId});
+            this.logger.error('Failed to get datapoint summary', { error: err.message, datapointId });
             return null;
         }
     }

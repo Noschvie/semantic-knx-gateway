@@ -78,7 +78,7 @@ export function createTunnelOptions(logger) {
 
         if (logger) {
             logger.info(
-                `KNX connection mode: Classic (${options.hostProtocol}) → ${options.ipAddr}:${options.ipPort}`
+                `KNX connection mode: Classic (${options.hostProtocol}) → ${options.ipAddr}:${options.ipPort}`,
             );
         }
 
@@ -91,12 +91,12 @@ export function createTunnelOptions(logger) {
 
     if (!keyringFile) {
         throw new Error(
-            'KNX_SECURE=true requires KNX_KEYRING_FILE (path to the exported ETS .knxkeys file) to be set.'
+            'KNX_SECURE=true requires KNX_KEYRING_FILE (path to the exported ETS .knxkeys file) to be set.',
         );
     }
     if (!keyringPassword) {
         throw new Error(
-            'KNX_SECURE=true requires KNX_KEYRING_PASSWORD (password protecting the Keyring) to be set.'
+            'KNX_SECURE=true requires KNX_KEYRING_PASSWORD (password protecting the Keyring) to be set.',
         );
     }
     if (!fs.existsSync(keyringFile)) {
@@ -107,7 +107,7 @@ export function createTunnelOptions(logger) {
     if (hostProtocol !== 'TunnelTCP') {
         if (logger) {
             logger.warn(
-                `KNX_HOST_PROTOCOL="${hostProtocol}" is not valid together with KNX_SECURE=true, forcing "TunnelTCP".`
+                `KNX_HOST_PROTOCOL="${hostProtocol}" is not valid together with KNX_SECURE=true, forcing "TunnelTCP".`,
             );
         }
         hostProtocol = 'TunnelTCP';
@@ -125,7 +125,7 @@ export function createTunnelOptions(logger) {
 
     if (logger) {
         logger.info(
-            `KNX connection mode: Secure (${options.hostProtocol}) → ${options.ipAddr}:${options.ipPort}, keyring="${keyringFile}"`
+            `KNX connection mode: Secure (${options.hostProtocol}) → ${options.ipAddr}:${options.ipPort}, keyring="${keyringFile}"`,
         );
     }
 

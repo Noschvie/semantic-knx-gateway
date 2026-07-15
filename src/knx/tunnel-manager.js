@@ -70,7 +70,7 @@ export class TunnelManager {
 
         this.logger.info(
             `Connecting to KNX Gateway at ${options.ipAddr}:${options.ipPort} ` +
-            `(${options.hostProtocol}${options.isSecureKNXEnabled ? ', Secure' : ''})`
+            `(${options.hostProtocol}${options.isSecureKNXEnabled ? ', Secure' : ''})`,
         );
 
         return new Promise((resolve, reject) => {
@@ -415,13 +415,13 @@ export class TunnelManager {
             } catch (err) {
                 failureCount++;
                 this.logger.error(
-                    `Failed to send queued telegram to ${telegram.groupAddress}: ${err.message}`
+                    `Failed to send queued telegram to ${telegram.groupAddress}: ${err.message}`,
                 );
             }
         }
 
         this.logger.info(
-            `✅ Queue processing complete: ${successCount} sent, ${failureCount} failed`
+            `✅ Queue processing complete: ${successCount} sent, ${failureCount} failed`,
         );
     }
 
