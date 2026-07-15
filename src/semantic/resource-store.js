@@ -17,55 +17,52 @@ export class ResourceStore {
     async storeGraph(graph) {
         this.logger.info('Storing semantic graph in database...');
 
-        const client = await this.db.getClient();
+        // Begin a transaction and return a transaction context
+        const txn = await this.db.beginTransaction();
 
         try {
-            await client.query('BEGIN');
-
             // Store locations
             for (const location of graph.locations) {
-                await this.storeResource(client, location);
+                await this.#storeResource(txn, location);
             }
 
             // Store devices
             for (const device of graph.devices) {
-                await this.storeResource(client, device);
+                await this.#storeResource(txn, device);
             }
 
             // Store functions
             for (const func of graph.functions) {
-                await this.storeResource(client, func);
+                await this.#storeResource(txn, func);
             }
 
             // Store datapoints
             for (const datapoint of graph.datapoints) {
-                await this.storeResource(client, datapoint);
+                await this.#storeResource(txn, datapoint);
             }
 
             // Store group addresses
             for (const ga of graph.groupAddresses) {
-                await this.storeResource(client, ga);
+                await this.#storeResource(txn, ga);
             }
 
             // Store relationships
-            await this.storeRelationships(client, graph.relationships);
+            await this.#storeRelationships(txn, graph.relationships);
 
-            await client.query('COMMIT');
+            await txn.commit();
 
             this.logger.info('✅ Semantic graph stored successfully');
         } catch (error) {
-            await client.query('ROLLBACK');
+            await txn.rollback();
             this.logger.error('Failed to store semantic graph:', error);
             throw error;
-        } finally {
-            client.release();
         }
     }
 
     /**
      * Store a single resource
      */
-    async storeResource(client, resource) {
+    async #storeResource(txn, resource) {
         const query = `
       INSERT INTO semantic_resources (id, type, resource, updated_at)
       VALUES ($1, $2, $3, NOW())
@@ -75,7 +72,7 @@ export class ResourceStore {
         updated_at = NOW()
     `;
 
-        await client.query(query, [
+        await txn.query(query, [
             resource.id,
             resource.type,
             JSON.stringify(resource),
@@ -85,7 +82,7 @@ export class ResourceStore {
     /**
      * Store relationships
      */
-    async storeRelationships(client, relationships) {
+    async #storeRelationships(txn, relationships) {
         for (const rel of relationships) {
             const insertQuery = `
                 INSERT INTO semantic_relationships (subject, predicate, object)
@@ -93,7 +90,7 @@ export class ResourceStore {
                 ON CONFLICT DO NOTHING
               `;
 
-            await client.query(insertQuery, [rel.subject, rel.predicate, rel.object]);
+            await txn.query(insertQuery, [rel.subject, rel.predicate, rel.object]);
         }
     }
 

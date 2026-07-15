@@ -426,4 +426,39 @@ export class PostgresClient {
     async getClient() {
         return await this.pool.connect();
     }
+
+    /**
+     * Begin a transaction and return a transaction context
+     * Usage:
+     *   const txn = await this.db.beginTransaction();
+     *   try {
+     *       await txn.query('UPDATE ...');
+     *       await txn.query('INSERT ...');
+     *       await txn.commit();
+     *   } catch (err) {
+     *       await txn.rollback();
+     *       throw err;
+     *   }
+     * @returns {Promise<TransactionContext>} Transaction context with query/commit/rollback methods
+     */
+    async beginTransaction() {
+        const client = await this.pool.connect();
+        try {
+            await client.query('BEGIN');
+            return {
+                query: (text, params) => client.query(text, params),
+                commit: async () => {
+                    await client.query('COMMIT');
+                    client.release();
+                },
+                rollback: async () => {
+                    await client.query('ROLLBACK');
+                    client.release();
+                },
+            };
+        } catch (err) {
+            client.release();
+            throw err;
+        }
+    }
 }
