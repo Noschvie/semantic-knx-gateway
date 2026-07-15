@@ -21,22 +21,26 @@ DB_NAME="${POSTGRES_DB:-knxdb}"
 # 3. Fallback to /etc/timezone (Debian/Ubuntu)
 # 4. Last resort: UTC
 detect_timezone() {
+    local tz
+
     if [ -n "$TZ" ]; then
         echo "$TZ"
         return
     fi
+
     if command -v timedatectl >/dev/null 2>&1; then
-        local tz
-        tz="$(timedatectl show -p Timezone --value 2>/dev/null)"
+        tz=$(timedatectl show -p Timezone --value 2>/dev/null) || true
         if [ -n "$tz" ]; then
             echo "$tz"
             return
         fi
     fi
+
     if [ -r /etc/timezone ]; then
         cat /etc/timezone
         return
     fi
+
     echo "UTC"
 }
 

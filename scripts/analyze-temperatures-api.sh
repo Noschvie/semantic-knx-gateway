@@ -83,18 +83,21 @@ api_get() {
 # Portable across Linux, macOS, and Windows (Git Bash/WSL)
 convert_to_local_time() {
     local utc_timestamp="$1"
-    # Remove milliseconds (.XXX) and Z from timestamp
+    local ts_clean
+    local result
+
+    # Remove milliseconds (.XXX) from timestamp
     # Input: 2026-07-14T16:26:14.369Z
     # Output: 2026-07-14 16:26:14 (in local timezone)
-    local ts_clean="${utc_timestamp%.*}"  # Remove .milliseconds part
+    ts_clean="${utc_timestamp%.*}"  # Remove .milliseconds part
 
     # Try different date command variants for portability
-    if date -d "$ts_clean" '+%Y-%m-%d %H:%M:%S' 2>/dev/null; then
-        return 0
-    elif date -jf '%Y-%m-%dT%H:%M:%S' "$ts_clean" '+%Y-%m-%d %H:%M:%S' 2>/dev/null; then
-        return 0
+    if result=$(date -d "$ts_clean" '+%Y-%m-%d %H:%M:%S' 2>/dev/null); then
+        echo "$result"
+    elif result=$(date -jf '%Y-%m-%dT%H:%M:%S' "$ts_clean" '+%Y-%m-%d %H:%M:%S' 2>/dev/null); then
+        echo "$result"
     else
-        # Fallback: use printf/awk (universally available)
+        # Fallback: use awk (universally available)
         echo "$utc_timestamp" | awk -F'[T.Z]' '{printf "%s %s\n", $1, $2}'
     fi
 }
