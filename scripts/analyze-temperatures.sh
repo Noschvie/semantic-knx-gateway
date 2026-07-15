@@ -14,7 +14,33 @@ set -e
 DB_CONTAINER="${DB_CONTAINER:-timescaledb}"
 DB_USER="${POSTGRES_USERNAME:-knxuser}"
 DB_NAME="${POSTGRES_DB:-knxdb}"
-DB_TIMEZONE="${TZ:-UTC}"  # Use TZ environment variable or default to UTC
+
+# Determine local timezone robustly:
+# 1. Explicit override via TZ env var (if the caller set one)
+# 2. System timezone via timedatectl (systemd) – preferred, always present
+# 3. Fallback to /etc/timezone (Debian/Ubuntu)
+# 4. Last resort: UTC
+detect_timezone() {
+    if [ -n "$TZ" ]; then
+        echo "$TZ"
+        return
+    fi
+    if command -v timedatectl >/dev/null 2>&1; then
+        local tz
+        tz="$(timedatectl show -p Timezone --value 2>/dev/null)"
+        if [ -n "$tz" ]; then
+            echo "$tz"
+            return
+        fi
+    fi
+    if [ -r /etc/timezone ]; then
+        cat /etc/timezone
+        return
+    fi
+    echo "UTC"
+}
+
+DB_TIMEZONE="${DB_TIMEZONE:-$(detect_timezone)}"
 
 # Colors for output
 RED='\033[0;31m'
@@ -64,13 +90,20 @@ print_header() {
     echo ""
 }
 
+# Helper to format timestamps: convert to local timezone AND truncate to whole seconds
+# This eliminates sub-second noise in the output while keeping the date/time readable.
+# Usage: ts_local <sql-expression>
+ts_local() {
+    echo "date_trunc('second', ($1) AT TIME ZONE '$DB_TIMEZONE')"
+}
+
 # Main function
 main() {
     echo ""
     echo -e "${BLUE}🌡️  TEMPERATURE DATA ANALYSIS${NC}"
-    echo -e "${BLUE}================================${NC}"
+    echo -e "${BLUE}════════════════════════════════${NC}"
     echo "Timestamp: $(date)"
-    echo "Local Timezone: $DB_TIMEZONE (timestamps displayed in this timezone)"
+    echo "Local Timezone: $DB_TIMEZONE (all timestamps in this timezone, truncated to whole seconds)"
     echo ""
 
     check_container
@@ -84,7 +117,7 @@ main() {
         datapoint_id,
         ga,
         ROUND(value_float::numeric, 2) as temperature_celsius,
-        ts AT TIME ZONE '$DB_TIMEZONE' as last_measurement,
+        $(ts_local ts) as last_measurement,
         ROUND(EXTRACT(EPOCH FROM (NOW() - ts))::numeric, 0)::int as seconds_old
     FROM knx_events
     WHERE dpt = '9.001'
@@ -122,8 +155,8 @@ main() {
         ga,
         COUNT(*) as measurements_24h,
         ROUND(COUNT(*) / 24.0, 1) as average_per_hour,
-        MIN(ts) AT TIME ZONE '$DB_TIMEZONE' as first_measurement,
-        MAX(ts) AT TIME ZONE '$DB_TIMEZONE' as last_measurement
+        $(ts_local "MIN(ts)") as first_measurement,
+        $(ts_local "MAX(ts)") as last_measurement
     FROM knx_events
     WHERE dpt = '9.001' AND ts > NOW() - INTERVAL '24 hours'
     GROUP BY datapoint_id, ga
@@ -140,8 +173,8 @@ main() {
         COUNT(*) as total_measurements,
         COUNT(DISTINCT datapoint_id) as unique_sensors,
         ROUND(AVG(measurements)::numeric, 1) as average_per_sensor,
-        MIN(oldest) AT TIME ZONE '$DB_TIMEZONE' as oldest_measurement,
-        MAX(newest) AT TIME ZONE '$DB_TIMEZONE' as newest_measurement,
+        $(ts_local "MIN(oldest)") as oldest_measurement,
+        $(ts_local "MAX(newest)") as newest_measurement,
         ROUND(EXTRACT(EPOCH FROM (MAX(newest) - MIN(oldest))) / 3600::numeric, 2) as time_span_hours,
         ROUND(EXTRACT(EPOCH FROM (MAX(newest) - MIN(oldest))) / 86400::numeric, 2) as time_span_days
     FROM (
@@ -162,7 +195,7 @@ main() {
 
     run_query "
     SELECT
-        time_bucket('1 hour', ts) AT TIME ZONE '$DB_TIMEZONE' as hour,
+        $(ts_local "time_bucket('1 hour', ts)") as hour,
         COUNT(*) as measurements,
         ROUND(AVG(value_float)::numeric, 2) as average,
         ROUND(MIN(value_float)::numeric, 2) as minimum,
@@ -180,7 +213,7 @@ main() {
 
     run_query "
     SELECT
-        ts AT TIME ZONE '$DB_TIMEZONE' as local_timestamp,
+        $(ts_local ts) as local_timestamp,
         datapoint_id,
         ga,
         ROUND((LAG(value_float) OVER (PARTITION BY datapoint_id ORDER BY ts))::numeric, 2) as previous,
@@ -188,7 +221,7 @@ main() {
         ROUND((value_float - LAG(value_float) OVER (PARTITION BY datapoint_id ORDER BY ts))::numeric, 2) as difference,
         CASE
             WHEN ABS(value_float - LAG(value_float) OVER (PARTITION BY datapoint_id ORDER BY ts)) > 2
-            THEN '⚠️  ANOMALY'
+            THEN '🚨 ANOMALY'
             ELSE 'OK'
         END as status
     FROM knx_events
@@ -208,7 +241,7 @@ main() {
         ROUND(MAX(value_float)::numeric, 2) as max_temperature,
         ROUND(AVG(value_float)::numeric, 2) as average,
         COUNT(*) as measurements,
-        MAX(ts) AT TIME ZONE '$DB_TIMEZONE' as last_measurement
+        $(ts_local "MAX(ts)") as last_measurement
     FROM knx_events
     WHERE dpt = '9.001' AND ts > NOW() - INTERVAL '24 hours'
     GROUP BY datapoint_id, ga
@@ -227,7 +260,7 @@ main() {
         ROUND(MIN(value_float)::numeric, 2) as min_temperature,
         ROUND(AVG(value_float)::numeric, 2) as average,
         COUNT(*) as measurements,
-        MAX(ts) AT TIME ZONE '$DB_TIMEZONE' as last_measurement
+        $(ts_local "MAX(ts)") as last_measurement
     FROM knx_events
     WHERE dpt = '9.001' AND ts > NOW() - INTERVAL '24 hours'
     GROUP BY datapoint_id, ga
@@ -243,7 +276,7 @@ main() {
     SELECT
         datapoint_id,
         ga,
-        MAX(ts) AT TIME ZONE '$DB_TIMEZONE' as last_measurement,
+        $(ts_local "MAX(ts)") as last_measurement,
         ROUND(EXTRACT(EPOCH FROM (NOW() - MAX(ts))) / 3600::numeric, 1) as hours_inactive
     FROM knx_events
     WHERE dpt = '9.001'
@@ -253,12 +286,12 @@ main() {
     " || success "All sensors are active!"
 
     # 10. Detailed chronology of one sensor
-    print_header "🔟 EXAMPLE: CHRONOLOGY OF ONE SENSOR (Last Sensor)"
+    print_header "🔟 EXAMPLE: CHRONOLOGY OF ONE SENSOR (Last 20 Measurements)"
     info "Shows the last 20 measurements of the most active sensor..."
 
     run_query "
     SELECT
-        ts AT TIME ZONE '$DB_TIMEZONE' as local_timestamp,
+        $(ts_local ts) as local_timestamp,
         datapoint_id,
         ga,
         ROUND(value_float::numeric, 2) as temperature,
