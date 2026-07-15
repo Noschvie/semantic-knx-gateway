@@ -151,7 +151,8 @@ async function getDatapointMappings(stateEngine) {
             FROM datapoint_mappings
         `);
         return result.rows ?? [];
-    } catch {
+    } catch (error) {
+        console.error('getDatapointMappings query failed:', error.message);
         return [];
     }
 }
