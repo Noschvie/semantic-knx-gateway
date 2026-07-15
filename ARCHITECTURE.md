@@ -478,6 +478,7 @@ Telegram history is an append-only, time-indexed workload. TimescaleDB hypertabl
 For detailed guidance on API response formatting, timestamp conventions, and field naming across both spec-compliant and vendor endpoints, see:
 
 - [**API Timestamp Convention**](./docs/API_TIMESTAMP_CONVENTION.md) — KNX Spec endpoints (UTC only) vs. Vendor extensions (dual local + ISO)
+- [**Database Query Patterns**](./docs/DATABASE_PATTERNS.md) — Best practices for database access: always use `this.db.query()`, never manual `client.connect()`
 
 ---
 
