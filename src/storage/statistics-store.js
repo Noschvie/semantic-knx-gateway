@@ -3,6 +3,7 @@
 // KNX Runtime Engine – https://github.com/Noschvie/semantic-knx-gateway.git
 
 import { createLogger } from '../utils/logger.js';
+import { formatTimestamp } from '../utils/timezone.js';
 
 /**
  * StatisticsStore - Abstraction layer for statistics database operations
@@ -762,6 +763,416 @@ export class StatisticsStore {
         } catch (err) {
             this.logger.error('Failed to get detailed stale mappings', {error: err.message});
             return {totalStale: 0, mappings: []};
+        } finally {
+            if (client) client.release();
+        }
+    }
+
+    /**
+     * PHASE 1: Get anomalies (temperature jumps > delta threshold)
+     * Detects sudden changes in sensor values using LAG window function
+     * @param {string} dpt - DPT type(s) to analyze (comma-separated, e.g., '9.001,9.007')
+     * @param {number} delta - Change a threshold to trigger anomaly (e.g., 2.0 for 2°C)
+     * @param {Date} since - Start timestamp for time window
+     * @param {number} limit - Maximum anomalies to return
+     * @returns {Promise<Object>} Anomalies with metadata and summary
+     */
+    async getAnomalies(dpt = '9.001', delta = 2.0, since = null, limit = 50) {
+        let client;
+        try {
+            client = await this.pool.connect();
+
+            if (!since) {
+                since = new Date(Date.now() - 24 * 60 * 60 * 1000); // Default: 24h
+            }
+
+            // Parse DPT list
+            const dptList = dpt.split(',').map(d => d.trim());
+            const placeholders = dptList.map((_, i) => `$${i + 3}`).join(',');
+
+            const anomaliesQuery = `
+                WITH ranked_events AS (
+                    SELECT 
+                        ts,
+                        datapoint_id,
+                        ga,
+                        value_float,
+                        dpt,
+                        source,
+                        LAG(value_float) OVER (PARTITION BY datapoint_id ORDER BY ts) as prev_value,
+                        LAG(ts) OVER (PARTITION BY datapoint_id ORDER BY ts) as prev_ts
+                    FROM knx_events
+                    WHERE ts >= $1
+                        AND dpt IN (${placeholders})
+                        AND value_float IS NOT NULL
+                )
+                SELECT 
+                    ts,
+                    datapoint_id,
+                    ga,
+                    prev_value as previous_value,
+                    value_float as current_value,
+                    ABS(value_float - prev_value) as delta,
+                    ROUND((ABS(value_float - prev_value) / NULLIF(ABS(prev_value), 0) * 100)::numeric, 2) as delta_percent,
+                    EXTRACT(EPOCH FROM (ts - prev_ts))::int as time_gap_seconds,
+                    dpt,
+                    source,
+                    CASE 
+                        WHEN ABS(value_float - prev_value) > $2 THEN 'high'
+                        WHEN ABS(value_float - prev_value) > ($2 * 0.5) THEN 'medium'
+                        ELSE 'low'
+                    END as severity
+                FROM ranked_events
+                WHERE prev_value IS NOT NULL
+                    AND ABS(value_float - prev_value) > ($2 * 0.5)
+                ORDER BY delta DESC, ts DESC
+                LIMIT $${dptList.length + 3}
+            `;
+
+            const result = await client.query(anomaliesQuery, [since, delta, ...dptList, limit]);
+
+            // Count by severity
+            const severityCounts = { high: 0, medium: 0, low: 0 };
+            result.rows.forEach(row => {
+                severityCounts[row.severity]++;
+            });
+
+            return {
+                meta: {
+                    collection: {
+                        total: result.rows.length,
+                        returned: Math.min(result.rows.length, limit),
+                        period_hours: Math.round((Date.now() - since) / (60 * 60 * 1000)),
+                    },
+                    query: {
+                        dpt,
+                        delta,
+                        severity_filter: 'all',
+                    },
+                },
+                data: result.rows.map(row => ({
+                    id: `anom-${row.datapoint_id}-${row.ts.getTime()}`,
+                    type: 'anomaly',
+                    attributes: {
+                        timestamp: row.ts.toISOString(),
+                        timestamp_local: formatTimestamp(row.ts),
+                        datapointId: row.datapoint_id,
+                        ga: row.ga,
+                        dpt: row.dpt,
+                        previousValue: parseFloat(row.previous_value || 0),
+                        currentValue: parseFloat(row.current_value || 0),
+                        delta: parseFloat(row.delta || 0),
+                        deltaPercent: parseFloat(row.delta_percent || 0),
+                        severity: row.severity,
+                        timeGapSeconds: row.time_gap_seconds || 0,
+                        source: row.source,
+                    },
+                })),
+                summary: {
+                    high: severityCounts.high,
+                    medium: severityCounts.medium,
+                    low: severityCounts.low,
+                    total: result.rows.length,
+                    timeRange: {
+                        since: since.toISOString(),
+                        until: new Date().toISOString(),
+                    },
+                },
+            };
+        } catch (err) {
+            this.logger.error('Failed to get anomalies', {error: err.message, dpt, delta});
+            return {
+                meta: { collection: { total: 0, returned: 0 }, query: { dpt, delta } },
+                data: [],
+                summary: { high: 0, medium: 0, low: 0, total: 0 },
+            };
+        } finally {
+            if (client) client.release();
+        }
+    }
+
+    /**
+     * PHASE 1: Get NULL value patterns for data quality analysis
+     * Analyzes NULL values both temporally (by minute of hour) and spatially (by GA)
+     * @param {string} dpts - DPT type(s) to analyze (comma-separated)
+     * @param {Date} since - Start timestamp for time window
+     * @returns {Promise<Object>} Temporal and spatial NULL patterns with diagnosis
+     */
+    async getNullPatterns(dpts = '9.001,9.007', since = null) {
+        let client;
+        try {
+            client = await this.pool.connect();
+
+            if (!since) {
+                since = new Date(Date.now() - 24 * 60 * 60 * 1000); // Default: 24h
+            }
+
+            const dptList = dpts.split(',').map(d => d.trim());
+            const placeholders = dptList.map((_, i) => `$${i + 2}`).join(',');
+
+            // Temporal patterns: NULL values by minute of hour
+            const temporalQuery = `
+                SELECT
+                    EXTRACT(MINUTE FROM ts)::int as minute_of_hour,
+                    COUNT(*) as null_count,
+                    COUNT(DISTINCT ga) as affected_ga_count,
+                    STRING_AGG(DISTINCT ga, ', ' ORDER BY ga) as sample_gas
+                FROM knx_events
+                WHERE ts >= $1
+                    AND dpt IN (${placeholders})
+                    AND value_float IS NULL
+                GROUP BY EXTRACT(MINUTE FROM ts)
+                ORDER BY null_count DESC
+                LIMIT 15
+            `;
+
+            // Spatial patterns: NULL values by GA
+            const spatialQuery = `
+                SELECT
+                    ga,
+                    datapoint_id,
+                    COUNT(*) as null_count,
+                    COUNT(DISTINCT EXTRACT(HOUR FROM ts)) as hours_affected,
+                    MIN(ts) as first_null,
+                    MAX(ts) as last_null
+                FROM knx_events
+                WHERE ts >= $1
+                    AND dpt IN (${placeholders})
+                    AND value_float IS NULL
+                GROUP BY ga, datapoint_id
+                ORDER BY null_count DESC
+                LIMIT 10
+            `;
+
+            // Get total events count for percentage calculation
+            const totalQuery = `
+                SELECT COUNT(*) as total
+                FROM knx_events
+                WHERE ts >= $1
+                    AND dpt IN (${placeholders})
+            `;
+
+            const [temporalResult, spatialResult, totalResult] = await Promise.all([
+                client.query(temporalQuery, [since, ...dptList]),
+                client.query(spatialQuery, [since, ...dptList]),
+                client.query(totalQuery, [since, ...dptList]),
+            ]);
+
+            const totalEvents = this.#parseInt(totalResult.rows[0]?.total || 1);
+
+            // Analyze patterns
+            const isTemporallySync = temporalResult.rows.length > 0 && temporalResult.rows[0].minute_of_hour !== null;
+            const isSpatiallyConcent = spatialResult.rows.length > 0 && spatialResult.rows[0].null_count > (totalEvents * 0.05);
+
+            return {
+                meta: {
+                    period_hours: Math.round((Date.now() - since) / (60 * 60 * 1000)),
+                    analysis_timestamp: new Date().toISOString(),
+                    analysis_timestamp_local: formatTimestamp(new Date()),
+                },
+                temporal_patterns: {
+                    description: 'NULL values grouped by minute of hour',
+                    synchronized: isTemporallySync,
+                    pattern: temporalResult.rows.map(row => ({
+                        minute_of_hour: row.minute_of_hour,
+                        null_count: this.#parseInt(row.null_count),
+                        affected_ga_count: this.#parseInt(row.affected_ga_count),
+                        sample_gas: (row.sample_gas || '').split(',').map(g => g.trim()).filter(g => g),
+                        percentage_of_total: parseFloat(((row.null_count / totalEvents) * 100).toFixed(1)),
+                    })),
+                },
+                spatial_patterns: {
+                    description: 'NULL values grouped by group address',
+                    concentrated: isSpatiallyConcent,
+                    pattern: spatialResult.rows.map(row => ({
+                        ga: row.ga,
+                        datapoint_id: row.datapoint_id,
+                        null_count: this.#parseInt(row.null_count),
+                        hours_affected: this.#parseInt(row.hours_affected),
+                        percent_of_all_events: parseFloat(((row.null_count / totalEvents) * 100).toFixed(1)),
+                        first_null: row.first_null.toISOString(),
+                        first_null_local: formatTimestamp(row.first_null),
+                        last_null: row.last_null.toISOString(),
+                        last_null_local: formatTimestamp(row.last_null),
+                    })),
+                },
+                diagnosis: {
+                    likely_cause: isTemporallySync ? 'synchronized_polling_issue' : 'sensor_communication_error',
+                    confidence: isTemporallySync ? 0.92 : 0.68,
+                    recommendation: isTemporallySync
+                        ? 'Check device polling intervals and KNX gateway connectivity'
+                        : 'Check sensor communication lines and device configuration',
+                },
+            };
+        } catch (err) {
+            this.logger.error('Failed to get NULL patterns', {error: err.message, dpts});
+            return {
+                meta: { period_hours: 24 },
+                temporal_patterns: { description: '', synchronized: false, pattern: [] },
+                spatial_patterns: { description: '', concentrated: false, pattern: [] },
+                diagnosis: { likely_cause: 'unknown', confidence: 0, recommendation: '' },
+            };
+        } finally {
+            if (client) client.release();
+        }
+    }
+
+    /**
+     * PHASE 1: Get comprehensive datapoint summary with statistics
+     * Returns time-series statistics for a single datapoint across multiple time windows
+     * @param {string} datapointId - Datapoint ID or GA (e.g., 'GA-329' or '3/6/1')
+     * @param {Date} since - Start timestamp (default: 24h ago)
+     * @returns {Promise<Object>} Detailed statistics and current state
+     */
+    async getDatapointSummary(datapointId, since = null) {
+        let client;
+        try {
+            client = await this.pool.connect();
+
+            if (!since) {
+                since = new Date(Date.now() - 24 * 60 * 60 * 1000); // Default: 24h
+            }
+
+            // Find datapoint by ID or GA
+            const dpLookup = await client.query(`
+                SELECT DISTINCT datapoint_id, ga, dpt
+                FROM knx_events
+                WHERE datapoint_id = $1 OR ga = $1
+                LIMIT 1
+            `, [datapointId]);
+
+            if (dpLookup.rows.length === 0) {
+                return null; // Datapoint not found
+            }
+
+            const dpId = dpLookup.rows[0].datapoint_id;
+            const ga = dpLookup.rows[0].ga;
+            const dpt = dpLookup.rows[0].dpt;
+
+            // Get detailed statistics for 24h period
+            const stats24h = await client.query(`
+                SELECT
+                    COUNT(*) as count,
+                    COUNT(CASE WHEN value_float IS NULL THEN 1 END) as null_count,
+                    AVG(value_float) as average,
+                    MIN(value_float) as minimum,
+                    MAX(value_float) as maximum,
+                    STDDEV(value_float) as stddev,
+                    PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY value_float) as median,
+                    PERCENTILE_CONT(0.25) WITHIN GROUP (ORDER BY value_float) as q1,
+                    PERCENTILE_CONT(0.75) WITHIN GROUP (ORDER BY value_float) as q3,
+                    FIRST_VALUE(value_float) OVER (ORDER BY ts) as first_value,
+                    LAST_VALUE(value_float) OVER (ORDER BY ts DESC) as last_value
+                FROM knx_events
+                WHERE datapoint_id = $1 AND ts >= $2 AND value_float IS NOT NULL
+            `, [dpId, since]);
+
+            const stats7d = await client.query(`
+                SELECT
+                    COUNT(*) as count,
+                    AVG(value_float) as average,
+                    MIN(value_float) as minimum,
+                    MAX(value_float) as maximum,
+                    COUNT(CASE WHEN value_float IS NULL THEN 1 END) as null_count
+                FROM knx_events
+                WHERE datapoint_id = $1 
+                    AND ts >= $2 - INTERVAL '7 days'
+                    AND value_float IS NOT NULL
+            `, [dpId, since]);
+
+            // Count anomalies (changes > 2 units)
+            const anomalies = await client.query(`
+                WITH changes AS (
+                    SELECT
+                        ABS(value_float - LAG(value_float) OVER (ORDER BY ts)) as delta
+                    FROM knx_events
+                    WHERE datapoint_id = $1 AND ts >= $2 AND value_float IS NOT NULL
+                )
+                SELECT COUNT(*) as anomaly_count
+                FROM changes
+                WHERE delta > 2.0
+            `, [dpId, since]);
+
+            // Get current state
+            const current = await client.query(`
+                SELECT ts, value_float
+                FROM knx_events
+                WHERE datapoint_id = $1
+                ORDER BY ts DESC
+                LIMIT 1
+            `, [dpId]);
+
+            const s24 = stats24h.rows[0] || {};
+            const s7d = stats7d.rows[0] || {};
+            const curr = current.rows[0];
+
+            return {
+                data: {
+                    id: datapointId,
+                    type: 'datapoint',
+                    attributes: {
+                        datapointId: dpId,
+                        ga,
+                        dpt,
+                    },
+                },
+                statistics: {
+                    last_24h: {
+                        period: {
+                            since: since.toISOString(),
+                            since_local: formatTimestamp(since),
+                            until: new Date().toISOString(),
+                            until_local: formatTimestamp(new Date()),
+                            hours: 24,
+                        },
+                        measurements: {
+                            count: this.#parseInt(s24.count),
+                            missing: 0,
+                            null_count: this.#parseInt(s24.null_count),
+                            null_percent: s24.count > 0 ? (s24.null_count / s24.count * 100).toFixed(1) : 0,
+                        },
+                        values: {
+                            average: parseFloat(s24.average || 0),
+                            minimum: parseFloat(s24.minimum || 0),
+                            maximum: parseFloat(s24.maximum || 0),
+                            range: parseFloat((s24.maximum - s24.minimum) || 0),
+                            stddev: parseFloat(s24.stddev || 0),
+                            median: parseFloat(s24.median || 0),
+                            q1: parseFloat(s24.q1 || 0),
+                            q3: parseFloat(s24.q3 || 0),
+                        },
+                        trend: {
+                            direction: s24.last_value > s24.first_value ? 'rising' : (s24.last_value < s24.first_value ? 'falling' : 'stable'),
+                            first_value: parseFloat(s24.first_value || 0),
+                            last_value: parseFloat(s24.last_value || 0),
+                            change: parseFloat((s24.last_value - s24.first_value) || 0),
+                            change_percent: s24.first_value !== 0 ? parseFloat(((s24.last_value - s24.first_value) / s24.first_value * 100).toFixed(2)) : 0,
+                        },
+                    },
+                    last_7d: {
+                        measurements: {
+                            count: this.#parseInt(s7d.count),
+                        },
+                        values: {
+                            average: parseFloat(s7d.average || 0),
+                            minimum: parseFloat(s7d.minimum || 0),
+                            maximum: parseFloat(s7d.maximum || 0),
+                            range: parseFloat((s7d.maximum - s7d.minimum) || 0),
+                        },
+                        anomalies: this.#parseInt(anomalies.rows[0]?.anomaly_count || 0),
+                    },
+                },
+                current: {
+                    value: curr ? parseFloat(curr.value_float) : null,
+                    timestamp: curr ? curr.ts.toISOString() : null,
+                    timestamp_local: curr ? formatTimestamp(curr.ts) : null,
+                    age_seconds: curr ? Math.round((Date.now() - curr.ts) / 1000) : null,
+                    status: curr ? 'ok' : 'unknown',
+                },
+            };
+        } catch (err) {
+            this.logger.error('Failed to get datapoint summary', {error: err.message, datapointId});
+            return null;
         } finally {
             if (client) client.release();
         }

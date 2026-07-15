@@ -22,6 +22,15 @@ function parseLimit(raw, defaultVal = 20, max = 1000) {
     return isNaN(n) ? defaultVal : Math.min(max, Math.max(1, n));
 }
 
+function parseDelta(raw, defaultVal = 2.0) {
+    const n = parseFloat(raw);
+    return isNaN(n) ? defaultVal : Math.max(0.1, n);
+}
+
+function parseDPTs(raw, defaultVal = '9.001') {
+    return raw ? String(raw).trim() : defaultVal;
+}
+
 export function statisticsRouter(stateEngine, db) {
     const router = Router();
 
@@ -280,6 +289,66 @@ export function statisticsRouter(stateEngine, db) {
                     hasState: row.hasState,
                 })),
             });
+        } catch (error) {
+            res.status(500).json({ errors: [{ status: '500', title: 'Internal Server Error', detail: error.message }] });
+        }
+    });
+
+    // GET /api/v2/stats/anomalies - Temperature/value anomalies detection
+    router.get('/anomalies', bearer('read'), async(req, res) => {
+        try {
+            const dpt = parseDPTs(req.query.dpt, '9.001');
+            const delta = parseDelta(req.query.delta, 2.0);
+            const hours = parseHours(req.query.hours, 24);
+            const limit = parseLimit(req.query.limit, 50);
+            const since = new Date(Date.now() - hours * 60 * 60 * 1000);
+
+            const store = new StatisticsStore(db);
+            const result = await store.getAnomalies(dpt, delta, since, limit);
+
+            res.json(result);
+        } catch (error) {
+            res.status(500).json({ errors: [{ status: '500', title: 'Internal Server Error', detail: error.message }] });
+        }
+    });
+
+    // GET /api/v2/stats/null-patterns - Analyze NULL value patterns
+    router.get('/null-patterns', bearer('read'), async(req, res) => {
+        try {
+            const dpts = parseDPTs(req.query.dpts, '9.001,9.007');
+            const hours = parseHours(req.query.hours, 24);
+            const since = new Date(Date.now() - hours * 60 * 60 * 1000);
+
+            const store = new StatisticsStore(db);
+            const result = await store.getNullPatterns(dpts, since);
+
+            res.json(result);
+        } catch (error) {
+            res.status(500).json({ errors: [{ status: '500', title: 'Internal Server Error', detail: error.message }] });
+        }
+    });
+
+    // GET /api/v2/stats/datapoints/:id - Comprehensive datapoint summary
+    router.get('/datapoints/:id', bearer('read'), async(req, res) => {
+        try {
+            const datapointId = req.params.id;
+            const hours = parseHours(req.query.hours, 24);
+            const since = new Date(Date.now() - hours * 60 * 60 * 1000);
+
+            const store = new StatisticsStore(db);
+            const result = await store.getDatapointSummary(datapointId, since);
+
+            if (!result) {
+                return res.status(404).json({
+                    errors: [{
+                        status: '404',
+                        title: 'Not Found',
+                        detail: `Datapoint '${datapointId}' not found in the database`
+                    }]
+                });
+            }
+
+            res.json(result);
         } catch (error) {
             res.status(500).json({ errors: [{ status: '500', title: 'Internal Server Error', detail: error.message }] });
         }

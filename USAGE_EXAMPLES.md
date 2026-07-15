@@ -375,3 +375,251 @@ The new TTL configuration approach is simpler, more flexible, and eliminates dep
 ✅ Use version control safely (no hardcoded paths)  
 ✅ Deploy with clear, actionable error messages  
 ✅ Scale from single installations to multi-site operations  
+
+---
+
+# Data Quality Analytics API – Usage Examples
+
+The **Data Quality Analytics API** provides three endpoints for monitoring sensor health, detecting anomalies, and analyzing trends. See `docs/DATA_QUALITY_ANALYTICS_API.md` for complete documentation.
+
+## Example 1: Detect Temperature Sensor Anomalies
+
+**Scenario:** Find sudden temperature jumps that might indicate sensor malfunction or wiring issues.
+
+```bash
+# Find temperature jumps > 2°C in last 24 hours
+curl -H "Authorization: Bearer $TOKEN" \
+  "http://localhost:3000/api/v2/stats/anomalies?dpt=9.001&delta=2.0&hours=24"
+
+# Output example:
+# {
+#   "meta": { "collection": { "total": 8, "period_hours": 24 } },
+#   "summary": { "high": 2, "medium": 4, "low": 2, "total": 8 },
+#   "data": [
+#     {
+#       "attributes": {
+#         "ga": "3/6/1",
+#         "previousValue": 21.5,
+#         "currentValue": 24.2,
+#         "delta": 2.7,
+#         "severity": "high"
+#       }
+#     }
+#   ]
+# }
+```
+
+**Interpretation:**
+- `high` severity → Large unexplained jump (investigate wiring)
+- `medium` severity → Moderate change (check sensor calibration)
+- Multiple anomalies on the same GA → Likely sensor malfunction
+
+---
+
+## Example 2: Diagnose NULL Value Issues
+
+**Scenario:** Sensors are reporting NULL values. Is it a gateway polling issue or sensor communication error?
+
+```bash
+# Analyze NULL patterns across all temperature sensors
+curl -H "Authorization: Bearer $TOKEN" \
+  "http://localhost:3000/api/v2/stats/null-patterns?dpts=9.001&hours=24"
+
+# Response shows diagnosis:
+# "diagnosis": {
+#   "likely_cause": "synchronized_polling_issue",
+#   "confidence": 0.92,
+#   "recommendation": "Check device polling intervals and KNX gateway connectivity"
+# }
+```
+
+**Interpretation:**
+- **synchronized_polling_issue** → All devices fail at the same minute (e.g., every :00)
+  - **Action:** Check KNX gateway polling configuration or network connectivity
+  
+- **sensor_communication_error** → NULLs scattered across time/space
+  - **Action:** Check individual sensor cables and device configuration
+
+---
+
+## Example 3: Time-Series Analysis for Trend Monitoring
+
+**Scenario:** Analyze room temperature trends for comfort control optimization.
+
+```bash
+# Get 7-day statistics for room temperature
+curl -H "Authorization: Bearer $TOKEN" \
+  "http://localhost:3000/api/v2/stats/datapoints/3%2F6%2F1?hours=168"
+
+# Extract key metrics:
+jq '.statistics.last_7d' <<< "$response"
+
+# Output:
+# {
+#   "measurements": { "count": 10080 },
+#   "values": {
+#     "average": 21.42,
+#     "minimum": 18.5,
+#     "maximum": 26.2,
+#     "range": 7.7
+#   },
+#   "anomalies": 12
+# }
+```
+
+**Use Cases:**
+- **Average 21.42°C** → Set thermostat target to 21-22°C
+- **Range 7.7°C** → Large variation → check for broken heating zones
+- **12 anomalies in 7 days** → Frequent jumps → investigate sensor/wiring
+
+---
+
+## Example 4: Scripted Health Check Workflow
+
+**Scenario:** Automated daily health check of all temperature sensors.
+
+```bash
+#!/bin/bash
+set -e
+
+TOKEN="your-bearer-token"
+API_BASE="http://localhost:3000/api/v2/stats"
+
+echo "=== Daily Sensor Health Check ==="
+
+# 1. Check for anomalies
+echo "Checking for temperature anomalies..."
+ANOMALIES=$(curl -s -H "Authorization: Bearer $TOKEN" \
+  "$API_BASE/anomalies?dpt=9.001&delta=3.0&hours=24" | jq '.summary.high')
+
+if [ "$ANOMALIES" -gt 0 ]; then
+  echo "⚠️  WARNING: $ANOMALIES high-severity anomalies detected"
+else
+  echo "✓ No anomalies"
+fi
+
+# 2. Check NULL patterns
+echo "Analyzing NULL patterns..."
+CAUSE=$(curl -s -H "Authorization: Bearer $TOKEN" \
+  "$API_BASE/null-patterns?hours=24" | jq -r '.diagnosis.likely_cause')
+
+if [ "$CAUSE" != "null" ]; then
+  echo "ℹ️  NULL pattern detected: $CAUSE"
+else
+  echo "✓ No NULL issues"
+fi
+
+# 3. Check sensor data quality
+echo "Checking sensor data quality..."
+curl -s -H "Authorization: Bearer $TOKEN" \
+  "$API_BASE/datapoints/3%2F6%2F1?hours=24" | jq '.statistics.last_24h.measurements'
+
+echo "=== Health Check Complete ==="
+```
+
+**Output:**
+```
+=== Daily Sensor Health Check ===
+Checking for temperature anomalies...
+✓ No anomalies
+Analyzing NULL patterns...
+✓ No NULL issues
+Checking sensor data quality...
+{
+  "count": 1440,
+  "null_count": 3,
+  "null_percent": "0.2"
+}
+=== Health Check Complete ===
+```
+
+---
+
+## Example 5: Identify Stale/Inactive Sensors
+
+**Scenario:** Find sensors that haven't been updated recently.
+
+```bash
+# Check all temperature sensors
+for GA in "3/6/1" "3/6/2" "3/6/3" "3/6/4"; do
+  echo "Checking $GA..."
+  RESULT=$(curl -s -H "Authorization: Bearer $TOKEN" \
+    "http://localhost:3000/api/v2/stats/datapoints/$GA?hours=24")
+  
+  AGE=$(echo "$RESULT" | jq '.current.age_seconds')
+  STATUS=$(echo "$RESULT" | jq -r '.current.status')
+  VALUE=$(echo "$RESULT" | jq '.current.value')
+  
+  if [ "$AGE" -gt 3600 ]; then
+    echo "  ⚠️  STALE: Last update $AGE seconds ago"
+  elif [ "$STATUS" = "unknown" ]; then
+    echo "  ❌ NO DATA"
+  else
+    echo "  ✓ Active (value: $VALUE, age: ${AGE}s)"
+  fi
+done
+```
+
+---
+
+## Example 6: Monitoring Dashboard Integration
+
+**Scenario:** Update a monitoring dashboard every 5 minutes.
+
+```bash
+#!/bin/bash
+# Runs every 5 minutes via cron: */5 * * * * /path/to/dashboard-update.sh
+
+TOKEN="your-bearer-token"
+API_BASE="http://localhost:3000/api/v2/stats"
+
+# Fetch metrics
+ANOMALIES=$(curl -s -H "Authorization: Bearer $TOKEN" \
+  "$API_BASE/anomalies?limit=5&hours=24" | jq '.summary')
+
+NULL_PATTERNS=$(curl -s -H "Authorization: Bearer $TOKEN" \
+  "$API_BASE/null-patterns?hours=24" | jq '.diagnosis')
+
+# Create JSON report
+cat > /var/www/dashboard/sensor-health.json <<EOF
+{
+  "timestamp": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
+  "anomalies": $ANOMALIES,
+  "null_patterns_diagnosis": $NULL_PATTERNS,
+  "status": "healthy"
+}
+EOF
+
+# Notify admin if issues
+if [ "$(echo $NULL_PATTERNS | jq '.confidence')" -gt "0.9" ]; then
+  echo "Sensor health issue detected" | mail -s "KNX Alert" admin@example.com
+fi
+```
+
+---
+
+## Authentication Setup
+
+All analytics endpoints require OAuth2 Bearer token with `read` scope:
+
+```bash
+# 1. Get token from OAuth provider (if using Keycloak)
+TOKEN=$(curl -X POST http://keycloak:8080/token \
+  -d "client_id=knx-client&client_secret=secret&grant_type=client_credentials" \
+  | jq -r '.access_token')
+
+# 2. Use in API calls
+curl -H "Authorization: Bearer $TOKEN" \
+  "http://localhost:3000/api/v2/stats/anomalies"
+
+# 3. Store in environment for scripts
+export KNX_API_TOKEN="$TOKEN"
+```
+
+---
+
+## Related Documentation
+
+- **Complete API Reference:** `docs/DATA_QUALITY_ANALYTICS_API.md`
+- **Timestamp Convention:** `docs/API_TIMESTAMP_CONVENTION.md`
+- **Database Management API:** `docs/DATABASE_MANAGEMENT.md`

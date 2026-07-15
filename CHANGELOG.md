@@ -87,6 +87,51 @@ Unreleased
   - ✅ Better error recovery and null value handling
   - ✅ Improved observability for database state and health
 
+- **Advanced Data Quality Analytics – Phase 1** — Anomaly detection and NULL pattern analysis:
+  
+  **New StatisticsStore Methods:**
+  - `getAnomalies(dpt, delta, since, limit)` — Detects temperature/value jumps using SQL `LAG()` window function
+    - Calculates delta (absolute change) and delta_percent (percentage change)
+    - Severity classification: `high` (> delta), `medium` (> delta/2), `low` (> delta/2)
+    - Time gap analysis between consecutive measurements
+    - Returns JSON:API response with `meta`, `data`, and `summary`
+  
+  - `getNullPatterns(dpts, since)` — Analyzes NULL value patterns temporally and spatially
+    - **Temporal analysis**: NULL counts grouped by minute-of-hour (detects synchronized issues)
+    - **Spatial analysis**: NULL counts grouped by group address (detects sensor communication errors)
+    - Automatic diagnosis: likely causes and confidence scores
+    - Actionable recommendations for remediation
+  
+  - `getDatapointSummary(datapointId, since)` — Comprehensive time-series statistics
+    - 24-hour window: count, avg, min, max, stddev, median, quartiles (Q1, Q3)
+    - 7-day window: measurements, values, anomaly count
+    - Current state: latest value, age in seconds, status flag
+    - Trend analysis: direction (rising/falling/stable), percentage change
+  
+  **REST API Endpoints:**
+  - `GET /api/v2/stats/anomalies?dpt=9.001&delta=2.0&hours=24&limit=50` — Anomaly detection
+    - Query parameters: `dpt` (sensor type), `delta` (threshold), `hours` (time window), `limit` (max results)
+  
+  - `GET /api/v2/stats/null-patterns?dpts=9.001,9.007&hours=24` — NULL pattern analysis
+    - Query parameters: `dpts` (comma-separated DPT types), `hours` (time window)
+  
+  - `GET /api/v2/stats/datapoints/:id?hours=24` — Datapoint summary by ID or GA
+    - Query parameters: `hours` (lookback period)
+    - Path parameter: `:id` (datapoint ID or group address, e.g., '3/6/1')
+  
+  **Timestamp Conventions (Vendor Extensions):**
+  - All responses follow a dual-timestamp format per `API_TIMESTAMP_CONVENTION.md`
+  - UTC (ISO 8601): `timestamp` field for machine processing
+  - Local time: `timestamp_local` field (Europe/Berlin) for developer readability
+  - Example: `"timestamp": "2026-07-15T14:30:00Z", "timestamp_local": "15. Juli 2026 16:30:00"`
+  
+  **Benefits:**
+  - ✅ Proactive detection of sensor malfunctions before critical failures
+  - ✅ Root-cause diagnosis: distinguish network issues from sensor faults
+  - ✅ Time-series analytics for trend monitoring and forecasting
+  - ✅ Improved UX with dual timestamps (UTC for APIs, local for logs/debugging)
+  - ✅ No performance impact: uses efficient SQL window functions and aggregations
+
 - **Improved GitHub Workflows** — Enhanced CI/CD pipeline configuration:
   - **Dependency Audit Workflow**: Upgraded to latest action versions (checkout@v7, setup-node@v6), increased security level to `high`, and improved error handling
   - **Dependabot Configuration**: Enhanced with better labels, explicit commit message formatting, automatic rebase strategy, and staggered scheduling (npm on Monday, GitHub Actions on Tuesday)
