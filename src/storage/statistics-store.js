@@ -18,7 +18,7 @@ import { formatTimestamp } from '../utils/timezone.js';
  */
 export class StatisticsStore {
     constructor(postgresClient) {
-        this.pool = postgresClient.pool;
+        this.db = postgresClient;
         this.logger = createLogger('StatisticsStore');
     }
 
@@ -27,16 +27,12 @@ export class StatisticsStore {
      * @returns {Promise<number>} Total event count
      */
     async getTotalEventCount() {
-        let client;
         try {
-            client = await this.pool.connect();
-            const result = await client.query('SELECT COUNT(*) as count FROM knx_events');
+            const result = await this.db.query('SELECT COUNT(*) as count FROM knx_events');
             return this.#parseInt(result.rows[0].count);
         } catch (err) {
             this.logger.error('Failed to get total event count', {error: err.message});
             return 0;
-        } finally {
-            if (client) client.release();
         }
     }
 
@@ -45,16 +41,12 @@ export class StatisticsStore {
      * @returns {Promise<number>} Total state count
      */
     async getTotalStateCount() {
-        let client;
         try {
-            client = await this.pool.connect();
-            const result = await client.query('SELECT COUNT(*) as count FROM current_state');
+            const result = await this.db.query('SELECT COUNT(*) as count FROM current_state');
             return this.#parseInt(result.rows[0].count);
         } catch (err) {
             this.logger.error('Failed to get total state count', {error: err.message});
             return 0;
-        } finally {
-            if (client) client.release();
         }
     }
 
@@ -63,16 +55,12 @@ export class StatisticsStore {
      * @returns {Promise<number>} Total mapping count
      */
     async getTotalMappingCount() {
-        let client;
         try {
-            client = await this.pool.connect();
-            const result = await client.query('SELECT COUNT(*) as count FROM datapoint_mappings');
+            const result = await this.db.query('SELECT COUNT(*) as count FROM datapoint_mappings');
             return this.#parseInt(result.rows[0].count);
         } catch (err) {
             this.logger.error('Failed to get total mapping count', {error: err.message});
             return 0;
-        } finally {
-            if (client) client.release();
         }
     }
 
@@ -81,16 +69,12 @@ export class StatisticsStore {
      * @returns {Promise<number>} Total resource count
      */
     async getTotalResourceCount() {
-        let client;
         try {
-            client = await this.pool.connect();
-            const result = await client.query('SELECT COUNT(*) as count FROM semantic_resources');
+            const result = await this.db.query('SELECT COUNT(*) as count FROM semantic_resources');
             return this.#parseInt(result.rows[0].count);
         } catch (err) {
             this.logger.error('Failed to get total resource count', {error: err.message});
             return 0;
-        } finally {
-            if (client) client.release();
         }
     }
 
@@ -99,16 +83,12 @@ export class StatisticsStore {
      * @returns {Promise<number>} Unique GA count
      */
     async getUniqueGroupAddressCount() {
-        let client;
         try {
-            client = await this.pool.connect();
-            const result = await client.query('SELECT COUNT(DISTINCT ga) as count FROM current_state');
+            const result = await this.db.query('SELECT COUNT(DISTINCT ga) as count FROM current_state');
             return this.#parseInt(result.rows[0].count);
         } catch (err) {
             this.logger.error('Failed to get unique GA count', {error: err.message});
             return 0;
-        } finally {
-            if (client) client.release();
         }
     }
 
@@ -117,10 +97,8 @@ export class StatisticsStore {
      * @returns {Promise<{oldest: Date|null, latest: Date|null}>} Event timestamps
      */
     async getEventTimeline() {
-        let client;
         try {
-            client = await this.pool.connect();
-            const result = await client.query(`
+            const result = await this.db.query(`
                 SELECT MIN(ts) as oldest,
                        MAX(ts) as latest
                 FROM knx_events
@@ -132,8 +110,6 @@ export class StatisticsStore {
         } catch (err) {
             this.logger.error('Failed to get event timeline', {error: err.message});
             return {oldest: null, latest: null};
-        } finally {
-            if (client) client.release();
         }
     }
 
@@ -142,16 +118,12 @@ export class StatisticsStore {
      * @returns {Promise<string>} Human-readable database size
      */
     async getDatabaseSize() {
-        let client;
         try {
-            client = await this.pool.connect();
-            const result = await client.query('SELECT pg_size_pretty(pg_database_size(current_database())) as size');
+            const result = await this.db.query('SELECT pg_size_pretty(pg_database_size(current_database())) as size');
             return result.rows[0]?.size || 'N/A';
         } catch (err) {
             this.logger.error('Failed to get database size', {error: err.message});
             return 'N/A';
-        } finally {
-            if (client) client.release();
         }
     }
 
@@ -162,10 +134,8 @@ export class StatisticsStore {
      * @returns {Promise<Array>} Top GAs with event counts and current values
      */
     async getTopActiveGroupAddresses(startTime, limit = 5) {
-        let client;
         try {
-            client = await this.pool.connect();
-            const result = await client.query(`
+            const result = await this.db.query(`
                 SELECT e.ga,
                        COUNT(*) as count,
                     MAX(e.ts) as last_seen,
@@ -191,8 +161,6 @@ export class StatisticsStore {
         } catch (err) {
             this.logger.error('Failed to get top active group addresses', {error: err.message});
             return [];
-        } finally {
-            if (client) client.release();
         }
     }
 
@@ -201,10 +169,8 @@ export class StatisticsStore {
      * @returns {Promise<{count: number, affectedGAs: number}>} Orphaned state info
      */
     async getOrphanedStatesInfo() {
-        let client;
         try {
-            client = await this.pool.connect();
-            const result = await client.query(`
+            const result = await this.db.query(`
                 SELECT COUNT(*) as count, COUNT(DISTINCT cs.ga) as affected_gas
                 FROM current_state cs
                     LEFT JOIN datapoint_mappings m
@@ -218,8 +184,6 @@ export class StatisticsStore {
         } catch (err) {
             this.logger.error('Failed to get orphaned states info', {error: err.message});
             return {count: 0, affectedGAs: 0};
-        } finally {
-            if (client) client.release();
         }
     }
 
@@ -228,10 +192,8 @@ export class StatisticsStore {
      * @returns {Promise<number>} Duplicate GA count
      */
     async getDuplicateGroupAddressCount() {
-        let client;
         try {
-            client = await this.pool.connect();
-            const result = await client.query(`
+            const result = await this.db.query(`
                 SELECT COUNT(*) as duplicate_count
                 FROM (SELECT ga, COUNT(*) as mapping_count
                       FROM datapoint_mappings
@@ -242,8 +204,6 @@ export class StatisticsStore {
         } catch (err) {
             this.logger.error('Failed to get duplicate GA count', {error: err.message});
             return 0;
-        } finally {
-            if (client) client.release();
         }
     }
 
@@ -252,10 +212,8 @@ export class StatisticsStore {
      * @returns {Promise<number>} Stale mapping count
      */
     async getStaleMappingCount() {
-        let client;
         try {
-            client = await this.pool.connect();
-            const result = await client.query(`
+            const result = await this.db.query(`
                 SELECT COUNT(*) as count
                 FROM datapoint_mappings m
                     LEFT JOIN current_state cs
@@ -266,8 +224,6 @@ export class StatisticsStore {
         } catch (err) {
             this.logger.error('Failed to get stale mapping count', {error: err.message});
             return 0;
-        } finally {
-            if (client) client.release();
         }
     }
 
@@ -276,10 +232,8 @@ export class StatisticsStore {
      * @returns {Promise<number>} Integrity score as percentage (0-100)
      */
     async getDataIntegrityScore() {
-        let client;
         try {
-            client = await this.pool.connect();
-            const result = await client.query(`
+            const result = await this.db.query(`
                 SELECT COUNT(*) as total_count
                 FROM datapoint_mappings
             `);
@@ -294,8 +248,6 @@ export class StatisticsStore {
         } catch (err) {
             this.logger.error('Failed to calculate data integrity score', {error: err.message});
             return 0;
-        } finally {
-            if (client) client.release();
         }
     }
 
@@ -312,27 +264,24 @@ export class StatisticsStore {
      * @returns {Promise<Object>} Complete stats object
      */
     async getAllStats() {
-        let client;
         try {
-            client = await this.pool.connect();
-
             // Count records in all tables
             const [events, states, datapoints, resources] = await Promise.all([
-                client.query('SELECT COUNT(*) as count FROM knx_events'),
-                client.query('SELECT COUNT(*) as count FROM current_state'),
-                client.query('SELECT COUNT(*) as count FROM datapoint_mappings'),
-                client.query('SELECT COUNT(*) as count FROM semantic_resources'),
+                this.db.query('SELECT COUNT(*) as count FROM knx_events'),
+                this.db.query('SELECT COUNT(*) as count FROM current_state'),
+                this.db.query('SELECT COUNT(*) as count FROM datapoint_mappings'),
+                this.db.query('SELECT COUNT(*) as count FROM semantic_resources'),
             ]);
 
             // Get date range of events
-            const eventRange = await client.query(`
+            const eventRange = await this.db.query(`
                 SELECT MIN(ts) as first_event, MAX(ts) as last_event
                 FROM knx_events
             `);
 
             // Get most active group addresses (24h window)
             const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
-            const topGAs = await client.query(`
+            const topGAs = await this.db.query(`
                 SELECT ga, COUNT(*) as event_count, MAX(ts) as last_seen
                 FROM knx_events
                 WHERE ts >= $1
@@ -341,7 +290,7 @@ export class StatisticsStore {
             `, [twentyFourHoursAgo]);
 
             // Get database size
-            const dbSize = await client.query(`
+            const dbSize = await this.db.query(`
                 SELECT pg_size_pretty(pg_database_size(current_database())) as size
             `);
 
@@ -374,23 +323,14 @@ export class StatisticsStore {
                 topGroupAddresses: [],
                 dbSize: 'N/A',
             };
-        } finally {
-            if (client) client.release();
         }
     }
 
-    /**
-     * Get event statistics for a given time period
-     * @param {number} hours - Number of hours to look back
-     * @returns {Promise<Object>} Event statistics
-     */
     async getEventStatistics(hours = 24) {
-        let client;
         try {
-            client = await this.pool.connect();
             const since = new Date(Date.now() - hours * 60 * 60 * 1000);
 
-            const stats = await client.query(`
+            const stats = await this.db.query(`
                 SELECT COUNT(*)                     as total_events,
                        COUNT(DISTINCT ga)           as unique_gas,
                        COUNT(DISTINCT source)       as unique_sources,
@@ -400,7 +340,7 @@ export class StatisticsStore {
             `, [since]);
 
             // Events per hour
-            const hourly = await client.query(`
+            const hourly = await this.db.query(`
                 SELECT time_bucket('1 hour', ts) AS hour, COUNT(*) as count
                 FROM knx_events
                 WHERE ts >= $1
@@ -409,7 +349,7 @@ export class StatisticsStore {
             `, [since]);
 
             // Events by type
-            const byType = await client.query(`
+            const byType = await this.db.query(`
                 SELECT event_type, COUNT(*) as count
                 FROM knx_events
                 WHERE ts >= $1
@@ -432,8 +372,6 @@ export class StatisticsStore {
         } catch (err) {
             this.logger.error('Failed to get event statistics', {error: err.message});
             return {summary: {}, hourly: [], byType: []};
-        } finally {
-            if (client) client.release();
         }
     }
 
@@ -442,11 +380,8 @@ export class StatisticsStore {
      * @returns {Promise<Object>} State statistics
      */
     async getStateStatistics() {
-        let client;
         try {
-            client = await this.pool.connect();
-
-            const stats = await client.query(`
+            const stats = await this.db.query(`
                 SELECT COUNT(*)                                    as total_states,
                        COUNT(DISTINCT ga)                          as unique_gas,
                        COUNT(DISTINCT source)                      as unique_sources,
@@ -457,7 +392,7 @@ export class StatisticsStore {
             `);
 
             // States by DPT
-            const byDpt = await client.query(`
+            const byDpt = await this.db.query(`
                 SELECT COALESCE(dpt, 'unknown') as dpt, COUNT(*) as count
                 FROM current_state
                 GROUP BY dpt
@@ -480,8 +415,6 @@ export class StatisticsStore {
         } catch (err) {
             this.logger.error('Failed to get state statistics', {error: err.message});
             return {summary: {}, byDpt: []};
-        } finally {
-            if (client) client.release();
         }
     }
 
@@ -492,11 +425,8 @@ export class StatisticsStore {
      * @returns {Promise<Array>} Top datapoints with event counts and current values
      */
     async getTopActiveDatapoints(startTime, limit = 20) {
-        let client;
         try {
-            client = await this.pool.connect();
-
-            const active = await client.query(`
+            const active = await this.db.query(`
                 SELECT e.ga,
                        e.datapoint_id,
                        COUNT(*)  as event_count,
@@ -529,8 +459,6 @@ export class StatisticsStore {
         } catch (err) {
             this.logger.error('Failed to get top active datapoints', {error: err.message});
             return [];
-        } finally {
-            if (client) client.release();
         }
     }
 
@@ -539,12 +467,9 @@ export class StatisticsStore {
      * @returns {Promise<Object>} Complete health check data
      */
     async getHealthCheckDetails() {
-        let client;
         try {
-            client = await this.pool.connect();
-
             // Get orphaned states
-            const orphanedResult = await client.query(`
+            const orphanedResult = await this.db.query(`
                 SELECT COUNT(*) as count, COUNT(DISTINCT cs.ga) as affected_gas
                 FROM current_state cs
                     LEFT JOIN datapoint_mappings m
@@ -553,7 +478,7 @@ export class StatisticsStore {
             `);
 
             // Get duplicate GAs
-            const duplicateResult = await client.query(`
+            const duplicateResult = await this.db.query(`
                 SELECT COUNT(*) as duplicate_count
                 FROM (SELECT ga, COUNT(*) as mapping_count
                       FROM datapoint_mappings
@@ -562,7 +487,7 @@ export class StatisticsStore {
             `);
 
             // Get stale mappings
-            const staleResult = await client.query(`
+            const staleResult = await this.db.query(`
                 SELECT COUNT(*) as count
                 FROM datapoint_mappings m
                     LEFT JOIN current_state cs
@@ -571,7 +496,7 @@ export class StatisticsStore {
             `);
 
             // Get general statistics
-            const statsResult = await client.query(`
+            const statsResult = await this.db.query(`
                 SELECT (SELECT COUNT(*) FROM datapoint_mappings)           as total_mappings,
                        (SELECT COUNT(DISTINCT ga) FROM datapoint_mappings) as unique_gas_mappings,
                        (SELECT COUNT(*) FROM current_state)                as total_states,
@@ -612,8 +537,6 @@ export class StatisticsStore {
                 uniqueGASStates: 0,
                 dataIntegrityScore: 100,
             };
-        } finally {
-            if (client) client.release();
         }
     }
 
@@ -623,11 +546,8 @@ export class StatisticsStore {
      * @returns {Promise<Object>} Orphaned states details
      */
     async getDetailedOrphanedStates(limit = 20) {
-        let client;
         try {
-            client = await this.pool.connect();
-
-            const orphanedStates = await client.query(`
+            const orphanedStates = await this.db.query(`
                 SELECT cs.datapoint_id,
                        cs.ga,
                        cs.dpt,
@@ -641,7 +561,7 @@ export class StatisticsStore {
                     LIMIT $1
             `, [limit]);
 
-            const countResult = await client.query(`
+            const countResult = await this.db.query(`
                 SELECT COUNT(*) as count
                 FROM current_state cs
                     LEFT JOIN datapoint_mappings m
@@ -663,8 +583,6 @@ export class StatisticsStore {
         } catch (err) {
             this.logger.error('Failed to get detailed orphaned states', {error: err.message});
             return {totalOrphaned: 0, states: []};
-        } finally {
-            if (client) client.release();
         }
     }
 
@@ -673,11 +591,8 @@ export class StatisticsStore {
      * @returns {Promise<Object>} Duplicate GAs details
      */
     async getDetailedDuplicateGAs() {
-        let client;
         try {
-            client = await this.pool.connect();
-
-            const duplicates = await client.query(`
+            const duplicates = await this.db.query(`
                 SELECT ga,
                        COUNT(*)                       as mapping_count,
                        COUNT(DISTINCT dpt)            as dpt_count,
@@ -690,7 +605,7 @@ export class StatisticsStore {
                 ORDER BY COUNT (*) DESC
             `);
 
-            const countResult = await client.query(`
+            const countResult = await this.db.query(`
                 SELECT COUNT(*) as count
                 FROM (
                     SELECT ga FROM datapoint_mappings
@@ -712,8 +627,6 @@ export class StatisticsStore {
         } catch (err) {
             this.logger.error('Failed to get detailed duplicate GAs', {error: err.message});
             return {totalDuplicateGAs: 0, duplicates: []};
-        } finally {
-            if (client) client.release();
         }
     }
 
@@ -723,11 +636,8 @@ export class StatisticsStore {
      * @returns {Promise<Object>} Stale mappings details
      */
     async getDetailedStaleMappings(limit = 20) {
-        let client;
         try {
-            client = await this.pool.connect();
-
-            const staleMappings = await client.query(`
+            const staleMappings = await this.db.query(`
                 SELECT m.datapoint_id,
                        m.ga,
                        m.dpt,
@@ -741,7 +651,7 @@ export class StatisticsStore {
                     LIMIT $1
             `, [limit]);
 
-            const countResult = await client.query(`
+            const countResult = await this.db.query(`
                 SELECT COUNT(*) as count
                 FROM datapoint_mappings m
                     LEFT JOIN current_state cs
@@ -763,8 +673,6 @@ export class StatisticsStore {
         } catch (err) {
             this.logger.error('Failed to get detailed stale mappings', {error: err.message});
             return {totalStale: 0, mappings: []};
-        } finally {
-            if (client) client.release();
         }
     }
 
@@ -778,10 +686,7 @@ export class StatisticsStore {
      * @returns {Promise<Object>} Anomalies with metadata and summary
      */
     async getAnomalies(dpt = '9.001', delta = 2.0, since = null, limit = 50) {
-        let client;
         try {
-            client = await this.pool.connect();
-
             if (!since) {
                 since = new Date(Date.now() - 24 * 60 * 60 * 1000); // Default: 24h
             }
@@ -829,7 +734,7 @@ export class StatisticsStore {
                 LIMIT $${dptList.length + 3}
             `;
 
-            const result = await client.query(anomaliesQuery, [since, delta, ...dptList, limit]);
+            const result = await this.db.query(anomaliesQuery, [since, delta, ...dptList, limit]);
 
             // Count by severity
             const severityCounts = { high: 0, medium: 0, low: 0 };
@@ -886,8 +791,6 @@ export class StatisticsStore {
                 data: [],
                 summary: { high: 0, medium: 0, low: 0, total: 0 },
             };
-        } finally {
-            if (client) client.release();
         }
     }
 
@@ -899,10 +802,7 @@ export class StatisticsStore {
      * @returns {Promise<Object>} Temporal and spatial NULL patterns with diagnosis
      */
     async getNullPatterns(dpts = '9.001,9.007', since = null) {
-        let client;
         try {
-            client = await this.pool.connect();
-
             if (!since) {
                 since = new Date(Date.now() - 24 * 60 * 60 * 1000); // Default: 24h
             }
@@ -1012,8 +912,6 @@ export class StatisticsStore {
                 spatial_patterns: { description: '', concentrated: false, pattern: [] },
                 diagnosis: { likely_cause: 'unknown', confidence: 0, recommendation: '' },
             };
-        } finally {
-            if (client) client.release();
         }
     }
 
@@ -1025,16 +923,13 @@ export class StatisticsStore {
      * @returns {Promise<Object>} Detailed statistics and current state
      */
     async getDatapointSummary(datapointId, since = null) {
-        let client;
         try {
-            client = await this.pool.connect();
-
             if (!since) {
                 since = new Date(Date.now() - 24 * 60 * 60 * 1000); // Default: 24h
             }
 
             // Find datapoint by ID or GA
-            const dpLookup = await client.query(`
+            const dpLookup = await this.db.query(`
                 SELECT DISTINCT datapoint_id, ga, dpt
                 FROM knx_events
                 WHERE datapoint_id = $1 OR ga = $1
@@ -1050,7 +945,7 @@ export class StatisticsStore {
             const dpt = dpLookup.rows[0].dpt;
 
             // Get detailed statistics for 24h period
-            const stats24h = await client.query(`
+            const stats24h = await this.db.query(`
                 SELECT
                     COUNT(*) as count,
                     COUNT(CASE WHEN value_float IS NULL THEN 1 END) as null_count,
@@ -1067,7 +962,7 @@ export class StatisticsStore {
                 WHERE datapoint_id = $1 AND ts >= $2 AND value_float IS NOT NULL
             `, [dpId, since]);
 
-            const stats7d = await client.query(`
+            const stats7d = await this.db.query(`
                 SELECT
                     COUNT(*) as count,
                     AVG(value_float) as average,
@@ -1081,7 +976,7 @@ export class StatisticsStore {
             `, [dpId, since]);
 
             // Count anomalies (changes > 2 units)
-            const anomalies = await client.query(`
+            const anomalies = await this.db.query(`
                 WITH changes AS (
                     SELECT
                         ABS(value_float - LAG(value_float) OVER (ORDER BY ts)) as delta
@@ -1094,7 +989,7 @@ export class StatisticsStore {
             `, [dpId, since]);
 
             // Get current state
-            const current = await client.query(`
+            const current = await this.db.query(`
                 SELECT ts, value_float
                 FROM knx_events
                 WHERE datapoint_id = $1
@@ -1173,8 +1068,6 @@ export class StatisticsStore {
         } catch (err) {
             this.logger.error('Failed to get datapoint summary', {error: err.message, datapointId});
             return null;
-        } finally {
-            if (client) client.release();
         }
     }
 }
