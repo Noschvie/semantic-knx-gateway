@@ -7,6 +7,13 @@ import { createLogger } from '../utils/logger.js';
 
 const { Pool } = pg;
 
+/**
+ * @typedef {Object} TransactionContext
+ * @property {Function} query - Execute a query within the transaction
+ * @property {Function} commit - Commit the transaction
+ * @property {Function} rollback - Rollback the transaction
+ */
+
 export class PostgresClient {
     constructor() {
         this.logger = createLogger('PostgreSQL');
