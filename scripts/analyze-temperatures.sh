@@ -230,6 +230,42 @@ main() {
     LIMIT 50;
     " || warn "No anomalies found or query error"
 
+    # 6b. NULL value analysis: temporal and spatial patterns
+    print_header "6️⃣ ᵇ NULL VALUE PATTERNS (Last 24 Hours)"
+    warn "Analyzing NULL values: Are they synchronized to time boundaries or specific group addresses?"
+
+    info "Pattern 1: NULL values by minute-of-hour (synchronized timing?)..."
+    run_query "
+    SELECT
+        EXTRACT(MINUTE FROM ts AT TIME ZONE '$DB_TIMEZONE')::int as minute_of_hour,
+        COUNT(*) as null_count,
+        COUNT(DISTINCT ga) as affected_ga_count,
+        STRING_AGG(DISTINCT ga, ', ' ORDER BY ga) as sample_gas
+    FROM knx_events
+    WHERE dpt IN ('9.001', '9.007')
+      AND value_float IS NULL
+      AND ts > NOW() - INTERVAL '24 hours'
+    GROUP BY EXTRACT(MINUTE FROM ts AT TIME ZONE '$DB_TIMEZONE')
+    ORDER BY null_count DESC
+    LIMIT 15;
+    "
+
+    info "Pattern 2: Which group addresses have the most NULLs (spatial concentration)?"
+    run_query "
+    SELECT
+        ga,
+        COUNT(*) as null_count,
+        COUNT(DISTINCT EXTRACT(HOUR FROM ts AT TIME ZONE '$DB_TIMEZONE')) as hours_affected,
+        ROUND(100.0 * COUNT(*) / (SELECT COUNT(*) FROM knx_events WHERE dpt IN ('9.001', '9.007') AND ts > NOW() - INTERVAL '24 hours'), 2) as percent_of_all_events
+    FROM knx_events
+    WHERE dpt IN ('9.001', '9.007')
+      AND value_float IS NULL
+      AND ts > NOW() - INTERVAL '24 hours'
+    GROUP BY ga
+    ORDER BY null_count DESC
+    LIMIT 10;
+    "
+
     # 7. Top 10 hottest locations (Maximum values)
     print_header "7️⃣  TOP 10 HOTTEST LOCATIONS (Max Values 24h)"
     info "Hottest locations in the last 24 hours..."
