@@ -85,9 +85,9 @@ export class StatisticsLogger {
             const gaWidth = 12;
             const idWidth = 10;
             const eventsWidth = 8;
-            const nameWidth = 36;
+            const nameWidth = 40;
             const lastSeenWidth = 23;
-            const valueWidth = 16;
+            const valueWidth = 15;
 
             output.push('───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────');
             output.push(
