@@ -129,7 +129,7 @@ while IFS= read -r ga; do
             echo "$response" | jq '.errors'
         elif echo "$response" | jq -e '.data.attributes.ga' > /dev/null 2>&1; then
             echo -e "${GREEN}✓ Success:${NC}"
-            echo "$response" | jq '{datapointId: .data.attributes.datapointId, name: .data.attributes.name, ga: .data.attributes.ga, dpt: .data.attributes.dpt, stats_24h: .statistics.last_24h.values, period: .statistics.last_24h.period}'
+            echo "$response" | jq '{datapointId: .data.attributes.datapointId, name: .data.attributes.name, ga: .data.attributes.ga, dpt: .data.attributes.dpt, measurements_24h: .statistics.last_24h.measurements.count, measurements_7d: .statistics.last_7d.measurements.count, stats_24h: .statistics.last_24h.values, stats_7d: .statistics.last_7d.values, period: .statistics.last_24h.period}'
         else
             echo -e "${YELLOW}? Unexpected response:${NC}"
             echo "$response" | jq '.' 2>/dev/null || echo "$response"
