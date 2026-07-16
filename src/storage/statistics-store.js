@@ -940,11 +940,16 @@ export class StatisticsStore {
                 since = new Date(Date.now() - 24 * 60 * 60 * 1000); // Default: 24h
             }
 
-            // Find datapoint by ID or GA
+            // Find datapoint by ID or GA, including name from mappings
             const dpLookup = await this.db.query(`
-                SELECT DISTINCT datapoint_id, ga, dpt
-                FROM knx_events
-                WHERE datapoint_id = $1 OR ga = $1
+                SELECT DISTINCT 
+                    e.datapoint_id, 
+                    e.ga, 
+                    e.dpt,
+                    COALESCE(m.name, 'Unknown') as name
+                FROM knx_events e
+                LEFT JOIN datapoint_mappings m ON e.datapoint_id = m.datapoint_id
+                WHERE e.datapoint_id = $1 OR e.ga = $1
                 LIMIT 1
             `, [datapointId]);
 
@@ -955,6 +960,7 @@ export class StatisticsStore {
             const dpId = dpLookup.rows[0].datapoint_id;
             const ga = dpLookup.rows[0].ga;
             const dpt = dpLookup.rows[0].dpt;
+            const name = dpLookup.rows[0].name;
 
             // Get detailed statistics for 24h period (aggregates only)
             const stats24h = await this.db.query(`
@@ -1037,6 +1043,7 @@ export class StatisticsStore {
                     type: 'datapoint',
                     attributes: {
                         datapointId: dpId,
+                        name: name,
                         ga,
                         dpt,
                     },
