@@ -83,7 +83,8 @@ export class StatisticsLogger {
 
             for (const ga of stats.topGAs) {
                 output.push(
-                    `   • ${ga.ga.padEnd(12)} → ${String(ga.count).padStart(4)} events` +
+                    `   • ${ga.ga.padEnd(10)} (ID: ${String(ga.datapointId).padEnd(6)}) → ${String(ga.count).padStart(4)} events` +
+                    `   | ${ga.gaName || 'Unknown'}` +
                     `   | ${formatTimestamp(ga.lastSeen) || 'N/A'}` +
                     `   | Value: ${formatDPTValue(ga.currentValue)}`,
                 );

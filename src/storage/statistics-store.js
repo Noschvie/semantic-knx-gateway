@@ -137,6 +137,7 @@ export class StatisticsStore {
         try {
             const result = await this.db.query(`
                 SELECT e.ga,
+                       e.datapoint_id,
                        COUNT(*) as count,
                     MAX(e.ts) as last_seen,
                     (
@@ -145,18 +146,28 @@ export class StatisticsStore {
                         WHERE cs.ga = e.ga
                         ORDER BY cs.updated_at DESC
                         LIMIT 1
-                    ) as current_value
+                    ) as current_value,
+                    (
+                        SELECT dm.name
+                        FROM datapoint_mappings dm
+                        WHERE dm.ga = e.ga
+                        ORDER BY dm.created_at DESC
+                        LIMIT 1
+                    ) as ga_name
                 FROM knx_events e
                 WHERE e.ts >= $1
-                GROUP BY e.ga
+                GROUP BY e.ga, e.datapoint_id
                 ORDER BY count DESC
                     LIMIT $2
             `, [startTime, limit]);
+
             return result.rows.map(row => ({
                 ga: row.ga,
+                datapointId: row.datapoint_id,
+                gaName: row.ga_name || 'Unknown',
                 count: this.#parseInt(row.count),
-                lastSeen: row.last_seen,
                 currentValue: row.current_value,
+                lastSeen: row.last_seen,
             }));
         } catch (err) {
             this.logger.error('Failed to get top active group addresses', { error: err.message });
