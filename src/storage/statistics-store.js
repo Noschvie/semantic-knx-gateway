@@ -944,7 +944,7 @@ export class StatisticsStore {
             const ga = dpLookup.rows[0].ga;
             const dpt = dpLookup.rows[0].dpt;
 
-            // Get detailed statistics for 24h period
+            // Get detailed statistics for 24h period (aggregates only)
             const stats24h = await this.db.query(`
                 SELECT
                     COUNT(*) as count,
@@ -955,11 +955,25 @@ export class StatisticsStore {
                     STDDEV(value_float) as stddev,
                     PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY value_float) as median,
                     PERCENTILE_CONT(0.25) WITHIN GROUP (ORDER BY value_float) as q1,
-                    PERCENTILE_CONT(0.75) WITHIN GROUP (ORDER BY value_float) as q3,
-                    FIRST_VALUE(value_float) OVER (ORDER BY ts) as first_value,
-                    LAST_VALUE(value_float) OVER (ORDER BY ts DESC) as last_value
+                    PERCENTILE_CONT(0.75) WITHIN GROUP (ORDER BY value_float) as q3
                 FROM knx_events
                 WHERE datapoint_id = $1 AND ts >= $2 AND value_float IS NOT NULL
+            `, [dpId, since]);
+
+            // Get first and last values for 24h period (using window functions separately)
+            const firstLastValues = await this.db.query(`
+                WITH ordered_values AS (
+                    SELECT
+                        value_float,
+                        ROW_NUMBER() OVER (ORDER BY ts ASC) as rn_asc,
+                        ROW_NUMBER() OVER (ORDER BY ts DESC) as rn_desc
+                    FROM knx_events
+                    WHERE datapoint_id = $1 AND ts >= $2 AND value_float IS NOT NULL
+                )
+                SELECT
+                    MAX(CASE WHEN rn_asc = 1 THEN value_float END) as first_value,
+                    MAX(CASE WHEN rn_desc = 1 THEN value_float END) as last_value
+                FROM ordered_values
             `, [dpId, since]);
 
             const stats7d = await this.db.query(`
@@ -999,6 +1013,7 @@ export class StatisticsStore {
 
             const s24 = stats24h.rows[0] || {};
             const s7d = stats7d.rows[0] || {};
+            const flv = firstLastValues.rows[0] || {};
             const curr = current.rows[0];
 
             return {
@@ -1037,11 +1052,11 @@ export class StatisticsStore {
                             q3: parseFloat(s24.q3 || 0),
                         },
                         trend: {
-                            direction: s24.last_value > s24.first_value ? 'rising' : (s24.last_value < s24.first_value ? 'falling' : 'stable'),
-                            first_value: parseFloat(s24.first_value || 0),
-                            last_value: parseFloat(s24.last_value || 0),
-                            change: parseFloat((s24.last_value - s24.first_value) || 0),
-                            change_percent: s24.first_value !== 0 ? parseFloat(((s24.last_value - s24.first_value) / s24.first_value * 100).toFixed(2)) : 0,
+                            direction: flv.last_value > flv.first_value ? 'rising' : (flv.last_value < flv.first_value ? 'falling' : 'stable'),
+                            first_value: parseFloat(flv.first_value || 0),
+                            last_value: parseFloat(flv.last_value || 0),
+                            change: parseFloat((flv.last_value - flv.first_value) || 0),
+                            change_percent: flv.first_value !== 0 ? parseFloat(((flv.last_value - flv.first_value) / flv.first_value * 100).toFixed(2)) : 0,
                         },
                     },
                     last_7d: {
