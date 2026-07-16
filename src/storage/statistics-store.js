@@ -151,7 +151,6 @@ export class StatisticsStore {
                         SELECT dm.name
                         FROM datapoint_mappings dm
                         WHERE dm.ga = e.ga
-                        ORDER BY dm.created_at DESC
                         LIMIT 1
                     ) as ga_name
                 FROM knx_events e

@@ -55,7 +55,7 @@ export class StatisticsLogger {
                 ? (eventsSinceLastCheck / this.intervalMinutes).toFixed(1)
                 : 0;
 
-            // Build output as single string for atomic write
+            // Build output as single string for atomic writing
             const output = [
                 '',
                 '════════════════════════════════════════════════════',
