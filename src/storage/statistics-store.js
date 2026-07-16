@@ -260,6 +260,18 @@ export class StatisticsStore {
     }
 
     /**
+     * Helper: Format float to 1 decimal place and return as float
+     * @param {number} value - Value to format
+     * @returns {number} Formatted float with 1 decimal place
+     */
+    #formatFloat(value) {
+        if (value === null || value === undefined) {
+            return 0.0;
+        }
+        return parseFloat((value || 0).toFixed(1));
+    }
+
+    /**
      * Get all comprehensive statistics for GET /api/v2/stats
      * @returns {Promise<Object>} Complete stats object
      */
@@ -878,7 +890,7 @@ export class StatisticsStore {
                         null_count: this.#parseInt(row.null_count),
                         affected_ga_count: this.#parseInt(row.affected_ga_count),
                         sample_gas: (row.sample_gas || '').split(',').map(g => g.trim()).filter(g => g),
-                        percentage_of_total: parseFloat(((row.null_count / totalEvents) * 100).toFixed(1)),
+                        percentage_of_total: this.#formatFloat((row.null_count / totalEvents) * 100),
                     })),
                 },
                 spatial_patterns: {
@@ -889,7 +901,7 @@ export class StatisticsStore {
                         datapoint_id: row.datapoint_id,
                         null_count: this.#parseInt(row.null_count),
                         hours_affected: this.#parseInt(row.hours_affected),
-                        percent_of_all_events: parseFloat(((row.null_count / totalEvents) * 100).toFixed(1)),
+                        percent_of_all_events: this.#formatFloat((row.null_count / totalEvents) * 100),
                         first_null: row.first_null.toISOString(),
                         first_null_local: formatTimestamp(row.first_null),
                         last_null: row.last_null.toISOString(),
@@ -1042,24 +1054,24 @@ export class StatisticsStore {
                             count: this.#parseInt(s24.count),
                             missing: 0,
                             null_count: this.#parseInt(s24.null_count),
-                            null_percent: s24.count > 0 ? (s24.null_count / s24.count * 100).toFixed(1) : 0,
+                            null_percent: s24.count > 0 ? this.#formatFloat((s24.null_count / s24.count * 100)) : 0,
                         },
                         values: {
-                            average: parseFloat(s24.average || 0),
-                            minimum: parseFloat(s24.minimum || 0),
-                            maximum: parseFloat(s24.maximum || 0),
-                            range: parseFloat((s24.maximum - s24.minimum) || 0),
-                            stddev: parseFloat(s24.stddev || 0),
-                            median: parseFloat(s24.median || 0),
-                            q1: parseFloat(s24.q1 || 0),
-                            q3: parseFloat(s24.q3 || 0),
+                            average: this.#formatFloat(s24.average),
+                            minimum: this.#formatFloat(s24.minimum),
+                            maximum: this.#formatFloat(s24.maximum),
+                            range: this.#formatFloat(s24.maximum - s24.minimum),
+                            stddev: this.#formatFloat(s24.stddev),
+                            median: this.#formatFloat(s24.median),
+                            q1: this.#formatFloat(s24.q1),
+                            q3: this.#formatFloat(s24.q3),
                         },
                         trend: {
                             direction: flv.last_value > flv.first_value ? 'rising' : (flv.last_value < flv.first_value ? 'falling' : 'stable'),
-                            first_value: parseFloat(flv.first_value || 0),
-                            last_value: parseFloat(flv.last_value || 0),
-                            change: parseFloat((flv.last_value - flv.first_value) || 0),
-                            change_percent: flv.first_value !== 0 ? parseFloat(((flv.last_value - flv.first_value) / flv.first_value * 100).toFixed(2)) : 0,
+                            first_value: this.#formatFloat(flv.first_value),
+                            last_value: this.#formatFloat(flv.last_value),
+                            change: this.#formatFloat(flv.last_value - flv.first_value),
+                            change_percent: flv.first_value !== 0 ? this.#formatFloat((flv.last_value - flv.first_value) / flv.first_value * 100) : 0,
                         },
                     },
                     last_7d: {
@@ -1067,16 +1079,16 @@ export class StatisticsStore {
                             count: this.#parseInt(s7d.count),
                         },
                         values: {
-                            average: parseFloat(s7d.average || 0),
-                            minimum: parseFloat(s7d.minimum || 0),
-                            maximum: parseFloat(s7d.maximum || 0),
-                            range: parseFloat((s7d.maximum - s7d.minimum) || 0),
+                            average: this.#formatFloat(s7d.average),
+                            minimum: this.#formatFloat(s7d.minimum),
+                            maximum: this.#formatFloat(s7d.maximum),
+                            range: this.#formatFloat(s7d.maximum - s7d.minimum),
                         },
                         anomalies: this.#parseInt(anomalies.rows[0]?.anomaly_count || 0),
                     },
                 },
                 current: {
-                    value: curr ? parseFloat(curr.value_float) : null,
+                    value: curr ? this.#formatFloat(curr.value_float) : null,
                     timestamp: curr ? curr.ts.toISOString() : null,
                     timestamp_local: curr ? formatTimestamp(curr.ts) : null,
                     age_seconds: curr ? Math.round((Date.now() - curr.ts) / 1000) : null,
