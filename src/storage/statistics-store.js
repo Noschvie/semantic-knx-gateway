@@ -153,10 +153,10 @@ export class StatisticsStore {
 
             // Step 2: Get current values and names for these GAs
             const gaList = topGAsResult.rows.map(row => row.ga);
-            const placeholders = gaList.map((_, i) => `\${i + 1}`).join(',');
+            const placeholders = gaList.map((_, i) => `$${i + 1}`).join(',');
 
             const attributesResult = await this.db.query(`
-                SELECT 
+                SELECT DISTINCT ON (cs.ga)
                     cs.ga,
                     cs.value_decoded,
                     dm.datapoint_id,
@@ -164,7 +164,7 @@ export class StatisticsStore {
                 FROM current_state cs
                 LEFT JOIN datapoint_mappings dm ON cs.ga = dm.ga
                 WHERE cs.ga IN (${placeholders})
-                QUALIFY ROW_NUMBER() OVER (PARTITION BY cs.ga ORDER BY cs.updated_at DESC) = 1
+                ORDER BY cs.ga, cs.updated_at DESC
             `, gaList);
 
             // Step 3: Merge results
