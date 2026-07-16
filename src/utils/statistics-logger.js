@@ -81,14 +81,40 @@ export class StatisticsLogger {
                 `🔝 Top 5 Active Group Addresses (last ${this.intervalMinutes}min):`,
             ];
 
+            // Table header
+            const gaWidth = 12;
+            const idWidth = 10;
+            const eventsWidth = 8;
+            const nameWidth = 36;
+            const lastSeenWidth = 23;
+            const valueWidth = 16;
+
+            output.push('───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────');
+            output.push(
+                '  ' +
+                'GA'.padEnd(gaWidth) +
+                'ID'.padEnd(idWidth) +
+                'Events'.padEnd(eventsWidth) +
+                'Name'.padEnd(nameWidth) +
+                'Last Seen'.padEnd(lastSeenWidth) +
+                'Value'.padEnd(valueWidth),
+            );
+            output.push('───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────');
+
+            // Table rows
             for (const ga of stats.topGAs) {
+                const gaStr = ga.ga.padEnd(gaWidth);
+                const idStr = String(ga.datapointId).padEnd(idWidth);
+                const eventsStr = String(ga.count).padEnd(eventsWidth);
+                const nameStr = (ga.gaName || 'Unknown').padEnd(nameWidth);
+                const lastSeenStr = (formatTimestamp(ga.lastSeen) || 'N/A').padEnd(lastSeenWidth);
+                const valueStr = formatDPTValue(ga.currentValue).padEnd(valueWidth);
+
                 output.push(
-                    `   • ${ga.ga.padEnd(10)} (ID: ${String(ga.datapointId).padEnd(6)}) → ${String(ga.count).padStart(4)} events` +
-                    `   | ${ga.gaName || 'Unknown'}` +
-                    `   | ${formatTimestamp(ga.lastSeen) || 'N/A'}` +
-                    `   | Value: ${formatDPTValue(ga.currentValue)}`,
+                    '  ' + gaStr + idStr + eventsStr + nameStr + lastSeenStr + valueStr,
                 );
             }
+            output.push('───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────');
 
             output.push('');
             output.push('🔍 DATA INTEGRITY CHECKS:');
