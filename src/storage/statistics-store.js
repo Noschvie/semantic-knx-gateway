@@ -976,6 +976,9 @@ export class StatisticsStore {
                 FROM ordered_values
             `, [dpId, since]);
 
+            // Calculated 7 days ago in JavaScript to avoid PostgreSQL operator precedence issues
+            const sevenDaysAgo = new Date(since.getTime() - 7 * 24 * 60 * 60 * 1000);
+
             const stats7d = await this.db.query(`
                 SELECT
                     COUNT(*) as count,
@@ -985,9 +988,9 @@ export class StatisticsStore {
                     COUNT(CASE WHEN value_float IS NULL THEN 1 END) as null_count
                 FROM knx_events
                 WHERE datapoint_id = $1 
-                    AND ts >= ($2 - INTERVAL '7 days')
+                    AND ts >= $2
                     AND value_float IS NOT NULL
-            `, [dpId, since]);
+            `, [dpId, sevenDaysAgo]);
 
             // Count anomalies (changes > 2 units)
             const anomalies = await this.db.query(`
