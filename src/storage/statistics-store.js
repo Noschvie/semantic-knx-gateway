@@ -135,39 +135,64 @@ export class StatisticsStore {
      */
     async getTopActiveGroupAddresses(startTime, limit = 5) {
         try {
-            const result = await this.db.query(`
+            // Step 1: Get top N group addresses by event count
+            const topGAsResult = await this.db.query(`
                 SELECT e.ga,
-                       e.datapoint_id,
-                       COUNT(*) as count,
-                    MAX(e.ts) as last_seen,
-                    (
-                        SELECT cs.value_decoded
-                        FROM current_state cs
-                        WHERE cs.ga = e.ga
-                        ORDER BY cs.updated_at DESC
-                        LIMIT 1
-                    ) as current_value,
-                    (
-                        SELECT dm.name
-                        FROM datapoint_mappings dm
-                        WHERE dm.ga = e.ga
-                        LIMIT 1
-                    ) as ga_name
+                    COUNT(*) as count,
+                    MAX(e.ts) as last_seen
                 FROM knx_events e
                 WHERE e.ts >= $1
-                GROUP BY e.ga, e.datapoint_id
+                GROUP BY e.ga
                 ORDER BY count DESC
-                    LIMIT $2
+                LIMIT $2
             `, [startTime, limit]);
 
-            return result.rows.map(row => ({
-                ga: row.ga,
-                datapointId: row.datapoint_id,
-                gaName: row.ga_name || 'Unknown',
-                count: this.#parseInt(row.count),
-                currentValue: row.current_value,
-                lastSeen: row.last_seen,
-            }));
+            if (topGAsResult.rows.length === 0) {
+                return [];
+            }
+
+            // Step 2: Get current values and names for these GAs
+            const gaList = topGAsResult.rows.map(row => row.ga);
+            const placeholders = gaList.map((_, i) => `\${i + 1}`).join(',');
+
+            const attributesResult = await this.db.query(`
+                SELECT 
+                    cs.ga,
+                    cs.value_decoded,
+                    dm.datapoint_id,
+                    dm.name
+                FROM current_state cs
+                LEFT JOIN datapoint_mappings dm ON cs.ga = dm.ga
+                WHERE cs.ga IN (${placeholders})
+                QUALIFY ROW_NUMBER() OVER (PARTITION BY cs.ga ORDER BY cs.updated_at DESC) = 1
+            `, gaList);
+
+            // Step 3: Merge results
+            const attributesMap = new Map();
+            attributesResult.rows.forEach(row => {
+                attributesMap.set(row.ga, {
+                    currentValue: row.value_decoded,
+                    datapointId: row.datapoint_id,
+                    gaName: row.name || 'Unknown'
+                });
+            });
+
+            // Step 4: Combine and return
+            return topGAsResult.rows.map(row => {
+                const attrs = attributesMap.get(row.ga) || {
+                    currentValue: null,
+                    datapointId: null,
+                    gaName: 'Unknown'
+                };
+                return {
+                    ga: row.ga,
+                    datapointId: attrs.datapointId,
+                    gaName: attrs.gaName,
+                    count: this.#parseInt(row.count),
+                    currentValue: attrs.currentValue,
+                    lastSeen: row.last_seen,
+                };
+            });
         } catch (err) {
             this.logger.error('Failed to get top active group addresses', { error: err.message });
             return [];
