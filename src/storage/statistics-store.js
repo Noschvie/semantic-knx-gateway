@@ -643,7 +643,7 @@ export class StatisticsStore {
                        m.dpt,
                        m.name,
                        m.device_id,
-                       COALESCE(cs.updated_at, NOW() - INTERVAL '999 years') as last_state_update
+                       COALESCE(cs.updated_at, (NOW() - INTERVAL '10 years')) as last_state_update
                 FROM datapoint_mappings m
                          LEFT JOIN current_state cs ON m.datapoint_id = cs.datapoint_id
                 WHERE cs.datapoint_id IS NULL
@@ -853,9 +853,9 @@ export class StatisticsStore {
             `;
 
             const [temporalResult, spatialResult, totalResult] = await Promise.all([
-                client.query(temporalQuery, [since, ...dptList]),
-                client.query(spatialQuery, [since, ...dptList]),
-                client.query(totalQuery, [since, ...dptList]),
+                 this.db.query(temporalQuery, [since, ...dptList]),
+                 this.db.query(spatialQuery, [since, ...dptList]),
+                 this.db.query(totalQuery, [since, ...dptList]),
             ]);
 
             const totalEvents = this.#parseInt(totalResult.rows[0]?.total || 1);
@@ -985,7 +985,7 @@ export class StatisticsStore {
                     COUNT(CASE WHEN value_float IS NULL THEN 1 END) as null_count
                 FROM knx_events
                 WHERE datapoint_id = $1 
-                    AND ts >= $2 - INTERVAL '7 days'
+                    AND ts >= ($2 - INTERVAL '7 days')
                     AND value_float IS NOT NULL
             `, [dpId, since]);
 
