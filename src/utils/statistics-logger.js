@@ -85,11 +85,11 @@ export class StatisticsLogger {
             const gaWidth = 12;
             const idWidth = 10;
             const eventsWidth = 8;
-            const nameWidth = 40;
+            const nameWidth = 42;
             const lastSeenWidth = 23;
             const valueWidth = 15;
 
-            output.push('───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────');
+            output.push('──────────────────────────────────────────────────────────────────────────────────────────────────────────────────');
             output.push(
                 '  ' +
                 'GA'.padEnd(gaWidth) +
@@ -99,7 +99,7 @@ export class StatisticsLogger {
                 'Last Seen'.padEnd(lastSeenWidth) +
                 'Value'.padEnd(valueWidth),
             );
-            output.push('───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────');
+            output.push('──────────────────────────────────────────────────────────────────────────────────────────────────────────────────');
 
             // Table rows
             for (const ga of stats.topGAs) {
@@ -114,11 +114,11 @@ export class StatisticsLogger {
                     '  ' + gaStr + idStr + eventsStr + nameStr + lastSeenStr + valueStr,
                 );
             }
-            output.push('───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────');
+            output.push('──────────────────────────────────────────────────────────────────────────────────────────────────────────────────');
 
             output.push('');
             output.push('🔍 DATA INTEGRITY CHECKS:');
-            output.push('─────────────────────────────────────────────────────');
+            output.push('────────────────────────────────────────────────────');
             output.push(`✓ Orphaned States:        ${stats.orphanedStatesCount} orphaned (${stats.orphanedStatesGAs} GAs affected)`);
             output.push(`✓ Duplicate GAs:          ${stats.duplicateGAsCount} duplicate GAs`);
             output.push(`✓ Stale Mappings:         ${stats.staleMappingsCount} stale mappings`);
