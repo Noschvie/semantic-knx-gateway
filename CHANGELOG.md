@@ -8,6 +8,9 @@ contributors and users to follow meaningful changes over time.
 Unreleased
 ----------
 
+2026-07-16
+----------
+
 ### Added
 - **KNX IP Secure Tunneling Integration** — Enterprise-grade encrypted KNX communication:
   
