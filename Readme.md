@@ -117,6 +117,7 @@ To enable full auto-tuning instead, add `cgroup_memory=1 cgroup_enable=memory` t
 
 - [Architecture & Resource Model](./ARCHITECTURE.md)
 - [Configuration Reference](./CONFIGURATION.md)
+- [API Timestamp Convention](./docs/API_TIMESTAMP_CONVENTION.md)
 - [KNX IoT 3rd Party API v2.1.0 — Swagger](https://schema.knx.org/2020/api/2.1.0?visualisation=swagger)
 - [KNX IoT API Server – KNX Association Implementation Guide](https://support.knx.org/hc/en-us/articles/23995369446162)
 

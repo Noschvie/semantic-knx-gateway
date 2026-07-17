@@ -1,0 +1,180 @@
+#!/usr/bin/env bash
+
+# support user renaming of script
+SCRIPT=$(basename "$0")
+
+# should not run as root
+[ "$EUID" -eq 0 ] && echo "$SCRIPT should NOT be run using sudo" && exit 1
+
+# assumptions that can be overridden
+IOTSTACK=${IOTSTACK:-"$HOME/IOTstack"}
+
+# the project name is the all-lower-case form of the folder name
+PROJECT=$(basename ${IOTSTACK,,})
+
+# useful function
+isStackUp() {
+   if COUNT=$( \
+      curl -s --unix-socket /var/run/docker.sock http://localhost/containers/json | \
+      jq -c ".[].Labels.\"com.docker.compose.project\"" | \
+      grep -c "\"$1\"$" \
+   ) ; then
+      if [ $COUNT -gt 0 ] ; then
+         return 0
+      fi
+   fi
+   return 1
+}
+
+USAGE=0
+
+case "$#" in
+
+  1 )
+    RUNTAG="$1"
+    # extract all characters to the right of the first period
+    BY_HOST_DIR=${RUNTAG#*.}
+    # if no period, RUNTAG is copied to BY_HOST_DIR
+    if [ "$BY_HOST_DIR" == "$RUNTAG" ] ; then
+       echo "Error: by_host_dir can't be derived from the runtag."
+       echo "       Try passing a second argument."
+       USAGE=1
+    fi
+    ;;
+
+  2 )
+    RUNTAG="$1"
+    BY_HOST_DIR="$2"
+    ;;
+
+  * )
+    USAGE=1
+    ;;
+
+esac
+
+if [ $USAGE -ne 0 ] ; then
+   echo "Usage: $SCRIPT runtag {by_host_dir}"
+   echo "where:"
+   echo "  runtag (eg yyyy-mm-dd_hhmm.by_host_dir)"
+   echo "  by_host_dir"
+   echo "  - must be a host that has performed at least one backup"
+   echo "  - is derived from runtag if omitted but runtag syntax"
+   echo "    must be yyyy-mm-dd_hhmm.hostname"
+   exit 1
+fi
+
+# check dependencies
+if [ -z "$(which shyaml)" -o -z "$(which curl)" -o -z "$(which jq)" ] ; then
+   echo "Missing dependencies. Please re-run install_scripts.sh."
+   exit 1
+fi
+
+# the configuration file is at
+CONFIG_YML="$HOME/.config/iotstack_backup/config.yml"
+
+# does the configuration file exist?
+if [ -e "$CONFIG_YML" ] ; then
+   CLOUD_METHOD=$(shyaml get-value restore.method  < "$CONFIG_YML")
+   CLOUD_OPTIONS=$(shyaml -q get-value restore.options  < "$CONFIG_YML")
+   CLOUD_PREFIX=$(shyaml get-value restore.prefix  < "$CONFIG_YML")
+else
+   echo "Warning: Configuration file not found: $CONFIG_YML"
+fi
+
+# apply defaults if not set from configuration file
+CLOUD_METHOD=${CLOUD_METHOD:-"SCP"}
+CLOUD_PREFIX=${CLOUD_PREFIX:-"myuser@myhost.mydomain.com:/path/to/backup/directory/on/myhost"}
+
+# form the cloud path
+CLOUD_PATH="$CLOUD_PREFIX/$BY_HOST_DIR"
+
+# assumptions
+COMPOSENAME="docker-compose.yml"
+COMPOSE="$IOTSTACK/$COMPOSENAME"
+
+# check the key assumption
+if [ ! -d "$IOTSTACK" ] ; then
+   echo "Error: $IOTSTACK does not exist. This may indicate a problem with your installation."
+   echo ""
+   echo "Note - if you are trying to perform a \"bare metal\" restore,"
+   echo "       you need to do the following to establish the basic"
+   echo "       structures needed before a restore can work:"
+   echo "         1. Clone IOTstack from GitHub."
+   echo "         2. Run the menu and install Docker."
+   echo "         3. Reboot (suggested by the menu)."
+   exit 1
+fi
+
+echo "----- Starting $SCRIPT at $(date) -----"
+echo " CLOUD_METHOD = $CLOUD_METHOD"
+echo "CLOUD_OPTIONS = $CLOUD_OPTIONS"
+echo " CLOUD_PREFIX = $CLOUD_PREFIX"
+echo "   CLOUD_PATH = $CLOUD_PATH"
+
+# make a temporary directory within the scope of IOTstack
+RESTOREDIR=$(mktemp -d -p "$IOTSTACK")
+
+# copy the backups into the restore directory
+echo "Attempting to fetch backup images for $RUNTAG"
+
+case "$CLOUD_METHOD" in
+
+  "RCLONE" )
+    rclone copy -v $CLOUD_OPTIONS --include "$RUNTAG.*" "$CLOUD_PATH" "$RESTOREDIR"
+    ;;
+
+  "RSYNC" | "SCP" )
+    scp $CLOUD_OPTIONS "$CLOUD_PATH/$RUNTAG".* "$RESTOREDIR"
+    ;;
+
+  * )
+    echo "Warning: $CLOUD_METHOD backup method is not supported"
+    echo "Warning: The only backup files are the ones in $BACKUPSDIR"
+    ;;
+
+esac
+
+# presume that the stack is not running and does not need restarting
+RESTART="NO"
+
+# does the compose file exist?
+if [ -e "$COMPOSE" ] ; then
+
+   # yes! is IOTstack (or any part of it) running?
+   if isStackUp "$PROJECT" ; then
+
+      echo "Deactivating $PROJECT"
+      docker compose --project-directory "$IOTSTACK" down
+
+      # the stack should be re-launched on exit
+      RESTART="YES"
+
+   fi
+
+fi
+
+# try to perform the restores
+iotstack_restore_general "$RESTOREDIR" "$RUNTAG"
+iotstack_restore_influxdb  "$RESTOREDIR" "$RUNTAG"
+iotstack_restore_influxdb2  "$RESTOREDIR" "$RUNTAG"
+iotstack_restore_nextcloud "$RESTOREDIR" "$RUNTAG"
+iotstack_restore_mariadb "$RESTOREDIR" "$RUNTAG"
+iotstack_restore_postgres "$RESTOREDIR" "$RUNTAG"
+iotstack_restore_wordpress "$RESTOREDIR" "$RUNTAG"
+iotstack_restore_gitea "$RESTOREDIR" "$RUNTAG"
+
+# clean up the temporary restore directory
+echo "Cleaning up"
+rm -rf "$RESTOREDIR"
+
+# should the stack be brought up?
+if [ "$RESTART" = "YES" ] ; then
+
+   # yes! if RESTART=YES then COMPOSE must exist
+   echo "Reactivating the stack"
+   docker compose --project-directory "$IOTSTACK" up -d
+
+fi
+
+echo "----- Finished $SCRIPT at $(date) -----"

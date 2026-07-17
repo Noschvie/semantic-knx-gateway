@@ -10,8 +10,9 @@ import { gaToInteger, resolveDatapointTypes, toSpecValue } from './knx-iot-dpt.j
 /**
  * Transforms an internal datapoint state into a JSON:API resource.
  * @param {Object} state - Row from current_state + optional semantic data
+ * @param {Object} options - Optional { dptAtCapture: string } for historical DPT
  */
-export function toDatapointResource(state) {
+export function toDatapointResource(state, options = {}) {
     const uuid     = stableUuid(state.datapointId ?? state.datapoint_id ?? '');
     const gaInt    = gaToInteger(state.ga);
     const dptTypes = resolveDatapointTypes(state.dpt);
@@ -35,6 +36,7 @@ export function toDatapointResource(state) {
             datapointId: state.datapointId,
             ga:          state.ga,
             dpt:         state.dpt,
+            ...(options.dptAtCapture ? { 'knx:dptAtCapture': options.dptAtCapture } : {}),
         },
         relationships: {
             datapointFunctions: { links: { related: `/functions?datapointId=${uuid}` } },

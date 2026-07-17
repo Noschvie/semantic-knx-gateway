@@ -8,6 +8,326 @@ contributors and users to follow meaningful changes over time.
 Unreleased
 ----------
 
+2026-07-17
+----------
+
+2026-07-16
+----------
+
+### Added
+- **KNX IP Secure Tunneling Integration** — Enterprise-grade encrypted KNX communication:
+  
+  **Architecture & Security:**
+  - Full support for KNX IP Secure (encrypted, authenticated tunneling per spec KNX/IP 1.0a §3.9)
+  - Delegation of all cryptographic work to KNXUltimate library (KNXClient handles a secure session establishment)
+  - Environment variable-based mode selection: `KNX_SECURE=true/false` for zero-code switching
+  
+  **TunnelOptions Module** (`src/knx/tunnel-options.js`):
+  - `createTunnelOptions(logger)` function evaluates `KNX_SECURE`, `KNX_HOST_PROTOCOL`, `KNX_KEYRING_FILE`, `KNX_KEYRING_PASSWORD`
+  - **Classic Mode (default)**: No behavioral change, fully backward compatible
+  - **Secure Mode**: Requires an ETS keyring file and password; forces TunnelTCP transport
+  - Fail-fast validation: errors are thrown immediately if required env vars are missing /invalid (before a connection attempt)
+  - Returns fully initialized KNXClient options object ready for a tunnel establishment
+  
+  **Integration with TunnelManager:**
+  - `tunnel-manager.js` calls `createTunnelOptions()` in `connect()` method (line 61)
+  - Automatic mode detection logged on connection: "Classic (TunnelUDP)" or "Secure (TunnelTCP)"
+  - The success message differs for Secure: "✅ KNX connected — Secure session established" vs. "KNX connected"
+  - All reconnection logic (health check, queue processing) works identically in both modes
+  
+  **Environment Variables:**
+  - `KNX_SECURE`: Set to `true` to enable KNX IP Secure (default: `false`)
+  - `KNX_HOST_PROTOCOL`: Transport protocol (`TunnelUDP` or `TunnelTCP`, default: `TunnelUDP`)
+  - `KNX_KEYRING_FILE`: Path to ETS keyring file (`.knxkeys`) — required if `KNX_SECURE=true`
+  - `KNX_KEYRING_PASSWORD`: Password protecting the keyring — required if `KNX_SECURE=true`
+  - All documented in updated `env.example`
+  
+  **Documentation:**
+  - Comprehensive integration specification in `docs/specifications/KNX_IP_Secure_Integration_Specification.md`
+  - Architecture overview, spec references, implementation details, and security rationale
+  - Configuration troubleshooting guide and operational runbook
+  
+  **Testing:**
+  - Unit tests in `test/unit/test-tunnel-options.js` covering mode selection, validation, and error handling
+  - Integration tests in `test/integration/knx-secure.test.sh` for end-to-end connectivity
+  - Test utilities and scripts in `scripts/run-unit-tests.sh` and `scripts/test-knx-secure-integration.sh`
+  
+  **Benefits:**
+  - ✅ Enterprise-ready security for sensitive KNX deployments
+  - ✅ Zero-breaking-change adoption: existing classic deployments unaffected
+  - ✅ Seamless mode switching via environment variables (no code changes)
+  - ✅ Full reuse of reconnection resilience (auto-reconnect, queue, health check) in both modes
+  - ✅ Fail-fast validation prevents runtime connection failures
+  
+- **TTL Loader Topology Enhancements** — Improved RDF parsing and device organization (since July 9):
+  - **Enhanced Floor & Room Handling**: Automatic fallback for non-hierarchical structures (Building → Room without Floor)
+  - **Device Collection Improvements**: More robust device URI extraction and context tracking
+  - **Topology Logging**: Comprehensive logging for building, floor, room, and device counts for debugging
+  - **Label Retrieval Refactoring**: Centralized private `#getLabel()` method using RDF namespaces (DC.title, RDFS.label, KNX.label)
+  - **Address Normalization**: Enhanced `#normalizePhysAddress()` supporting hex, dot-notation, and invalid format handling
+  - **Improved Debugging**: Debug-level logging for device mapping to rooms/floors/buildings
+  
+  **Files Modified:**
+  - `src/semantic/ttl-loader.js` — Phase 1 (device collection), Phase 2 (topology building), private methods refactoring
+
+- **Enhanced KNX IoT Test Suite** — Improved validation and error handling:
+  - `scripts/test-knx-iot.sh` — Enhanced datapoint validation with comprehensive error handling
+  - Better state change verification and messaging for test outcomes
+  - Improved test result reporting for API integration testing
+
+- **Database Statistics & Health Monitoring** — Encapsulated statistics operations:
+  - **New `StatisticsStore` Class** (`src/storage/statistics-store.js`): Encapsulated database statistics operations
+  - **Integration**: Integrated into `StatisticsLogger` for unified statistics handling
+  - **Data Integrity Checks**: Null value handling, sanitization, and comprehensive validation
+  - **Enhanced Database Summary**: Improved null handling in aggregation queries with default values
+  - **Health Check Script Enhancements**:
+    - Local mode support for direct database queries
+    - API integration for health check verification
+    - Better error handling and data validation
+  - **Scripts Updated:**
+    - `scripts/database-summary.sh` — Improved API URL handling, JSON validation
+    - `scripts/db-health-check.sh` — Typo fixes, enhanced duplicate GA count retrieval
+  
+  **Benefits:**
+  - ✅ More reliable database monitoring and statistics collection
+  - ✅ Better error recovery and null value handling
+  - ✅ Improved observability for database state and health
+
+- **Advanced Data Quality Analytics – Phase 1** — Anomaly detection and NULL pattern analysis:
+  
+  **New StatisticsStore Methods:**
+  - `getAnomalies(dpt, delta, since, limit)` — Detects temperature/value jumps using SQL `LAG()` window function
+    - Calculates delta (absolute change) and delta_percent (percentage change)
+    - Severity classification: `high` (> delta), `medium` (> delta/2), `low` (> delta/2)
+    - Time gap analysis between consecutive measurements
+    - Returns JSON:API response with `meta`, `data`, and `summary`
+  
+  - `getNullPatterns(dpts, since)` — Analyzes NULL value patterns temporally and spatially
+    - **Temporal analysis**: NULL counts grouped by minute-of-hour (detects synchronized issues)
+    - **Spatial analysis**: NULL counts grouped by group address (detects sensor communication errors)
+    - Automatic diagnosis: likely causes and confidence scores
+    - Actionable recommendations for remediation
+  
+  - `getDatapointSummary(datapointId, since)` — Comprehensive time-series statistics
+    - 24-hour window: count, avg, min, max, stddev, median, quartiles (Q1, Q3)
+    - 7-day window: measurements, values, anomaly count
+    - Current state: latest value, age in seconds, status flag
+    - Trend analysis: direction (rising/falling/stable), percentage change
+  
+  **REST API Endpoints:**
+  - `GET /api/v2/stats/anomalies?dpt=9.001&delta=2.0&hours=24&limit=50` — Anomaly detection
+    - Query parameters: `dpt` (sensor type), `delta` (threshold), `hours` (time window), `limit` (max results)
+  
+  - `GET /api/v2/stats/null-patterns?dpts=9.001,9.007&hours=24` — NULL pattern analysis
+    - Query parameters: `dpts` (comma-separated DPT types), `hours` (time window)
+  
+  - `GET /api/v2/stats/datapoints/:id?hours=24` — Datapoint summary by ID or GA
+    - Query parameters: `hours` (lookback period)
+    - Path parameter: `:id` (datapoint ID or group address, e.g., '3/6/1')
+  
+  **Timestamp Conventions (Vendor Extensions):**
+  - All responses follow a dual-timestamp format per `API_TIMESTAMP_CONVENTION.md`
+  - UTC (ISO 8601): `timestamp` field for machine processing
+  - Local time: `timestamp_local` field (Europe/Berlin) for developer readability
+  - Example: `"timestamp": "2026-07-15T14:30:00Z", "timestamp_local": "15. Juli 2026 16:30:00"`
+  
+  **Benefits:**
+  - ✅ Proactive detection of sensor malfunctions before critical failures
+  - ✅ Root-cause diagnosis: distinguish network issues from sensor faults
+  - ✅ Time-series analytics for trend monitoring and forecasting
+  - ✅ Improved UX with dual timestamps (UTC for APIs, local for logs/debugging)
+  - ✅ No performance impact: uses efficient SQL window functions and aggregations
+
+- **Improved GitHub Workflows** — Enhanced CI/CD pipeline configuration:
+  - **Dependency Audit Workflow**: Upgraded to latest action versions (checkout@v7, setup-node@v6), increased security level to `high`, and improved error handling
+  - **Dependabot Configuration**: Enhanced with better labels, explicit commit message formatting, automatic rebase strategy, and staggered scheduling (npm on Monday, GitHub Actions on Tuesday)
+  - **Create Release Workflow**: Updated to the latest action versions for consistency
+
+- **Database Management API – Test Suite** — Comprehensive test coverage for database maintenance endpoints:
+  - Automated test script in `scripts/test-database-management-api.sh`
+  - Tests for all Phase 1 & 2 endpoints: health checks, database statistics, cleanup jobs, event purging, and optimization
+  - Detailed documentation in `docs/DATABASE_MANAGEMENT_API_TESTS.md`
+  - Includes operational impact assessment and performance considerations
+
+- **KNX Connection Resilience & Automatic Reconnection** — Robust handling of network interruptions:
+
+  **Automatic Reconnection Strategy:**
+  - Phase 1: Exponential backoff for the first 10 attempts (2s, 4s, 6s, ..., 30s)
+  - Phase 2: Persistent retry every 30 seconds indefinitely (never gives up)
+  - **Never terminates**: System continues reconnecting forever until connection restored
+  - Configuration via constants: `MAX_RECONNECT_ATTEMPTS`, `INITIAL_RECONNECT_DELAY_MS`, `MAX_RECONNECT_DELAY_MS`, `PERSISTENT_RECONNECT_INTERVAL_MS`
+
+  **Outgoing Telegram Queue with FIFO Drop Policy:**
+  - New `TelegramQueue` class (`src/knx/telegram-queue.js`) implements FIFO queue for outgoing writes
+  - Max queue size: 100 (constant `MAX_QUEUE_SIZE`, configurable)
+  - **FIFO Drop policy**: When the queue is full, the oldest telegram is dropped to make room for the newest
+  - Write API requests return 200 OK even during disconnect (telegram queued for later delivery)
+  - Queue automatically processes on reconnection (sends all queued telegrams in FIFO order)
+  - Logging for queue status and dropped telegrams
+
+  **Health Check:**
+  - Periodic health check every 30 seconds (constant `HEALTH_CHECK_INTERVAL_MS`)
+  - Detects silent connection losses (a connection object still exists but is no longer responsive)
+  - Triggers automatic reconnection flow on detection
+
+  **Event Emission:**
+  - After 10 failed reconnection attempts, the system switches to persistent 30s retry mode
+  - Event `knx:max-reconnect-attempts` emitted for admin alerting (email, SMS, dashboard notification)
+
+  **Implementation Details:**
+  - `TunnelManager.connect()` — Attempts connection with 10s timeout
+  - `TunnelManager.scheduleReconnect()` — Manages exponential backoff + persistent retry
+  - `TunnelManager.write()` — Queues telegrams if disconnected (never throws error)
+  - `TunnelManager.processQueuedTelegrams()` — Sends all queued telegrams after reconnection
+  - `TunnelManager.startHealthCheck()` / `stopHealthCheck()` — 30s health monitoring
+  - All constants defined at top of `src/knx/tunnel-manager.js` for easy tuning
+
+  **Documentation:**
+  - Comprehensive guide in `docs/KNX_RECONNECT_RESILIENCE.md`
+  - State transition diagram showing phases and flows
+  - Usage examples for API requests during disconnect
+  - Configuration and troubleshooting guide
+  - `TelegramQueue` API reference with all methods
+
+- **Duplicate Datapoints Prevention** — Filters orphaned states from API responses:
+  - API no longer returns stale datapoints when switching KNX systems
+  - Orphaned states (without corresponding datapoint_mappings) are automatically ignored
+  - Affected endpoints: `GET /api/v2/datapoints`, `GET /api/v2/datapoints/:id`, `GET /api/v2/datapoints/:id/timeseries`
+  - Documentation in `docs/DUPLICATE_DATAPOINTS_PREVENTION.md`
+
+- **DPT History Database Views** — Performance optimization for DPT lookups:
+  - New views: `v_dpt_current` (current DPT for each GA), `v_dpt_history` (complete change timeline)
+  - `getDptAtTime()` now uses `v_dpt_history` view for efficient historical lookups
+  - `getCurrentDptMap()` NEW method uses `v_dpt_current` for O(1) DPT lookups
+  - `detectDptConflicts()` now O(n) instead of O(n²) using `getCurrentDptMap()`
+
+- **TelegramQueue Class** — Separated queue logic from TunnelManager:
+  - New file: `src/knx/telegram-queue.js`
+  - FIFO queue with automatic drop policy
+  - Methods: `push()`, `shift()`, `drain()`, `clear()`, `isEmpty()`, `isFull()`, `getStats()`, `getAll()`, `length`
+  - Thread-safe for Node.js single-threaded environment
+  - Testable in isolation, reusable in other contexts
+
+- **Connection Constants** — Centralized configuration for KNX reconnection:
+  - `HEALTH_CHECK_INTERVAL_MS = 30000` — Health check every 30 seconds
+  - `INITIAL_RECONNECT_DELAY_MS = 2000` — Start with 2-second backoff
+  - `MAX_RECONNECT_DELAY_MS = 30000` — Cap backoff at 30 seconds
+  - `MAX_RECONNECT_ATTEMPTS = 10` — Switch to persistent mode after 10 attempts
+  - `PERSISTENT_RECONNECT_INTERVAL_MS = 30000` — Persistent retry every 30 seconds
+  - `MAX_QUEUE_SIZE = 100` — Maximum outgoing telegram queue size
+  - All are configurable at top of `src/knx/tunnel-manager.js`
+ 
+- **DPT Change History Tracking & Conflict Detection** — New audit trail for datapoint type (DPT) changes:
+  
+  **Database Schema:**
+  - New `dpt_change_log` table tracking all DPT modifications per group address
+  - Columns: `id`, `datapoint_id`, `ga`, `old_dpt`, `new_dpt`, `changed_at`, `changed_by`, `reason`, `metadata`
+  - Indexed on `(ga, changed_at DESC)` and `(datapoint_id, changed_at DESC)` for efficient lookups
+  - Automatically created on startup if missing
+  
+  **DPT History Manager** (`src/storage/dpt-history.js`):
+  - `logDptChange(datapointId, ga, oldDpt, newDpt, changedBy, reason)` — Log a DPT change with audit trail
+  - `getDptAtTime(ga, timestamp)` — Retrieve the DPT that was active at a specific point in time (for historical value interpretation)
+  - `getDptHistory(ga)` — Fetch complete change history for a group address
+  - `detectDptConflicts(newMappings)` — Detect conflicts before applying new mappings:
+    - **Type 1**: DPT changes for existing group addresses (warns before applying)
+    - **Type 2**: Multiple datapoints with different DPTs for the same GA in import (error condition)
+  - `getStatistics()` — Aggregate statistics (total changes, affected GAs, last change timestamp)
+  
+  **State Engine Integration** (`src/state/state-engine.js`):
+  - DptHistoryManager initialized in constructor
+  - `registerDatapoint()` detects DPT changes and logs them with reason "DPT changed during mapping update"
+  - Supports initial DPT recording for new group addresses
+  
+  **Semantic Mapper Integration** (`src/semantic/semantic-mapper.js`):
+  - Conflict detection performed **before** applying new mappings during TTL import
+  - All detected conflicts are logged as warnings; import continues safely
+  - Each datapoint registration triggers DPT change logging if DPT differs
+
+  **TTL Loader Integration** (`src/semantic/ttl-loader.js`):
+  - Constructor remains clean and simple (no dependencies injected)
+  - Works independently as an RDF parsing utility
+  - DPT conflict detection is handled by `SemanticMapper` using `DptHistoryManager.detectDptConflicts()`
+  - Backward compatible with the existing codebase
+  
+  **Diagnostic Tools:**
+  - `scripts/dpt-history-check.sh` — Check table status, view statistics, verify consistency
+  - Supports `--log` (recent changes), `--stats` (detailed overview), `--consistency` (mismatch detection)
+  
+  **Benefits:**
+  - ✅ Full audit trail of who changed what DPT and when
+  - ✅ Historical values are always interpreted with the correct DPT context
+  - ✅ Conflict detection prevents data corruption during TTL imports
+  - ✅ Enables debugging of DPT-related issues (e.g., why a value appears wrong)
+  
+  **Use Cases Now Supported:**
+  - Renaming a group address (no DPT logging triggered)
+  - Changing DPT for existing GA (logged with old→new DPT tracking)
+  - Importing a new TTL file with DPT changes (conflicts detected, logged, safely applied)
+  - Interpreting historical states with correct DPT (via `getDptAtTime()`)
+
+- **API Response Enhancement: Historical DPT Tracking** – KNX vendor-specific extension to datapoint responses:
+  
+  **Field Addition:**
+  - New `knx:dptAtCapture` field in response `meta` object (KNX vendor-specific namespace prefix)
+  - Shows the DPT that was active when a historical value was captured
+  - Added to all datapoint and timeseries endpoints for accurate historical value interpretation
+  
+  **Integration Points:**
+  - `GET /api/v2/datapoints/` — Lists all datapoints with `knx:dptAtCapture` if DPT differs from current
+  - `GET /api/v2/datapoints/{id}` — Single datapoint with historical DPT context
+  - `GET /api/v2/datapoints/{id}/timeseries` — Each timeseries entry includes `knx:dptAtCapture` for its timestamp
+  - `GET /api/v2/datapoints/values` — Bulk endpoint with `knx:dptAtCapture` per datapoint
+  
+  **Spec Compliance:**
+  - Fully compliant with KNX IoT 3rd Party API v2.1.0
+  - Uses KNX vendor-specific namespace prefix (`knx:`) per spec §2.1.0, line 2793
+  - Placed in JSON:API `meta` object (not `attributes`) per spec §2.1.0, line 2805
+  - Graceful fallback: omitted if DPT hasn't changed since capture
+  
+  **Example Response:**
+  ```json
+  {
+    "data": {
+      "id": "uuid...",
+      "type": "datapoint",
+      "attributes": {
+        "title": "Temperature",
+        "value": "21.5",
+        "timestamp": "2026-07-10T10:30:00Z",
+        "dpt": "9.001"
+      },
+      "meta": {
+        "@type": ["knx:dpa.418.52"],
+        "ga": "1/2/3",
+        "dpt": "9.001",
+        "knx:dptAtCapture": "10.001"
+      }
+    }
+  }
+  ```
+  
+  **Implementation Details:**
+  - Helper function: `toDatapointResourceWithHistoricalDpt()` in `src/api/routes/datapoints.js`
+  - Updated transform: `toDatapointResource()` accepts optional `dptAtCapture` parameter  
+  - Reuses `DptHistoryManager` instance from StateEngine for API endpoints (consistency & efficiency)
+  - Conflict detection happens in `SemanticMapper.mapDatapointsToStateEngine()` via `DptHistoryManager.detectDptConflicts()`
+  - DPT logging occurs in `StateEngine.registerDatapoint()` when mapping is registered
+  - Uses `DptHistoryManager.getDptAtTime()` to look up historical DPT for responses
+  - Non-blocking: gracefully handles missing history (optional enhancement)
+
+### Changed
+- **Code Refactoring & Quality Improvements** (since July 9):
+  - **TTL Loader Private Methods**: Refactored to use private field syntax (`#getLabel()`, `#getDeviceInfo()`, etc.) for better encapsulation
+  - **Removed Unused Methods**: Eliminated unused hex-to-physical address conversion method
+  - **Consistency Fixes**: Fixed misplaced commas and inconsistent string formatting in:
+    - `src/knx/tunnel-manager.js`
+    - `src/storage/subscription-store.js`
+    - `src/state/state-engine.js`
+    - `src/state/state-store.js`
+  - **Logic Simplification**: Simplified `hasState` logic in `src/storage/statistics.js` for better readability
+  - **Database Query Alias Corrections**: Updated orphaned states query to use the correct table alias for affected GAs count
+
 2026-07-09
 ----------
 
@@ -19,7 +339,7 @@ Unreleased
   - `GET /api/v2/database/info` — Real-time database statistics and health metrics:
     - Database size, version, backend capabilities
     - Per-table statistics (rows, sizes, indexes)
-    - Event timeline (earliest/latest event, coverage, average events/day)
+    - Event timeline (the earliest/latest event, coverage, average events/day)
     - TimescaleDB hypertable compression info (chunk count, compression ratio)
     - Subscription counts (total, active, expired)
     - Backend capability flags (VACUUM support, compression support, dry-run support, presets)
@@ -39,7 +359,7 @@ Unreleased
     - **VACUUM FULL (optional)**: Maximum space reclamation (100%), requires **maintenance window** (system goes offline 10-30 minutes)
     - **Parameters**: `full: boolean`, `analyze: boolean` (update query planner stats)
     - **Response (202 Accepted)**: Space freed (bytes/pretty), method used, downtime warning for VACUUM FULL
-    - **Critical Warning**: VACUUM FULL causes API downtime; never schedule automatically in production
+    - **Critical Warning**: VACUUM FULL causes API downtime; never schedules automatically in production
     - **Authentication**: Bearer token with `delete:database` scope
   
   **Tier 3: Audit**
@@ -51,7 +371,7 @@ Unreleased
   - `GET /api/v2/database/health` — Simple database connectivity check (no authentication required)
 
 - **Database Maintenance Audit Log** – New persistent table `database_maintenance_log`:
-  - Tracks all purge and optimize operations with full audit trail
+  - Tracks all purge and optimize operations with a full audit trail
   - Stores: operation type, preset, parameters, execution timestamps, status, results (JSONB)
   - Indexed on status and created_at for efficient queries
   - User attribution via `executed_by` field
@@ -90,7 +410,7 @@ Unreleased
 
 ### Added
 - **Release Workflow automation** – GitHub Actions workflow (`create-release.yml`) and
-  Node.js script (`update-changelog-for-release.js`) to automate release process:
+  Node.js script (`update-changelog-for-release.js`) to automate a release process:
   - Manual workflow trigger with version input (e.g., `v2026.07.07`)
   - Automatic CHANGELOG.md update (Unreleased → dated section)
   - Automatic merge `development` → `main`

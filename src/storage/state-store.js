@@ -13,7 +13,7 @@ export class StateStore {
     /**
      * Normalize a value from DB – convert Buffer-objects to hex strings
      */
-    normalizeValue(value) {
+    #normalizeValue(value) {
         if (value === null || value === undefined) return value;
         if (typeof value === 'object' && value.type === 'Buffer' && Array.isArray(value.data)) {
             return Buffer.from(value.data).toString('hex');
@@ -28,8 +28,8 @@ export class StateStore {
         const { ga, value, dpt, source, timestamp } = state;
 
         // Handle Buffer objects properly
-        let valueForJson = value;
-        let valueForText = null;
+        let valueForJson;
+        let valueForText;
 
         if (value && typeof value === 'object' && value.type === 'Buffer' && Array.isArray(value.data)) {
             // Store raw buffer as hex string for text representation
@@ -41,6 +41,14 @@ export class StateStore {
             // Handle actual Buffer instances
             valueForText = value.toString('hex');
             valueForJson = { type: 'Buffer', data: Array.from(value) };
+        } else if (value && typeof value === 'object' && !Array.isArray(value)) {
+            // Handle decoded DPT objects (with 'formatted' field for DPT 10, 11, 18, 19)
+            if (value.formatted) {
+                valueForText = value.formatted;
+            } else {
+                valueForText = JSON.stringify(value);
+            }
+            valueForJson = value;
         } else {
             // Regular values
             valueForText = String(value);
@@ -110,7 +118,7 @@ export class StateStore {
             datapointId: row.datapoint_id,
             ga: row.ga,
             name: row.name ?? null,
-            value: this.normalizeValue(row.value),
+            value: this.#normalizeValue(row.value),
             dpt: row.dpt,
             updatedAt: row.updated_at,
             source: row.source,
@@ -161,7 +169,7 @@ export class StateStore {
             datapointId: row.datapoint_id,
             ga: row.ga,
             name: row.name ?? null,
-            value: this.normalizeValue(row.value),
+            value: this.#normalizeValue(row.value),
             dpt: row.dpt,
             updatedAt: row.updated_at,
             source: row.source,
@@ -188,7 +196,7 @@ export class StateStore {
             datapointId: row.datapoint_id,
             ga: row.ga,
             name: row.name ?? null,
-            value: this.normalizeValue(row.value),
+            value: this.#normalizeValue(row.value),
             dpt: row.dpt,
             updatedAt: row.updated_at,
             source: row.source,

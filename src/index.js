@@ -11,7 +11,7 @@ import { StateEngine } from './state/state-engine.js';
 import { PostgresClient } from './storage/postgres.js';
 import { SemanticEngine } from './semantic/semantic-engine.js';
 import { RestAPI } from './api/rest-api.js';
-import { StatsLogger } from './utils/stats-logger.js';
+import { StatisticsLogger } from './utils/statistics-logger.js';
 
 dotenv.config();
 
@@ -75,15 +75,15 @@ class SemanticKNXRuntime {
             this.tunnelManager = new TunnelManager(this.stateEngine);
             await this.tunnelManager.connect();
 
-            // Phase 5: Statistics Logger (periodic)
-            this.logger.info('Phase 5: Starting Statistics Logger...');
-            this.statsLogger = new StatsLogger(this.db);
-            this.statsLogger.start();
-
-            // Phase 6: REST API
+            // Phase 5: REST API
             this.logger.info('Phase 6: Starting REST API...');
             this.api = new RestAPI(this.stateEngine, this.db, this.semanticEngine, this.tunnelManager);
             await this.api.start();
+
+            // Phase 6: Statistics Logger (periodic)
+            this.logger.info('Phase 5: Starting Statistics Logger...');
+            this.statsLogger = new StatisticsLogger(this.db);
+            this.statsLogger.start();
 
             this.logger.info('=====================================');
             this.logger.info('✅ Semantic KNX Runtime Engine started successfully');

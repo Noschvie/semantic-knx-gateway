@@ -3,6 +3,7 @@
 // KNX Runtime Engine – https://github.com/Noschvie/semantic-knx-gateway.git
 
 import { createLogger } from '../utils/logger.js';
+import { formatTimestamp } from '../utils/timezone.js';
 
 /**
  * DatabaseManager - High-level database maintenance operations
@@ -14,10 +15,21 @@ import { createLogger } from '../utils/logger.js';
  * - Audit logging
  */
 export class DatabaseManager {
-    constructor(pool) {
-        this.pool = pool;
+    constructor(db) {
+        this.db = db;
         this.logger = createLogger('DatabaseManager');
     }
+
+    /**
+     * Purge presets configuration
+     */
+    static PURGE_PRESETS = {
+        '30_days': { label: 'Last 30 days', days: 30 },
+        '90_days': { label: 'Last 90 days (Recommended)', days: 90 },
+        '365_days': { label: 'Last 365 days (1 year)', days: 365 },
+        'custom': { label: 'Custom date', days: null },
+        'purge_all': { label: '⚠️ Delete All', days: null },
+    };
 
     /**
      * Format bytes to human-readable size
@@ -25,11 +37,50 @@ export class DatabaseManager {
      * @returns {string} Formatted size (e.g. "2.7 GB")
      */
     static formatBytes(bytes) {
-        if (!bytes || bytes === 0) return '0 B';
+        // Handle null, undefined, or non-numeric values
+        if (bytes === null || bytes === undefined) return '0 B';
+        
+        const numBytes = parseInt(bytes, 10);
+        
+        // Check for zero, NaN, or non-finite values
+        if (!Number.isFinite(numBytes) || numBytes === 0) return '0 B';
+        
         const k = 1024;
         const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
-        const i = Math.floor(Math.log(bytes) / Math.log(k));
-        return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+        const absBytes = Math.abs(numBytes);
+        
+        // Ensure absBytes is valid for Math.log (must be > 0)
+        if (absBytes < 1) return '0 B';
+        
+        const i = Math.floor(Math.log(absBytes) / Math.log(k));
+        // Safety check: ensure i is within bounds
+        const safeI = Math.max(0, Math.min(i, sizes.length - 1));
+        const sign = numBytes < 0 ? '-' : '';
+        const value = parseFloat((absBytes / Math.pow(k, safeI)).toFixed(1));
+        
+        // Extra safety check for the final result
+        if (!Number.isFinite(value)) return '0 B';
+        
+        return sign + value + ' ' + sizes[safeI];
+    }
+
+    /**
+     * Calculate the date threshold for a purge preset
+     * @param {string} preset - Preset name
+     * @param {Date} customDate - Optional custom date for 'custom' preset
+     * @returns {Date} The threshold date
+     */
+    static _calculateThresholdDate(preset, customDate = null) {
+        if (preset === 'custom' && customDate) {
+            return customDate;
+        }
+        const presetConfig = DatabaseManager.PURGE_PRESETS[preset];
+        if (presetConfig?.days) {
+            const now = new Date();
+            now.setDate(now.getDate() - presetConfig.days);
+            return now;
+        }
+        return null;
     }
 
     /**
@@ -45,24 +96,23 @@ export class DatabaseManager {
      * @returns {Promise<object>} Database statistics
      */
     async getStatistics() {
-        const client = await this.pool.connect();
         try {
             // Get PostgreSQL version
-            const versionResult = await client.query(`
+            const versionResult = await this.db.query(`
                 SELECT version();
             `);
             const version = versionResult.rows[0]?.version || 'unknown';
 
             // Get database size
-            const dbSizeResult = await client.query(`
+            const dbSizeResult = await this.db.query(`
                 SELECT 
                     current_database() as database_name,
                     pg_database_size(current_database()) as size_bytes;
             `);
             const dbSize = dbSizeResult.rows[0];
 
-            // Get table information
-            const tablesResult = await client.query(`
+            // Get table information (only from public schema where app tables are)
+            const tablesResult = await this.db.query(`
                 SELECT 
                     schemaname,
                     tablename,
@@ -70,12 +120,12 @@ export class DatabaseManager {
                     pg_relation_size(schemaname || '.' || tablename) as table_size,
                     pg_indexes_size(schemaname || '.' || tablename) as index_size
                 FROM pg_tables
-                WHERE schemaname NOT IN ('pg_catalog', 'information_schema')
+                WHERE schemaname = 'public'
                 ORDER BY total_size DESC;
             `);
 
             // Get row counts
-            const rowCountsResult = await client.query(`
+            const rowCountsResult = await this.db.query(`
                 SELECT relname, n_live_tup
                 FROM pg_stat_user_tables
                 ORDER BY n_live_tup DESC;
@@ -85,7 +135,7 @@ export class DatabaseManager {
             // Get hypertable information
             let hypertableInfo = {};
             try {
-                const hypertablesResult = await client.query(`
+                const hypertablesResult = await this.db.query(`
                     SELECT 
                         ht.table_name,
                         count(*) as chunk_count,
@@ -99,7 +149,7 @@ export class DatabaseManager {
                     ORDER BY ht.table_name;
                 `);
                 for (const row of hypertablesResult.rows) {
-                    const compressionRatio = await this._getCompressionRatio(client, row.table_name);
+                    const compressionRatio = await this.#getCompressionRatio(row.table_name);
                     hypertableInfo[row.table_name] = {
                         chunk_count: row.chunk_count,
                         earliest_chunk: row.earliest_chunk ? row.earliest_chunk.toISOString().split('T')[0] : null,
@@ -122,7 +172,7 @@ export class DatabaseManager {
                 events_per_day_avg: 0,
             };
             try {
-                const eventsResult = await client.query(`
+                const eventsResult = await this.db.query(`
                     SELECT 
                         COUNT(*) as total_count,
                         MIN(ts) as earliest,
@@ -138,7 +188,7 @@ export class DatabaseManager {
                             (latest - earliest) / (1000 * 60 * 60 * 24)
                         );
                         eventTimeline = {
-                            total_events: parseInt(row.total_count),
+                            total_events: this.#parseInt(row.total_count),
                             earliest_event: earliest.toISOString(),
                             latest_event: latest.toISOString(),
                             coverage_days: Math.max(1, coverageDays),
@@ -157,7 +207,7 @@ export class DatabaseManager {
                 expired: 0,
             };
             try {
-                const subsResult = await client.query(`
+                const subsResult = await this.db.query(`
                     SELECT 
                         COUNT(*) as total,
                         COUNT(*) FILTER (WHERE expires_at > NOW()) as active,
@@ -167,9 +217,9 @@ export class DatabaseManager {
                 if (subsResult.rows[0]) {
                     const row = subsResult.rows[0];
                     subscriptionCounts = {
-                        total_subscriptions: parseInt(row.total),
-                        active: parseInt(row.active),
-                        expired: parseInt(row.expired),
+                        total_subscriptions: this.#parseInt(row.total),
+                        active: this.#parseInt(row.active),
+                        expired: this.#parseInt(row.expired),
                     };
                 }
             } catch (err) {
@@ -180,22 +230,26 @@ export class DatabaseManager {
             const tables = {};
             for (const row of tablesResult.rows) {
                 const rowCount = rowCountMap.get(row.tablename) || 0;
+                const tableSize = this.#parseInt(row.table_size);
+                const indexSize = this.#parseInt(row.index_size);
                 tables[row.tablename] = {
                     type: hypertableInfo[row.tablename] ? 'hypertable' : 'regular',
                     row_count: rowCount,
-                    size_bytes: row.table_size,
-                    size_pretty: DatabaseManager.formatBytes(row.table_size),
-                    index_size_bytes: row.index_size || 0,
-                    index_size_pretty: DatabaseManager.formatBytes(row.index_size || 0),
+                    size_bytes: tableSize,
+                    size_pretty: DatabaseManager.formatBytes(tableSize),
+                    index_size_bytes: indexSize,
+                    index_size_pretty: DatabaseManager.formatBytes(indexSize),
                 };
             }
 
+            const now = new Date();
             return {
-                timestamp: new Date().toISOString(),
+                timestamp: formatTimestamp(now),
+                timestampISO: now.toISOString(),
                 database: {
                     name: dbSize.database_name,
-                    size_bytes: dbSize.size_bytes,
-                    size_pretty: DatabaseManager.formatBytes(dbSize.size_bytes),
+                    size_bytes: this.#parseInt(dbSize.size_bytes),
+                    size_pretty: DatabaseManager.formatBytes(this.#parseInt(dbSize.size_bytes)),
                     version: version,
                 },
                 tables,
@@ -206,8 +260,6 @@ export class DatabaseManager {
         } catch (err) {
             this.logger.error('Failed to get database statistics', { error: err.message });
             throw err;
-        } finally {
-            client.release();
         }
     }
 
@@ -219,10 +271,9 @@ export class DatabaseManager {
      * @returns {Promise<object>} Capabilities
      */
     async getCapabilities() {
-        const client = await this.pool.connect();
         try {
             // Check for TimescaleDB
-            const tsdbResult = await client.query(`
+            const tsdbResult = await this.db.query(`
                 SELECT EXISTS (
                     SELECT 1 FROM pg_extension WHERE extname = 'timescaledb'
                 ) as timescaledb_installed;
@@ -253,39 +304,7 @@ export class DatabaseManager {
                     supports_presets: true,
                 },
             };
-        } finally {
-            client.release();
         }
-    }
-
-    /**
-     * Purge presets configuration
-     */
-    static PURGE_PRESETS = {
-        '30_days': { label: 'Last 30 days', days: 30 },
-        '90_days': { label: 'Last 90 days (Recommended)', days: 90 },
-        '365_days': { label: 'Last 365 days (1 year)', days: 365 },
-        'custom': { label: 'Custom date', days: null },
-        'purge_all': { label: '⚠️ Delete All', days: null },
-    };
-
-    /**
-     * Calculate the date threshold for a purge preset
-     * @param {string} preset - Preset name
-     * @param {Date} customDate - Optional custom date for 'custom' preset
-     * @returns {Date} The threshold date
-     */
-    static _calculateThresholdDate(preset, customDate = null) {
-        if (preset === 'custom' && customDate) {
-            return customDate;
-        }
-        const presetConfig = DatabaseManager.PURGE_PRESETS[preset];
-        if (presetConfig?.days) {
-            const now = new Date();
-            now.setDate(now.getDate() - presetConfig.days);
-            return now;
-        }
-        return null;
     }
 
     /**
@@ -302,7 +321,6 @@ export class DatabaseManager {
             throw new Error(`Invalid preset: ${preset}. Valid options: ${validPresets.join(', ')}`);
         }
 
-        const client = await this.pool.connect();
         try {
             let thresholdDate;
 
@@ -325,7 +343,7 @@ export class DatabaseManager {
             const thresholdISO = thresholdDate.toISOString();
 
             // Get preview for knx_events
-            const knxEventsResult = await client.query(`
+            const knxEventsResult = await this.db.query(`
                 SELECT 
                     COUNT(*) as rows_to_delete,
                     COALESCE(pg_total_relation_size('knx_events'), 0) as table_size
@@ -334,13 +352,13 @@ export class DatabaseManager {
             `, [thresholdDate]);
 
             const knxData = knxEventsResult.rows[0];
-            const rowsToDeleteKnx = parseInt(knxData.rows_to_delete);
-            const tableSizeKnx = parseInt(knxData.table_size);
-            const deletionRatioKnx = rowsToDeleteKnx > 0 ? rowsToDeleteKnx / (await this._getTotalRowCount(client, 'knx_events')) : 0;
+            const rowsToDeleteKnx = this.#parseInt(knxData.rows_to_delete);
+            const tableSizeKnx = this.#parseInt(knxData.table_size);
+            const deletionRatioKnx = rowsToDeleteKnx > 0 ? rowsToDeleteKnx / (await this.#getTotalRowCount('knx_events')) : 0;
             const estimatedFreedKnx = Math.floor(tableSizeKnx * deletionRatioKnx);
 
             // Get preview for subscription_events
-            const subEventsResult = await client.query(`
+            const subEventsResult = await this.db.query(`
                 SELECT 
                     COUNT(*) as rows_to_delete,
                     COALESCE(pg_total_relation_size('subscription_events'), 0) as table_size
@@ -349,9 +367,9 @@ export class DatabaseManager {
             `, [thresholdDate]);
 
             const subData = subEventsResult.rows[0];
-            const rowsToDeleteSub = parseInt(subData.rows_to_delete);
-            const tableSizeSub = parseInt(subData.table_size);
-            const deletionRatioSub = rowsToDeleteSub > 0 ? rowsToDeleteSub / (await this._getTotalRowCount(client, 'subscription_events')) : 0;
+            const rowsToDeleteSub = this.#parseInt(subData.rows_to_delete);
+            const tableSizeSub = this.#parseInt(subData.table_size);
+            const deletionRatioSub = rowsToDeleteSub > 0 ? rowsToDeleteSub / (await this.#getTotalRowCount('subscription_events')) : 0;
             const estimatedFreedSub = Math.floor(tableSizeSub * deletionRatioSub);
 
             const totalRowsToDelete = rowsToDeleteKnx + rowsToDeleteSub;
@@ -365,22 +383,22 @@ export class DatabaseManager {
                     tables: {
                         knx_events: {
                             rows_to_delete: rowsToDeleteKnx,
-                            rows_remaining: (await this._getTotalRowCount(client, 'knx_events')) - rowsToDeleteKnx,
+                            rows_remaining: (await this.#getTotalRowCount('knx_events')) - rowsToDeleteKnx,
                             size_to_free_bytes: estimatedFreedKnx,
                             size_to_free_pretty: DatabaseManager.formatBytes(estimatedFreedKnx),
-                            percentage: rowsToDeleteKnx > 0 ? parseFloat(((rowsToDeleteKnx / (await this._getTotalRowCount(client, 'knx_events'))) * 100).toFixed(1)) : 0,
+                            percentage: rowsToDeleteKnx > 0 ? parseFloat(((rowsToDeleteKnx / (await this.#getTotalRowCount('knx_events'))) * 100).toFixed(1)) : 0,
                         },
                         subscription_events: {
                             rows_to_delete: rowsToDeleteSub,
-                            rows_remaining: (await this._getTotalRowCount(client, 'subscription_events')) - rowsToDeleteSub,
+                            rows_remaining: (await this.#getTotalRowCount('subscription_events')) - rowsToDeleteSub,
                             size_to_free_bytes: estimatedFreedSub,
                             size_to_free_pretty: DatabaseManager.formatBytes(estimatedFreedSub),
-                            percentage: rowsToDeleteSub > 0 ? parseFloat(((rowsToDeleteSub / (await this._getTotalRowCount(client, 'subscription_events'))) * 100).toFixed(1)) : 0,
+                            percentage: rowsToDeleteSub > 0 ? parseFloat(((rowsToDeleteSub / (await this.#getTotalRowCount('subscription_events'))) * 100).toFixed(1)) : 0,
                         },
                     },
                     totals: {
                         total_rows_to_delete: totalRowsToDelete,
-                        total_rows_remaining: (await this._getTotalRowCount(client, 'knx_events')) + (await this._getTotalRowCount(client, 'subscription_events')) - totalRowsToDelete,
+                        total_rows_remaining: (await this.#getTotalRowCount('knx_events')) + (await this.#getTotalRowCount('subscription_events')) - totalRowsToDelete,
                         total_size_to_free_bytes: totalSizeToFree,
                         total_size_to_free_pretty: DatabaseManager.formatBytes(totalSizeToFree),
                     },
@@ -391,8 +409,6 @@ export class DatabaseManager {
         } catch (err) {
             this.logger.error('Failed to get purge preview', { error: err.message, preset, olderThan });
             throw err;
-        } finally {
-            client.release();
         }
     }
 
@@ -411,8 +427,8 @@ export class DatabaseManager {
             throw new Error(`Invalid preset: ${preset}. Valid options: ${validPresets.join(', ')}`);
         }
 
-        const client = await this.pool.connect();
         const jobId = `purge-job-${Date.now()}-${Math.random().toString(36).substring(7)}`;
+        const txn = await this.db.beginTransaction();
 
         try {
             // Calculate threshold date
@@ -432,7 +448,7 @@ export class DatabaseManager {
 
             // Log the job as started
             const startedAt = new Date();
-            await client.query(
+            await txn.query(
                 `INSERT INTO database_maintenance_log (
                     id, operation, preset, older_than, purge_all, dry_run, 
                     executed_by, created_at, started_at, status, tables_affected
@@ -440,16 +456,16 @@ export class DatabaseManager {
                 [
                     jobId, 'purge', preset, thresholdDate, preset === 'purge_all',
                     false, executedBy, startedAt, startedAt, 'running',
-                    ['knx_events', 'subscription_events']
+                    ['knx_events', 'subscription_events'],
                 ]
             );
 
             // Get row counts before deletion
-            const beforeKnx = await client.query('SELECT COUNT(*) as count FROM knx_events');
-            const beforeSub = await client.query('SELECT COUNT(*) as count FROM subscription_events');
+            const beforeKnx = await txn.query('SELECT COUNT(*) as count FROM knx_events');
+            const beforeSub = await txn.query('SELECT COUNT(*) as count FROM subscription_events');
 
-            const rowsBeforeKnx = parseInt(beforeKnx.rows[0].count);
-            const rowsBeforeSub = parseInt(beforeSub.rows[0].count);
+            const rowsBeforeKnx = this.#parseInt(beforeKnx.rows[0].count);
+            const rowsBeforeSub = this.#parseInt(beforeSub.rows[0].count);
 
             this.logger.info('📊 Row counts before purge', {
                 jobId,
@@ -459,35 +475,35 @@ export class DatabaseManager {
                 total: rowsBeforeKnx + rowsBeforeSub,
             });
 
-            const deleteKnxResult = await client.query(
+            const deleteKnxResult = await txn.query(
                 'DELETE FROM knx_events WHERE ts < $1',
                 [thresholdDate]
             );
             const knxRowsDeleted = deleteKnxResult.rowCount;
 
             // Delete from subscription_events
-            const deleteSubResult = await client.query(
+            const deleteSubResult = await txn.query(
                 'DELETE FROM subscription_events WHERE ts < $1',
                 [thresholdDate]
             );
             const subRowsDeleted = deleteSubResult.rowCount;
 
             // Get row counts after deletion
-            const afterKnx = await client.query('SELECT COUNT(*) as count FROM knx_events');
-            const afterSub = await client.query('SELECT COUNT(*) as count FROM subscription_events');
+            const afterKnx = await txn.query('SELECT COUNT(*) as count FROM knx_events');
+            const afterSub = await txn.query('SELECT COUNT(*) as count FROM subscription_events');
 
             // Get sizes after deletion
-            const sizeKnxAfter = await client.query(
-                'SELECT pg_total_relation_size(\'knx_events\') as size'
+            const sizeKnxAfter = await txn.query(
+                'SELECT pg_total_relation_size(\'knx_events\') as size',
             );
-            const sizeSubAfter = await client.query(
-                'SELECT pg_total_relation_size(\'subscription_events\') as size'
+            const sizeSubAfter = await txn.query(
+                'SELECT pg_total_relation_size(\'subscription_events\') as size',
             );
 
-            const rowsAfterKnx = parseInt(afterKnx.rows[0].count);
-            const rowsAfterSub = parseInt(afterSub.rows[0].count);
-            const sizeAfterKnx = parseInt(sizeKnxAfter.rows[0].size);
-            const sizeAfterSub = parseInt(sizeSubAfter.rows[0].size);
+            const rowsAfterKnx = this.#parseInt(afterKnx.rows[0].count);
+            const rowsAfterSub = this.#parseInt(afterSub.rows[0].count);
+            const sizeAfterKnx = this.#parseInt(sizeKnxAfter.rows[0].size);
+            const sizeAfterSub = this.#parseInt(sizeSubAfter.rows[0].size);
 
             this.logger.info('📊 Row counts and sizes after deletion', {
                 jobId,
@@ -515,31 +531,33 @@ export class DatabaseManager {
             const results = {
                 knx_events: {
                     rows_deleted: knxRowsDeleted,
-                    rows_remaining: parseInt(afterKnx.rows[0].count),
+                    rows_remaining: rowsAfterKnx,
                     size_freed_bytes: 0,  // Estimation
                     size_freed_pretty: '~' + DatabaseManager.formatBytes(0),
                 },
                 subscription_events: {
                     rows_deleted: subRowsDeleted,
-                    rows_remaining: parseInt(afterSub.rows[0].count),
+                    rows_remaining: rowsAfterSub,
                     size_freed_bytes: 0,
                     size_freed_pretty: '~' + DatabaseManager.formatBytes(0),
                 },
                 totals: {
                     total_rows_deleted: knxRowsDeleted + subRowsDeleted,
-                    total_rows_remaining: parseInt(afterKnx.rows[0].count) + parseInt(afterSub.rows[0].count),
+                    total_rows_remaining: rowsAfterKnx + rowsAfterSub,
                     total_freed_bytes: 0,
                     total_freed_pretty: '~0 MB',
                 },
             };
 
             // Update job as completed
-            await client.query(
+            await txn.query(
                 `UPDATE database_maintenance_log 
                  SET status = $1, completed_at = $2, results = $3
                  WHERE id = $4`,
-                ['completed', completedAt, JSON.stringify(results), jobId]
+                ['completed', completedAt, JSON.stringify(results), jobId],
             );
+
+            await txn.commit();
 
             this.logger.info('✅ Purge operation completed', {
                 jobId,
@@ -555,8 +573,10 @@ export class DatabaseManager {
                 dry_run: false,
                 preset,
                 execution: {
-                    started_at: startedAt.toISOString(),
-                    completed_at: completedAt.toISOString(),
+                    started_at: formatTimestamp(startedAt),
+                    started_at_iso: startedAt.toISOString(),
+                    completed_at: formatTimestamp(completedAt),
+                    completed_at_iso: completedAt.toISOString(),
                     duration_seconds: Math.round((completedAt - startedAt) / 1000),
                 },
                 results: results.knx_events,
@@ -564,25 +584,13 @@ export class DatabaseManager {
             };
         } catch (err) {
             this.logger.error('Failed to execute purge', { error: err.message, jobId });
-            // Log failure
-            try {
-                await client.query(
-                    `UPDATE database_maintenance_log 
-                     SET status = $1, completed_at = $2, error_message = $3
-                     WHERE id = $4`,
-                    ['failed', new Date(), err.message, jobId]
-                );
-            } catch (logErr) {
-                this.logger.error('Failed to log purge failure', { error: logErr.message });
-            }
+            await txn.rollback();
             throw err;
-        } finally {
-            client.release();
         }
     }
 
     /**
-     * Optimize database using VACUUM
+     * Optimize a database using VACUUM
      *
      * @param {object} options - { full: boolean, analyze: boolean }
      * @param {string} executedBy - User email/ID
@@ -590,8 +598,8 @@ export class DatabaseManager {
      */
     async optimizeDatabase(options = {}, executedBy = 'system') {
         const { full = false, analyze = true } = options;
-        const client = await this.pool.connect();
         const jobId = `optimize-job-${Date.now()}-${Math.random().toString(36).substring(7)}`;
+        const txn = await this.db.beginTransaction();
 
         try {
             const vacuumMethod = full ? 'VACUUM FULL' : 'VACUUM';
@@ -600,14 +608,14 @@ export class DatabaseManager {
                 : vacuumMethod;
 
             // Get size before
-            const sizeBefore = await client.query(
+            const sizeBefore = await txn.query(
                 'SELECT pg_database_size(current_database()) as size'
             );
-            const sizeBeforeBytes = parseInt(sizeBefore.rows[0].size);
+            const sizeBeforeBytes = this.#parseInt(sizeBefore.rows[0].size);
 
             // Log the job
             const startedAt = new Date();
-            await client.query(
+            await txn.query(
                 `INSERT INTO database_maintenance_log (
                     id, operation, dry_run, executed_by, created_at, started_at, 
                     status, tables_affected
@@ -620,46 +628,50 @@ export class DatabaseManager {
 
             // Execute VACUUM
             this.logger.info(`Executing ${vacuumCommand}...`);
-            await client.query(vacuumCommand);
+            await txn.query(vacuumCommand);
 
             // Get size after
-            const sizeAfter = await client.query(
-                'SELECT pg_database_size(current_database()) as size'
+            const sizeAfter = await txn.query(
+                'SELECT pg_database_size(current_database()) as size',
             );
-            const sizeAfterBytes = parseInt(sizeAfter.rows[0].size);
+            const sizeAfterBytes = this.#parseInt(sizeAfter.rows[0].size);
 
             const completedAt = new Date();
             const spaceFreedbytes = sizeBeforeBytes - sizeAfterBytes;
-            const spaceFreePercent = (spaceFreedbytes / sizeBeforeBytes * 100).toFixed(1);
+            const spaceFreePercent = sizeBeforeBytes > 0
+                ? (spaceFreedbytes / sizeBeforeBytes * 100).toFixed(1)
+                : 0;
 
-            const results = {
-                status: 'completed',
-                execution: {
-                    started_at: startedAt.toISOString(),
-                    completed_at: completedAt.toISOString(),
-                    duration_seconds: Math.round((completedAt - startedAt) / 1000),
-                },
-                results: {
-                    size_before_bytes: sizeBeforeBytes,
-                    size_before_pretty: DatabaseManager.formatBytes(sizeBeforeBytes),
-                    size_after_bytes: sizeAfterBytes,
-                    size_after_pretty: DatabaseManager.formatBytes(sizeAfterBytes),
-                    space_freed_bytes: spaceFreedbytes,
-                    space_freed_pretty: DatabaseManager.formatBytes(spaceFreedbytes),
-                    space_freed_percent: parseFloat(spaceFreePercent),
-                    method: vacuumCommand,
-                    tables_optimized: ['knx_events', 'current_state', 'subscription_events'],
-                    downtime_warning: full ? `⚠️ VACUUM FULL: System was offline for ${Math.round((completedAt - startedAt) / 1000)} seconds` : null,
-                },
+            const executionInfo = {
+                started_at: formatTimestamp(startedAt),
+                started_at_iso: startedAt.toISOString(),
+                completed_at: formatTimestamp(completedAt),
+                completed_at_iso: completedAt.toISOString(),
+                duration_seconds: Math.round((completedAt - startedAt) / 1000),
+            };
+
+            const optimizationResults = {
+                size_before_bytes: sizeBeforeBytes,
+                size_before_pretty: DatabaseManager.formatBytes(sizeBeforeBytes),
+                size_after_bytes: sizeAfterBytes,
+                size_after_pretty: DatabaseManager.formatBytes(sizeAfterBytes),
+                space_freed_bytes: spaceFreedbytes,
+                space_freed_pretty: DatabaseManager.formatBytes(spaceFreedbytes),
+                space_freed_percent: parseFloat(spaceFreePercent),
+                method: vacuumCommand,
+                tables_optimized: ['knx_events', 'current_state', 'subscription_events'],
+                downtime_warning: full ? `⚠️ VACUUM FULL: System was offline for ${Math.round((completedAt - startedAt) / 1000)} seconds` : null,
             };
 
             // Update job as completed
-            await client.query(
+            await txn.query(
                 `UPDATE database_maintenance_log 
                  SET status = $1, completed_at = $2, results = $3
                  WHERE id = $4`,
-                ['completed', completedAt, JSON.stringify(results.results), jobId]
+                ['completed', completedAt, JSON.stringify(optimizationResults), jobId],
             );
+
+            await txn.commit();
 
             this.logger.info('✅ Optimize operation completed', {
                 jobId,
@@ -671,65 +683,14 @@ export class DatabaseManager {
             return {
                 id: jobId,
                 type: 'optimize-result',
-                ...results,
+                status: 'completed',
+                execution: executionInfo,
+                results: optimizationResults,
             };
         } catch (err) {
             this.logger.error('Failed to optimize database', { error: err.message, jobId });
-            // Log failure
-            try {
-                await client.query(
-                    `UPDATE database_maintenance_log 
-                     SET status = $1, completed_at = $2, error_message = $3
-                     WHERE id = $4`,
-                    ['failed', new Date(), err.message, jobId]
-                );
-            } catch (logErr) {
-                this.logger.error('Failed to log optimize failure', { error: logErr.message });
-            }
+            await txn.rollback();
             throw err;
-        } finally {
-            client.release();
-        }
-    }
-
-    /**
-     * Helper: Get the total row count for a table
-     * @private
-     */
-    async _getTotalRowCount(client, tableName) {
-        try {
-            const result = await client.query(`SELECT COUNT(*) as count FROM ${tableName}`);
-            return parseInt(result.rows[0].count);
-        } catch (err) {
-            return 0;
-        }
-    }
-
-    /**
-     * Helper: Get a compression ratio for a hypertable
-     * @private
-     */
-    async _getCompressionRatio(client, tableName) {
-        try {
-            const result = await client.query(`
-                SELECT 
-                    COALESCE(
-                        ROUND(
-                            (SELECT pg_total_relation_size(tablename)
-                             FROM pg_tables WHERE tablename = $1) /
-                            NULLIF(
-                                (SELECT total_compressed_bytes FROM _timescaledb_internal.compressed_hypertable_stats
-                                 WHERE hypertable_id = (SELECT id FROM _timescaledb_catalog.hypertable WHERE table_name = $1)),
-                                0
-                            ),
-                            1
-                        )::text || ':1',
-                        'N/A'
-                    ) as ratio;
-            `, [tableName]);
-            return result.rows[0]?.ratio || 'N/A';
-        } catch (err) {
-            return 'N/A';
         }
     }
 
@@ -743,7 +704,6 @@ export class DatabaseManager {
      * @returns {Promise<object>} { jobs: [], total: number }
      */
     async getCleanupJobs(offset = 0, limit = 20, status = null, days = 30) {
-        const client = await this.pool.connect();
         try {
             // Build query
             let whereClause = 'WHERE created_at > NOW() - INTERVAL \'1 day\' * $1';
@@ -755,14 +715,14 @@ export class DatabaseManager {
             }
 
             // Get total count
-            const countResult = await client.query(
+            const countResult = await this.db.query(
                 `SELECT COUNT(*) as total FROM database_maintenance_log ${whereClause}`,
                 params
             );
-            const total = parseInt(countResult.rows[0].total);
+            const total = this.#parseInt(countResult.rows[0].total);
 
             // Get paginated results
-            const result = await client.query(
+            const result = await this.db.query(
                 `SELECT * FROM database_maintenance_log 
                  ${whereClause}
                  ORDER BY created_at DESC
@@ -780,8 +740,10 @@ export class DatabaseManager {
                     params: row.params || {},
                     dry_run: row.dry_run || false,
                     executed_by: row.executed_by,
-                    created_at: row.created_at?.toISOString(),
-                    completed_at: row.completed_at?.toISOString(),
+                    created_at: formatTimestamp(row.created_at),
+                    created_at_iso: row.created_at?.toISOString(),
+                    completed_at: row.completed_at ? formatTimestamp(row.completed_at) : null,
+                    completed_at_iso: row.completed_at?.toISOString(),
                     duration_seconds: row.completed_at && row.started_at
                         ? Math.round((row.completed_at - row.started_at) / 1000)
                         : null,
@@ -797,8 +759,6 @@ export class DatabaseManager {
         } catch (err) {
             this.logger.error('Failed to get cleanup jobs', { error: err.message, offset, limit, status, days });
             throw err;
-        } finally {
-            client.release();
         }
     }
 
@@ -808,15 +768,59 @@ export class DatabaseManager {
      * @returns {Promise<boolean>} true if a database is connected, false otherwise
      */
     async checkHealth() {
-        const client = await this.pool.connect();
         try {
-            await client.query('SELECT NOW()');
+            await this.db.query('SELECT NOW()');
             return true;
         } catch (err) {
             this.logger.error('Database health check failed', { error: err.message });
             return false;
-        } finally {
-            client.release();
+        }
+    }
+
+    /**
+     * Helper: Safe parseInt with radix 10 and default value 0
+     */
+    #parseInt(value) {
+        const parsed = parseInt(value, 10);
+        return Number.isNaN(parsed) ? 0 : parsed;
+    }
+
+    /**
+     * Helper: Get the total row count for a table
+     */
+    async #getTotalRowCount(tableName) {
+        try {
+            const result = await this.db.query(`SELECT COUNT(*) as count FROM ${tableName}`);
+            return this.#parseInt(result.rows[0].count);
+        } catch {
+            return 0;
+        }
+    }
+
+    /**
+     * Helper: Get a compression ratio for a hypertable
+     */
+    async #getCompressionRatio(tableName) {
+        try {
+            const result = await this.db.query(`
+                SELECT 
+                    COALESCE(
+                        ROUND(
+                            (SELECT pg_total_relation_size(tablename)
+                             FROM pg_tables WHERE tablename = $1) /
+                            NULLIF(
+                                (SELECT total_compressed_bytes FROM _timescaledb_internal.compressed_hypertable_stats
+                                 WHERE hypertable_id = (SELECT id FROM _timescaledb_catalog.hypertable WHERE table_name = $1)),
+                                0
+                            ),
+                            1
+                         )::text || ':1',
+                         'N/A'
+                     ) as ratio;
+             `, [tableName]);
+            return result.rows[0]?.ratio || 'N/A';
+        } catch {
+            return 'N/A';
         }
     }
 }

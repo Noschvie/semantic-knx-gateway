@@ -151,7 +151,8 @@ async function getDatapointMappings(stateEngine) {
             FROM datapoint_mappings
         `);
         return result.rows ?? [];
-    } catch {
+    } catch (error) {
+        console.error('getDatapointMappings query failed:', error.message);
         return [];
     }
 }
@@ -161,7 +162,13 @@ async function getDatapointMappingByUuid(uuid, stateEngine) {
     return mappings.find(m => stableUuid(m.datapointId) === uuid) ?? null;
 }
 
-function toDatapointResourceWithStateMeta(state) {
+/**
+ * Enriches a datapoint resource with historical DPT information
+ * @param {Object} state - Datapoint state
+ * @param {DptHistoryManager} dptHistory - DPT history manager instance
+ * @returns {Promise<Object>} Enriched resource
+ */
+async function toDatapointResourceWithHistoricalDpt(state, dptHistory) {
     const resource = toDatapointResource(state);
 
     resource.meta = {
@@ -176,6 +183,18 @@ function toDatapointResourceWithStateMeta(state) {
             valueType: 'string',
             timestamp: null,
         };
+    }
+
+    // Add historical DPT if state has a timestamp
+    if (dptHistory && state.ga && state.updated_at) {
+        try {
+            const dptAtCapture = await dptHistory.getDptAtTime(state.ga, state.updated_at);
+            if (dptAtCapture && dptAtCapture !== state.dpt) {
+                resource.meta['knx:dptAtCapture'] = dptAtCapture;
+            }
+        } catch (_err) {
+            // Silently fail - historical DPT is optional
+        }
     }
 
     return resource;
@@ -306,6 +325,7 @@ async function writeDatapointValue(uuid, value, stateEngine, tunnelManager) {
 
 export function datapointsRouter(stateEngine, tunnelManager) {
     const router = Router();
+    const dptHistory = stateEngine.dptHistory;  // Reuse instance from StateEngine
 
     // ── GET /api/v2/datapoints ────────────────────────────────────────────
     // Spec parameters: page[number], page[size], typeFilter, tagFilter,
@@ -351,6 +371,12 @@ export function datapointsRouter(stateEngine, tunnelManager) {
                     ?? mappingByGa.get(state.ga)
                     ?? null;
 
+                // Skip orphaned states without a mapping
+                // (prevents duplicate/stale datapoints from old KNX systems appearing in API)
+                if (!mapping) {
+                    continue;
+                }
+
                 const merged = {
                     ...mapping,
                     ...state,
@@ -393,7 +419,9 @@ export function datapointsRouter(stateEngine, tunnelManager) {
                 );
             }
 
-            const resources = unionDatapoints.map(toDatapointResourceWithStateMeta);
+            const resources = await Promise.all(
+                unionDatapoints.map(state => toDatapointResourceWithHistoricalDpt(state, dptHistory)),
+            );
 
             const filters = parseFilters(req.query);
             const specFilters = filters.filter(f => f.key !== 'deviceId' &&
@@ -418,9 +446,12 @@ export function datapointsRouter(stateEngine, tunnelManager) {
     router.get('/values', bearer('read'), async(req, res) => {
         try {
             const allStates = await stateEngine.getAllStates();
+            const enrichedStates = await Promise.all(
+                allStates.map(state => toDatapointResourceWithHistoricalDpt(state, dptHistory)),
+            );
             res.json({
                 meta: { collection: { total: allStates.length } },
-                data: allStates.map(toDatapointResource),
+                data: enrichedStates,
             });
         } catch (error) {
             res.status(500).json(knxError(500, 'Internal Server Error', error.message));
@@ -520,6 +551,11 @@ export function datapointsRouter(stateEngine, tunnelManager) {
                     ?? mappingByGa.get(state.ga)
                     ?? null;
 
+                // Skip orphaned states without a mapping
+                if (!mapping) {
+                    continue;
+                }
+
                 const merged = {
                     ...mapping,
                     ...state,
@@ -564,16 +600,35 @@ export function datapointsRouter(stateEngine, tunnelManager) {
             // Pagination
             const { items, total, number, size } = paginate(filteredHistory, rawNumber, rawSize);
 
+            // Enrich history items with historical DPT information
+            const enrichedItems = await Promise.all(
+                items.map(async(event) => {
+                    const item = {
+                        id:         stableUuid(`${datapoint.datapointId}-${event.timestamp}`),
+                        type:       'datapoint',
+                        attributes: {
+                            timestamp: event.timestamp,
+                            ...toSpecValue(event.value),
+                        },
+                    };
+
+                    // Add historical DPT if available
+                    try {
+                        const dptAtTime = await dptHistory.getDptAtTime(datapoint.ga, event.timestamp);
+                        if (dptAtTime && dptAtTime !== datapoint.dpt) {
+                            item.meta = { 'knx:dptAtCapture': dptAtTime };
+                        }
+                    } catch (_err) {
+                        // Silently fail - historical DPT is optional
+                    }
+
+                    return item;
+                }),
+            );
+
             res.json({
                 meta: { collection: { number, size, total } },
-                data: items.map(event => ({
-                    id:         stableUuid(`${datapoint.datapointId}-${event.timestamp}`),
-                    type:       'datapoint',
-                    attributes: {
-                        timestamp: event.timestamp,
-                        ...toSpecValue(event.value),
-                    },
-                })),
+                data: enrichedItems,
             });
         } catch (error) {
             res.status(500).json(knxError(500, 'Internal Server Error', error.message));
@@ -614,6 +669,11 @@ export function datapointsRouter(stateEngine, tunnelManager) {
                     ?? mappingByGa.get(state.ga)
                     ?? null;
 
+                // Skip orphaned states without a mapping
+                if (!mapping) {
+                    continue;
+                }
+
                 const merged = {
                     ...mapping,
                     ...state,
@@ -645,7 +705,8 @@ export function datapointsRouter(stateEngine, tunnelManager) {
                 return res.status(404).json(knxError(404, 'Not Found', `Datapoint ${id} not found`));
             }
 
-            res.json({ data: toDatapointResourceWithStateMeta(datapoint) });
+            const resource = await toDatapointResourceWithHistoricalDpt(datapoint, dptHistory);
+            res.json({ data: resource });
         } catch (error) {
             res.status(500).json(knxError(500, 'Internal Server Error', error.message));
         }

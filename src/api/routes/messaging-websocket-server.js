@@ -345,7 +345,7 @@ export class MessagingWebSocketServer {
                         },
                     },
                 });
-            } catch (_) {
+            } catch (err) {
                 this.sendWsMessage(ws, {
                     type: 'error',
                     errors: [{ status: '502', detail: `KNX write failed: ${err.message}` }],
@@ -408,7 +408,7 @@ export class MessagingWebSocketServer {
 
             try {
                 await this.onMessage(ws, msg, subscriptions, context);
-            } catch (_) {
+            } catch (err) {
                 this.logger.error({ msg: 'WebSocket message handling failed', error: err.message });
                 this.sendWsMessage(ws, {
                     type: 'error',
