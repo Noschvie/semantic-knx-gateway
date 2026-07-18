@@ -39,8 +39,8 @@ Testet `createTunnelOptions()` direkt – schneller, Hardware-unabhängig, keine
 
 **Szenarien (Umgebungsvariablen-Parsing)**
 
-- ✓ `KNX_SECURE="1"` → true
-- ✓ `KNX_SECURE="yes"` → true
+- ✓ `KNX_SECURE_ENABLED="1"` → true
+- ✓ `KNX_SECURE_ENABLED="yes"` → true
 
 ### Durchführung
 
@@ -72,9 +72,9 @@ node /home/noschvie/test-tunnel-options.js
 ### Erwartetes Ergebnis
 
 ```
-[HH:MM:SS] ✓ KNX_SECURE unset, KNX_HOST_PROTOCOL unset → defaults to TunnelUDP
-[HH:MM:SS] ✓ KNX_SECURE=false, KNX_HOST_PROTOCOL=TunnelUDP → Classic TunnelUDP
-[HH:MM:SS] ✓ KNX_SECURE=true, valid keyring file, valid password → Secure TunnelTCP
+[HH:MM:SS] ✓ KNX_SECURE_ENABLED unset, KNX_HOST_PROTOCOL unset → defaults to TunnelUDP
+[HH:MM:SS] ✓ KNX_SECURE_ENABLED=false, KNX_HOST_PROTOCOL=TunnelUDP → Classic TunnelUDP
+[HH:MM:SS] ✓ KNX_SECURE_ENABLED=true, valid keyring file, valid password → Secure TunnelTCP
 ...
 ✓ All 10 tests passed (100%)
 ```
@@ -190,7 +190,7 @@ Test Summary
 
 **Konfiguration:**
 ```bash
-export KNX_SECURE=false
+export KNX_SECURE_ENABLED=false
 export KNX_HOST_PROTOCOL=TunnelUDP
 ```
 
@@ -205,7 +205,7 @@ export KNX_HOST_PROTOCOL=TunnelUDP
 
 **Konfiguration:**
 ```bash
-export KNX_SECURE=false
+export KNX_SECURE_ENABLED=false
 export KNX_HOST_PROTOCOL=TunnelTCP
 ```
 
@@ -220,7 +220,7 @@ export KNX_HOST_PROTOCOL=TunnelTCP
 
 **Konfiguration:**
 ```bash
-export KNX_SECURE=true
+export KNX_SECURE_ENABLED=true
 export KNX_HOST_PROTOCOL=TunnelUDP  # wird zu TunnelTCP erzwungen
 export KNX_KEYRING_FILE="/path/to/keyring.knxkeys"
 export KNX_KEYRING_PASSWORD="keyring-password"
@@ -243,14 +243,14 @@ export KNX_KEYRING_PASSWORD="keyring-password"
 
 **Konfiguration:**
 ```bash
-export KNX_SECURE=true
+export KNX_SECURE_ENABLED=true
 unset KNX_KEYRING_FILE
 export KNX_KEYRING_PASSWORD="password"
 ```
 
 **Erwartet (Fail-Fast):**
 - `createTunnelOptions()` wirft Fehler **vor** dem Verbindungsversuch
-- Log: `Invalid KNX tunnel configuration: KNX_SECURE=true requires KNX_KEYRING_FILE`
+- Log: `Invalid KNX tunnel configuration: KNX_SECURE_ENABLED=true requires KNX_KEYRING_FILE`
 - App startet nicht
 
 ---
@@ -259,14 +259,14 @@ export KNX_KEYRING_PASSWORD="password"
 
 **Konfiguration:**
 ```bash
-export KNX_SECURE=true
+export KNX_SECURE_ENABLED=true
 export KNX_KEYRING_FILE="/path/to/keyring.knxkeys"
 unset KNX_KEYRING_PASSWORD
 ```
 
 **Erwartet (Fail-Fast):**
 - `createTunnelOptions()` wirft Fehler **vor** dem Verbindungsversuch
-- Log: `Invalid KNX tunnel configuration: KNX_SECURE=true requires KNX_KEYRING_PASSWORD`
+- Log: `Invalid KNX tunnel configuration: KNX_SECURE_ENABLED=true requires KNX_KEYRING_PASSWORD`
 - App startet nicht
 
 ---

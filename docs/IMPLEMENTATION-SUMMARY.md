@@ -13,9 +13,9 @@ This package implements optional **KNX IP Secure** support for the KNX Runtime E
 ### Key Design Principles
 
 1. **Backward Compatible**: Classic KNXnet/IP (TunnelUDP, TunnelTCP) works unchanged
-2. **Configuration-Only Switching**: Environment variables (`KNX_SECURE`, etc.) control mode
+2. **Configuration-Only Switching**: Environment variables (`KNX_SECURE_ENABLED`, etc.) control mode
 3. **No Crypto Implementation**: All Secure operations delegated to KNXUltimate library
-4. **Fail-Fast Validation**: Invalid configs caught before connection attempt
+4. **Fail-Fast Validation**: Invalid configs caught before a connection attempt
 5. **Minimal Code Changes**: Only `connect()` method in TunnelManager modified
 
 ---
@@ -37,12 +37,12 @@ This package implements optional **KNX IP Secure** support for the KNX Runtime E
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `KNX_SECURE` | `false` | Enable KNX IP Secure mode |
+| `KNX_SECURE_ENABLED` | `false` | Enable KNX IP Secure mode |
 | `KNX_HOST_PROTOCOL` | `TunnelUDP` | Protocol: TunnelUDP or TunnelTCP |
 | `KNX_KEYRING_FILE` | *(none)* | Path to exported ETS keyring (.knxkeys) |
 | `KNX_KEYRING_PASSWORD` | *(none)* | Password protecting the keyring |
 
-**Classic Mode** (`KNX_SECURE=false`):
+**Classic Mode** (`KNX_SECURE_ENABLED=false`):
 ```javascript
 const options = {
     ipAddr: '192.168.1.1',
@@ -54,7 +54,7 @@ const options = {
 };
 ```
 
-**Secure Mode** (`KNX_SECURE=true`):
+**Secure Mode** (`KNX_SECURE_ENABLED=true`):
 ```javascript
 const options = {
     ipAddr: '192.168.1.1',
@@ -72,8 +72,8 @@ const options = {
 ```
 
 **Error Handling** (Fail-Fast):
-- Secure without keyring file → `Error: KNX_SECURE=true requires KNX_KEYRING_FILE`
-- Secure without password → `Error: KNX_SECURE=true requires KNX_KEYRING_PASSWORD`
+- Secure without keyring file → `Error: KNX_SECURE_ENABLED=true requires KNX_KEYRING_FILE`
+- Secure without password → `Error: KNX_SECURE_ENABLED=true requires KNX_KEYRING_PASSWORD`
 - Keyring file not found → `Error: KNX_KEYRING_FILE not found on disk: ...`
 
 **Lines**: ~80  
@@ -287,14 +287,14 @@ node test-tunnel-options.js
 **Create `.env.secure` for testing**:
 ```bash
 # Classic Mode (current)
-KNX_SECURE=false
+KNX_SECURE_ENABLED=false
 KNX_HOST_PROTOCOL=TunnelUDP
 KNX_GATEWAY_IP=192.168.1.1
 KNX_GATEWAY_PORT=3671
 KNX_GATEWAY_PHYS_ADDR=1.1.1
 
 # Secure Mode (future, after Weinzierl 732 Secure deployment)
-# KNX_SECURE=true
+# KNX_SECURE_ENABLED=true
 # KNX_KEYRING_FILE=/path/to/keyring.knxkeys
 # KNX_KEYRING_PASSWORD=***
 ```
@@ -333,7 +333,7 @@ git pull  # (after merge of KNX-Secure branch)
 npm install
 
 # 3. Set Secure ENV vars
-echo "KNX_SECURE=true" >> .env
+echo "KNX_SECURE_ENABLED=true" >> .env
 echo "KNX_KEYRING_FILE=/etc/knx/secure-keyring.knxkeys" >> .env
 # KNX_KEYRING_PASSWORD should be from secure vault, not plaintext
 

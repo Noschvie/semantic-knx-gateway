@@ -175,7 +175,7 @@ KNX_TTL_FILE=my-installation.ttl
 
 # Logging
 LOG_LEVEL=info
-PRETTY_LOGS=true
+PRETTY_LOGS_ENABLED=true
 
 # TimescaleDB tuning (set explicitly on Raspberry Pi)
 # TS_TUNE_MEMORY=2GB
