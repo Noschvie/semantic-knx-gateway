@@ -8,10 +8,65 @@ contributors and users to follow meaningful changes over time.
 Unreleased
 ----------
 
-2026-07-17
-----------
+### Added
+- **Bus Protection & Graceful Degradation** — Administrative control over KNX bus connectivity:
+  
+  **New Environment Variables:**
+  - `KNX_DISABLED` (default: `false`) — Completely disable KNX tunnel connection without stopping API/DB/Semantic layers
+    - Use case: maintenance windows, dry-run/testing environments, protecting the bus during diagnostics
+    - All KNX write operations return HTTP 503 with error code `KNX_DISABLED`
+    - Incoming telegrams are not processed; the system operates in pure database/API mode
+  - `KNX_READONLY` (default: `false`) — Keep a tunnel connected but block outgoing writes (listen-only mode)
+    - Use case: troubleshooting write issues, monitoring-only deployments, temporary read-only access
+    - All KNX write operations return HTTP 403 with error code `KNX_READONLY`
+    - Incoming telegrams are still processed and stored in the database
+  
+  **Implementation Details:**
+  - `TunnelManager` checks both flags on startup and in `write()` method
+  - Write errors throw custom exceptions with specific error codes (`KNX_DISABLED`, `KNX_READONLY`)
+  - `DatapointsRouter` catches these errors and returns appropriate HTTP status codes and error payloads
+  - Startup logging shows the current mode: 🚫 for disabled, 🔒 for read-only, or normal mode
+  - Configuration documented in updated `env.example`
+  
+  **Benefits:**
+  - ✅ Bus protection without full shutdown (API remains available for clients)
+  - ✅ Zero-breaking-change feature (defaults to false, backward compatible)
+  - ✅ Clear error messages and HTTP status codes for client applications
+  - ✅ Useful for multi-tenant environments or controlled rollouts
 
-2026-07-16
+- **Structured Logging Enhancement** — Improved observability and debugging:
+  
+  **Migration from Console Logging:**
+  - Replaced ad-hoc `console.log()`, `console.error()`, `console.warn()` with structured logger calls
+  - Affected modules: `src/api/routes/datapoints.js` (primary implementation)
+  - Logger uses a consistent format: `{ msg: '...', key: value, error: err.message }`
+  - Allows downstream log aggregation tools to parse and filter structured fields
+  
+  **New Log Points in DatapointsRouter:**
+  - `getDatapointMappings()` — Query failures logged with context
+  - `writeDatapointValue()` — Comprehensive instrumentation:
+    - Info: datapoint not found (404 case)
+    - Warn: datapoint not writable, missing metadata, unknown DPT, value decode failures
+    - Warn: KNX write blocked due to `KNX_DISABLED` or `KNX_READONLY`
+    - Error: tunnelManager unavailable, KNX write failed
+    - Error: state update failure after successful KNX writing (non-fatal, logged but still returns success)
+  
+  **Emoji Prefixes for Visual Debugging:**
+  - 🚫 — KNX bus disabled or write rejected
+  - 🔒 — Read-only mode restrictions
+  - ❌ — Fatal errors (KNX write failed)
+  - Non-fatal warnings for client-side issues (bad input, missing metadata)
+  
+  **Benefits:**
+  - ✅ Better root-cause diagnosis for API failures
+  - ✅ Clearer distinction between recoverable and fatal errors
+  - ✅ Structured fields enable downstream alerting and metrics extraction
+  - ✅ Emoji prefixes make log scanning easier in high-volume environments
+
+### Changed
+- **CHANGELOG.md cleanup** — Removed redundant "2026-07-16" section (duplicate date marker)
+
+2026-07-17
 ----------
 
 ### Added

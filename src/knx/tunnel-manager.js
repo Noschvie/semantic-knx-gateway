@@ -35,11 +35,27 @@ export class TunnelManager {
         this.isConnected = false;
         this.isConnecting = false;
 
+        // ===== BUS PROTECTION =====
+        // KNX_DISABLED: do not open the tunnel at all
+        // KNX_READONLY: tunnel is opened, but outgoing writes are hard-rejected
+        this.disabled = String(process.env.KNX_DISABLED ?? 'false').toLowerCase() === 'true';
+        this.readOnly = String(process.env.KNX_READONLY ?? 'false').toLowerCase() === 'true';
+
+        if (this.disabled) {
+            this.logger.warn('🚫 TunnelManager instantiated in DISABLED mode – no bus traffic will occur');
+        } else if (this.readOnly) {
+            this.logger.warn('🔒 TunnelManager instantiated in READ-ONLY mode – outgoing writes will be rejected');
+        }
+
         // Telegram queue for outgoing writes during disconnect (FIFO with drop policy)
         this.telegramQueue = new TelegramQueue(MAX_QUEUE_SIZE, this.logger);
     }
 
     async connect() {
+        if (this.disabled) {
+            this.logger.warn('connect() ignored – KNX_DISABLED=true');
+            return;
+        }
         if (this.isConnecting) {
             this.logger.debug('Connection already in progress, skipping...');
             return;
@@ -364,6 +380,24 @@ export class TunnelManager {
     }
 
     async write(groupAddress, value, dpt) {
+        if (this.disabled) {
+            this.logger.warn(
+                `🚫 KNX write blocked (KNX_DISABLED=true): ${groupAddress} = ${value}`,
+            );
+            const err = new Error('KNX bus is disabled (KNX_DISABLED=true)');
+            err.code = 'KNX_DISABLED';
+            throw err;
+        }
+
+        if (this.readOnly) {
+            this.logger.warn(
+                `🔒 KNX write blocked (read-only mode): ${groupAddress} = ${value}`,
+            );
+            const err = new Error('KNX bus is in read-only mode (KNX_READONLY=true)');
+            err.code = 'KNX_READONLY';
+            throw err;
+        }
+
         const telegram = {
             groupAddress,
             value,

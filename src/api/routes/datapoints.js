@@ -9,9 +9,12 @@ import { paginate, stableUuid } from './helpers/knx-iot-uuid.js';
 import { toDatapointResource } from './helpers/knx-iot-transform.js';
 import { decodeValueForKnx, toSpecValue } from './helpers/knx-iot-dpt.js';
 import { parseFilters } from './helpers/knx-iot-filters.js';
+import { createLogger } from '../../utils/logger.js';
 
 // ── KNX IoT Spec §Errors ──────────────────────────────────────────────────────
 const KNX_SCHEMA_LINK = 'https://schema.knx.org/2020/api';
+
+const logger = createLogger('DatapointsRouter');
 
 function knxError(status, title, detail) {
     return { errors: [{ title, links: KNX_SCHEMA_LINK, status: String(status), detail }] };
@@ -152,7 +155,7 @@ async function getDatapointMappings(stateEngine) {
         `);
         return result.rows ?? [];
     } catch (error) {
-        console.error('getDatapointMappings query failed:', error.message);
+        logger.error({ msg: 'getDatapointMappings query failed', error: error.message });
         return [];
     }
 }
@@ -211,12 +214,16 @@ function normalizeIncomingValue(value) {
 async function writeDatapointValue(uuid, value, stateEngine, tunnelManager) {
     const valueStr = normalizeIncomingValue(value);
 
-    const allStates = await stateEngine.getAllStates().catch(() => []);
+    const allStates = await stateEngine.getAllStates().catch((err) => {
+        logger.warn({ msg: 'writeDatapointValue: getAllStates failed, continuing with mapping only', uuid, error: err.message });
+        return [];
+    });
     const currentState = allStates.find(s => stableUuid(s.datapointId) === uuid) ?? null;
     const mapping = await getDatapointMappingByUuid(uuid, stateEngine);
 
     // If neither a current state nor a mapping exists, > a true 404 error
     if (!currentState && !mapping) {
+        logger.info({ msg: 'writeDatapointValue: datapoint not found', uuid });
         return {
             error: {
                 status: 404,
@@ -234,6 +241,7 @@ async function writeDatapointValue(uuid, value, stateEngine, tunnelManager) {
     // Only strictly prohibit writable if explicitly false.
     const writable = currentState?.writable;
     if (writable === false) {
+        logger.warn({ msg: 'writeDatapointValue: datapoint not writable', uuid, ga, name });
         return {
             error: {
                 status: 403,
@@ -244,6 +252,7 @@ async function writeDatapointValue(uuid, value, stateEngine, tunnelManager) {
 
     // KNX write is not possible without GA/DPT
     if (!ga || !dpt || !datapointId) {
+        logger.warn({ msg: 'writeDatapointValue: missing datapoint metadata', uuid, ga, dpt, datapointId });
         return {
             error: {
                 status: 422,
@@ -254,6 +263,7 @@ async function writeDatapointValue(uuid, value, stateEngine, tunnelManager) {
 
     const resolvedDpt = normalizeDpt(dpt);
     if (!resolvedDpt) {
+        logger.warn({ msg: 'writeDatapointValue: unknown DPT', uuid, ga, dpt });
         return {
             error: {
                 status: 400,
@@ -266,6 +276,7 @@ async function writeDatapointValue(uuid, value, stateEngine, tunnelManager) {
     try {
         nativeValue = decodeValueForKnx(valueStr, resolvedDpt);
     } catch (err) {
+        logger.warn({ msg: 'writeDatapointValue: value decode failed', uuid, ga, dpt: resolvedDpt, value: valueStr, error: err.message });
         return {
             error: {
                 status: 422,
@@ -275,6 +286,7 @@ async function writeDatapointValue(uuid, value, stateEngine, tunnelManager) {
     }
 
     if (!tunnelManager) {
+        logger.error({ msg: 'writeDatapointValue: no tunnelManager available', uuid, ga });
         return {
             error: {
                 status: 503,
@@ -286,6 +298,25 @@ async function writeDatapointValue(uuid, value, stateEngine, tunnelManager) {
     try {
         await tunnelManager.write(ga, nativeValue, resolvedDpt);
     } catch (err) {
+        if (err?.code === 'KNX_DISABLED') {
+            logger.warn({ msg: '🚫 KNX write rejected: bus disabled', uuid, ga, dpt: resolvedDpt });
+            return {
+                error: {
+                    status: 503,
+                    payload: knxError(503, 'Service Unavailable', 'KNX bus is administratively disabled (KNX_DISABLED=true)'),
+                },
+            };
+        }
+        if (err?.code === 'KNX_READONLY') {
+            logger.warn({ msg: '🔒 KNX write rejected: read-only mode', uuid, ga, dpt: resolvedDpt });
+            return {
+                error: {
+                    status: 403,
+                    payload: knxError(403, 'Forbidden', 'KNX bus is in read-only mode (KNX_READONLY=true)'),
+                },
+            };
+        }
+        logger.error({ msg: '❌ KNX write failed', uuid, ga, dpt: resolvedDpt, error: err.message, stack: err.stack });
         return {
             error: {
                 status: 502,
@@ -304,7 +335,9 @@ async function writeDatapointValue(uuid, value, stateEngine, tunnelManager) {
             timestamp,
         });
     } catch (err) {
-        console.warn(`[knx-iot] State update after PUT failed for ${ga}: ${err.message}`);
+        // State update failure is non-fatal for the caller: the KNX bus write already succeeded.
+        // Log it, but still return success — the next incoming bus echo will reconcile the state.
+        logger.warn({ msg: 'writeDatapointValue: state update after KNX write failed (non-fatal)', uuid, ga, error: err.message });
     }
 
     return {

@@ -71,9 +71,15 @@ class SemanticKNXRuntime {
             }
 
             // Phase 4: KNX Tunnel Manager
-            this.logger.info('Phase 4: Connecting to KNX...');
             this.tunnelManager = new TunnelManager(this.stateEngine);
-            await this.tunnelManager.connect();
+            const knxDisabled = String(process.env.KNX_DISABLED ?? 'false').toLowerCase() === 'true';
+            if (knxDisabled) {
+                this.logger.warn('⚠️  KNX_DISABLED=true – KNX tunnel will NOT be opened (bus protection mode)');
+                this.logger.warn('   API, DB and Semantic Layer remain available. All bus writes will return HTTP 503.');
+            } else {
+                this.logger.info('Phase 4: Connecting to KNX...');
+                await this.tunnelManager.connect();
+            }
 
             // Phase 5: REST API
             this.logger.info('Phase 6: Starting REST API...');
@@ -90,6 +96,12 @@ class SemanticKNXRuntime {
             this.logger.info(`📡 KNX Gateway: ${process.env.KNX_GATEWAY_IP}:${process.env.KNX_GATEWAY_PORT}`);
             this.logger.info(`🌐 REST API: http://0.0.0.0:${process.env.API_PORT}`);
             this.logger.info(`💾 Database: ${process.env.POSTGRES_HOST}:${process.env.POSTGRES_PORT}`);
+
+            if (knxDisabled) {
+                this.logger.info('🚫 KNX Bus: DISABLED (KNX_DISABLED=true)');
+            } else if (this.tunnelManager?.readOnly) {
+                this.logger.info('🔒 KNX Bus: READ-ONLY (KNX_READONLY=true) — incoming telegrams processed, outgoing writes blocked');
+            }
 
             if (ttlFilePath) {
                 this.logger.info(`🧠 Semantic Layer: Enabled (${ttlFileName})`);
