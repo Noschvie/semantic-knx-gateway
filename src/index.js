@@ -100,7 +100,7 @@ class SemanticKNXRuntime {
             if (knxDisabled) {
                 this.logger.info('🚫 KNX Bus: DISABLED (KNX_DISABLED=true)');
             } else if (this.tunnelManager?.readOnly) {
-                this.logger.info('🔒 KNX Bus: READ-ONLY (KNX_READONLY=true) — incoming telegrams processed, outgoing writes blocked');
+                this.logger.info('🔒 KNX Bus: READ-ONLY (KNX_READONLY_ENABLED=true) — incoming telegrams processed, outgoing writes blocked');
             }
 
             if (ttlFilePath) {

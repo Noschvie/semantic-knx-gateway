@@ -8,7 +8,59 @@ contributors and users to follow meaningful changes over time.
 Unreleased
 ----------
 
+### Changed
+- **Environment Variable Naming Convention Standardization (BREAKING CHANGE)** — Unified naming pattern for all boolean feature flags:
+  
+  **Renamed Variables:**
+  - `KNX_SECURE` → `KNX_SECURE_ENABLED` (set to `true` to enable KNX IP Secure tunneling)
+  - `KNX_READONLY` → `KNX_READONLY_ENABLED` (set to `true` to enable read-only mode)
+  - `PRETTY_LOGS` → `PRETTY_LOGS_ENABLED` (set to `true` to enable pretty console logging)
+  
+  **Naming Convention Established:**
+  - **Feature Flags**: `<MODULE>_<FEATURE>_ENABLED` — boolean variables that activate features when set to `true`
+    - `KNX_SECURE_ENABLED`, `PRETTY_LOGS_ENABLED`, `KNX_READONLY_ENABLED`
+  - **Disable Flags**: `<MODULE>_DISABLED` — boolean variables that deactivate subsystems when set to `true`
+    - `KNX_DISABLED`, `OAUTH_DISABLED` (unchanged, already follow this pattern)
+  
+  **Migration Required:**
+  Users must update their `.env` files and Docker configurations:
+  ```bash
+  # Before
+  KNX_SECURE=false
+  KNX_READONLY=false
+  PRETTY_LOGS=true
+  
+  # After
+  KNX_SECURE_ENABLED=false
+  KNX_READONLY_ENABLED=false
+  PRETTY_LOGS_ENABLED=true
+  ```
+  
+  **Updated Documentation:**
+  - `env.example` — All environment variable examples updated
+  - All error messages and log output are updated to reference new variable names
+  - Test suite fully migrated to the new naming convention
+  
+  **Files Modified:**
+  - `env.example` — Configuration template
+  - `src/knx/tunnel-options.js` — KNX Secure mode detection
+  - `src/knx/tunnel-manager.js` — Read-only mode enforcement
+  - `src/utils/logger.js` — Pretty logging configuration
+  - `src/index.js` — Startup logging messages
+  - `src/api/routes/datapoints.js` — Read-only error responses
+  - `test/unit/test-tunnel-options.js` — All unit tests updated
+  
+  **Benefits:**
+  - ✅ Consistent naming across all boolean configuration options
+  - ✅ Clearer intent: `_ENABLED` for features, `_DISABLED` for protections
+  - ✅ Easier maintenance and documentation
+  - ✅ Reduced confusion between enable/disable semantics
+  
+  **Recommendation:**
+  Target this change for the next **Major version release** to clearly signal the breaking change to users.
+
 ### Added
+
 - **Bus Protection & Graceful Degradation** — Administrative control over KNX bus connectivity:
   
   **New Environment Variables:**

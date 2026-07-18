@@ -41,23 +41,23 @@ function envBool(value, defaultValue = false) {
  * Builds the KNXUltimate client options object based on environment
  * configuration (spec §5):
  *
- *   KNX_SECURE             Enable or disable KNX IP Secure (default: false)
+ *   KNX_SECURE_ENABLED     Enable or disable KNX IP Secure (default: false)
  *   KNX_HOST_PROTOCOL      TunnelUDP or TunnelTCP (default: TunnelUDP)
- *   KNX_KEYRING_FILE       ETS Keyring (.knxkeys) — required if KNX_SECURE=true
- *   KNX_KEYRING_PASSWORD   Password protecting the Keyring — required if KNX_SECURE=true
+ *   KNX_KEYRING_FILE       ETS Keyring (.knxkeys) — required if KNX_SECURE_ENABLED=true
+ *   KNX_KEYRING_PASSWORD   Password protecting the Keyring — required if KNX_SECURE_ENABLED=true
  *
- * When KNX_SECURE=false the application behaves exactly like the classic
+ * When KNX_SECURE_ENABLED=false the application behaves exactly like the classic
  * (pre-Secure) implementation — no behavioral change, no new required env vars.
  *
  * @param {object} [logger] optional logger (createLogger instance) for
  *        diagnostic connection-mode output (spec §10). Purely informational,
  *        function works without it.
  * @returns {object} options object suitable for `new KNXClient(options)`
- * @throws {Error} if KNX_SECURE=true but required Secure configuration is
+ * @throws {Error} if KNX_SECURE_ENABLED=true but required Secure configuration is
  *         missing or invalid (fail fast, before attempting a connection)
  */
 export function createTunnelOptions(logger) {
-    const secureEnabled = envBool(process.env.KNX_SECURE, false);
+    const secureEnabled = envBool(process.env.KNX_SECURE_ENABLED, false);
     let hostProtocol = process.env.KNX_HOST_PROTOCOL || 'TunnelUDP';
 
     const baseOptions = {
@@ -91,12 +91,12 @@ export function createTunnelOptions(logger) {
 
     if (!keyringFile) {
         throw new Error(
-            'KNX_SECURE=true requires KNX_KEYRING_FILE (path to the exported ETS .knxkeys file) to be set.',
+            'KNX_SECURE_ENABLED=true requires KNX_KEYRING_FILE (path to the exported ETS .knxkeys file) to be set.',
         );
     }
     if (!keyringPassword) {
         throw new Error(
-            'KNX_SECURE=true requires KNX_KEYRING_PASSWORD (password protecting the Keyring) to be set.',
+            'KNX_SECURE_ENABLED=true requires KNX_KEYRING_PASSWORD (password protecting the Keyring) to be set.',
         );
     }
     if (!fs.existsSync(keyringFile)) {
@@ -107,7 +107,7 @@ export function createTunnelOptions(logger) {
     if (hostProtocol !== 'TunnelTCP') {
         if (logger) {
             logger.warn(
-                `KNX_HOST_PROTOCOL="${hostProtocol}" is not valid together with KNX_SECURE=true, forcing "TunnelTCP".`,
+                `KNX_HOST_PROTOCOL="${hostProtocol}" is not valid together with KNX_SECURE_ENABLED=true, forcing "TunnelTCP".`,
             );
         }
         hostProtocol = 'TunnelTCP';

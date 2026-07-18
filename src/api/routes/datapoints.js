@@ -307,12 +307,12 @@ async function writeDatapointValue(uuid, value, stateEngine, tunnelManager) {
                 },
             };
         }
-        if (err?.code === 'KNX_READONLY') {
+        if (err?.code === 'KNX_READONLY_ENABLED') {
             logger.warn({ msg: '🔒 KNX write rejected: read-only mode', uuid, ga, dpt: resolvedDpt });
             return {
                 error: {
                     status: 403,
-                    payload: knxError(403, 'Forbidden', 'KNX bus is in read-only mode (KNX_READONLY=true)'),
+                    payload: knxError(403, 'Forbidden', 'KNX bus is in read-only mode (KNX_READONLY_ENABLED=true)'),
                 },
             };
         }

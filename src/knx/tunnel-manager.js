@@ -37,9 +37,9 @@ export class TunnelManager {
 
         // ===== BUS PROTECTION =====
         // KNX_DISABLED: do not open the tunnel at all
-        // KNX_READONLY: tunnel is opened, but outgoing writes are hard-rejected
+        // KNX_READONLY_ENABLED: tunnel is opened, but outgoing writes are hard-rejected
         this.disabled = String(process.env.KNX_DISABLED ?? 'false').toLowerCase() === 'true';
-        this.readOnly = String(process.env.KNX_READONLY ?? 'false').toLowerCase() === 'true';
+        this.readOnly = String(process.env.KNX_READONLY_ENABLED ?? 'false').toLowerCase() === 'true';
 
         if (this.disabled) {
             this.logger.warn('🚫 TunnelManager instantiated in DISABLED mode – no bus traffic will occur');
@@ -70,7 +70,7 @@ export class TunnelManager {
 
         // Options are built by tunnel-options.js, which decides between
         // Classic KNXnet/IP and KNX IP Secure based on environment
-        // variables (KNX_SECURE, KNX_HOST_PROTOCOL, KNX_KEYRING_FILE,
+        // variables (KNX_SECURE_ENABLED, KNX_HOST_PROTOCOL, KNX_KEYRING_FILE,
         // KNX_KEYRING_PASSWORD). See KNX_IP_Secure_Integration_Specification.md.
         let options;
         try {
@@ -393,7 +393,7 @@ export class TunnelManager {
             this.logger.warn(
                 `🔒 KNX write blocked (read-only mode): ${groupAddress} = ${value}`,
             );
-            const err = new Error('KNX bus is in read-only mode (KNX_READONLY=true)');
+            const err = new Error('KNX bus is in read-only mode (KNX_READONLY_ENABLED=true)');
             err.code = 'KNX_READONLY';
             throw err;
         }

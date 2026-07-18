@@ -133,8 +133,8 @@ function assertThrows(fn, expectedMsg, msg) {
 
 section('Test 1: Classic Mode (TunnelUDP) – Default Configuration');
 
-testCase('KNX_SECURE unset, KNX_HOST_PROTOCOL unset → defaults to TunnelUDP', () => {
-    delete process.env.KNX_SECURE;
+testCase('KNX_SECURE_ENABLED unset, KNX_HOST_PROTOCOL unset → defaults to TunnelUDP', () => {
+    delete process.env.KNX_SECURE_ENABLED;
     delete process.env.KNX_HOST_PROTOCOL;
     process.env.KNX_GATEWAY_IP = '192.168.1.1';
     process.env.KNX_GATEWAY_PORT = '3671';
@@ -149,8 +149,8 @@ testCase('KNX_SECURE unset, KNX_HOST_PROTOCOL unset → defaults to TunnelUDP', 
     assertEqual(opts.ipPort, 3671, 'ipPort mismatch');
 });
 
-testCase('KNX_SECURE=false, KNX_HOST_PROTOCOL=TunnelUDP → Classic TunnelUDP', () => {
-    process.env.KNX_SECURE = 'false';
+testCase('KNX_SECURE_ENABLED=false, KNX_HOST_PROTOCOL=TunnelUDP → Classic TunnelUDP', () => {
+    process.env.KNX_SECURE_ENABLED = 'false';
     process.env.KNX_HOST_PROTOCOL = 'TunnelUDP';
     process.env.KNX_GATEWAY_IP = '192.168.1.1';
     process.env.KNX_GATEWAY_PORT = '3671';
@@ -165,8 +165,8 @@ testCase('KNX_SECURE=false, KNX_HOST_PROTOCOL=TunnelUDP → Classic TunnelUDP', 
 
 section('Test 2: Classic Mode (TunnelTCP) – Explicit TCP Configuration');
 
-testCase('KNX_SECURE=false, KNX_HOST_PROTOCOL=TunnelTCP → Classic TunnelTCP', () => {
-    process.env.KNX_SECURE = 'false';
+testCase('KNX_SECURE_ENABLED=false, KNX_HOST_PROTOCOL=TunnelTCP → Classic TunnelTCP', () => {
+    process.env.KNX_SECURE_ENABLED = 'false';
     process.env.KNX_HOST_PROTOCOL = 'TunnelTCP';
     process.env.KNX_GATEWAY_IP = '192.168.1.1';
     process.env.KNX_GATEWAY_PORT = '3671';
@@ -181,13 +181,13 @@ testCase('KNX_SECURE=false, KNX_HOST_PROTOCOL=TunnelTCP → Classic TunnelTCP', 
 
 section('Test 3: Secure Mode – Valid Keyring Setup');
 
-testCase('KNX_SECURE=true, valid keyring file, valid password → Secure TunnelTCP', () => {
+testCase('KNX_SECURE_ENABLED=true, valid keyring file, valid password → Secure TunnelTCP', () => {
     // Create a temporary dummy keyring file for testing
     const tmpDir = '/tmp';
     const keyringPath = path.join(tmpDir, 'test-keyring.knxkeys');
     fs.writeFileSync(keyringPath, 'DUMMY_KEYRING_CONTENT');
 
-    process.env.KNX_SECURE = 'true';
+    process.env.KNX_SECURE_ENABLED = 'true';
     process.env.KNX_HOST_PROTOCOL = 'TunnelUDP'; // Will be forced to TCP
     process.env.KNX_KEYRING_FILE = keyringPath;
     process.env.KNX_KEYRING_PASSWORD = 'test-password';
@@ -218,8 +218,8 @@ testCase('KNX_SECURE=true, valid keyring file, valid password → Secure TunnelT
 
 section('Test 4: Secure Mode – Error: Missing Keyring File');
 
-testCase('KNX_SECURE=true, no KNX_KEYRING_FILE → throws error', () => {
-    process.env.KNX_SECURE = 'true';
+testCase('KNX_SECURE_ENABLED=true, no KNX_KEYRING_FILE → throws error', () => {
+    process.env.KNX_SECURE_ENABLED = 'true';
     delete process.env.KNX_KEYRING_FILE;
     process.env.KNX_KEYRING_PASSWORD = 'test-password';
     process.env.KNX_GATEWAY_IP = '192.168.1.1';
@@ -236,12 +236,12 @@ testCase('KNX_SECURE=true, no KNX_KEYRING_FILE → throws error', () => {
 
 section('Test 5: Secure Mode – Error: Missing Password');
 
-testCase('KNX_SECURE=true, no KNX_KEYRING_PASSWORD → throws error', () => {
+testCase('KNX_SECURE_ENABLED=true, no KNX_KEYRING_PASSWORD → throws error', () => {
     const tmpDir = '/tmp';
     const keyringPath = path.join(tmpDir, 'test-keyring2.knxkeys');
     fs.writeFileSync(keyringPath, 'DUMMY_KEYRING_CONTENT');
 
-    process.env.KNX_SECURE = 'true';
+    process.env.KNX_SECURE_ENABLED = 'true';
     process.env.KNX_KEYRING_FILE = keyringPath;
     delete process.env.KNX_KEYRING_PASSWORD;
     process.env.KNX_GATEWAY_IP = '192.168.1.1';
@@ -261,8 +261,8 @@ testCase('KNX_SECURE=true, no KNX_KEYRING_PASSWORD → throws error', () => {
 
 section('Test 6: Secure Mode – Error: Keyring File Not Found');
 
-testCase('KNX_SECURE=true, keyring file does not exist → throws error', () => {
-    process.env.KNX_SECURE = 'true';
+testCase('KNX_SECURE_ENABLED=true, keyring file does not exist → throws error', () => {
+    process.env.KNX_SECURE_ENABLED = 'true';
     process.env.KNX_KEYRING_FILE = '/nonexistent/path/to/keyring.knxkeys';
     process.env.KNX_KEYRING_PASSWORD = 'test-password';
     process.env.KNX_GATEWAY_IP = '192.168.1.1';
@@ -279,12 +279,12 @@ testCase('KNX_SECURE=true, keyring file does not exist → throws error', () => 
 
 section('Test 7: Secure Mode – Verify TCP Forced Even If UDP Requested');
 
-testCase('KNX_SECURE=true, KNX_HOST_PROTOCOL=TunnelUDP → forces TunnelTCP', () => {
+testCase('KNX_SECURE_ENABLED=true, KNX_HOST_PROTOCOL=TunnelUDP → forces TunnelTCP', () => {
     const tmpDir = '/tmp';
     const keyringPath = path.join(tmpDir, 'test-keyring3.knxkeys');
     fs.writeFileSync(keyringPath, 'DUMMY_KEYRING_CONTENT');
 
-    process.env.KNX_SECURE = 'true';
+    process.env.KNX_SECURE_ENABLED = 'true';
     process.env.KNX_HOST_PROTOCOL = 'TunnelUDP';
     process.env.KNX_KEYRING_FILE = keyringPath;
     process.env.KNX_KEYRING_PASSWORD = 'test-password';
@@ -303,8 +303,8 @@ testCase('KNX_SECURE=true, KNX_HOST_PROTOCOL=TunnelUDP → forces TunnelTCP', ()
 
 section('Test 8: Environment Variable Parsing – Boolean Edge Cases');
 
-testCase('KNX_SECURE="1" → treated as true', () => {
-    process.env.KNX_SECURE = '1';
+testCase('KNX_SECURE_ENABLED="1" → treated as true', () => {
+    process.env.KNX_SECURE_ENABLED = '1';
     delete process.env.KNX_HOST_PROTOCOL;
 
     const tmpDir = '/tmp';
@@ -320,14 +320,14 @@ testCase('KNX_SECURE="1" → treated as true', () => {
     const logger = new TestLogger('TEST-8');
     const opts = createTunnelOptions(logger);
 
-    assertEqual(opts.isSecureKNXEnabled, true, 'KNX_SECURE="1" should enable Secure');
+    assertEqual(opts.isSecureKNXEnabled, true, 'KNX_SECURE_ENABLED="1" should enable Secure');
 
     // Cleanup
     fs.unlinkSync(keyringPath);
 });
 
-testCase('KNX_SECURE="yes" → treated as true', () => {
-    process.env.KNX_SECURE = 'yes';
+testCase('KNX_SECURE_ENABLED="yes" → treated as true', () => {
+    process.env.KNX_SECURE_ENABLED = 'yes';
 
     const tmpDir = '/tmp';
     const keyringPath = path.join(tmpDir, 'test-keyring5.knxkeys');
@@ -342,7 +342,7 @@ testCase('KNX_SECURE="yes" → treated as true', () => {
     const logger = new TestLogger('TEST-8b');
     const opts = createTunnelOptions(logger);
 
-    assertEqual(opts.isSecureKNXEnabled, true, 'KNX_SECURE="yes" should enable Secure');
+    assertEqual(opts.isSecureKNXEnabled, true, 'KNX_SECURE_ENABLED="yes" should enable Secure');
 
     // Cleanup
     fs.unlinkSync(keyringPath);
