@@ -1,6 +1,6 @@
 {
   "name": "semantic-knx-gateway",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "type": "module",
   "description": "Semantic KNX Runtime Engine",
   "main": "src/index.js",
@@ -19,6 +19,7 @@
   },
   "dependencies": {
     "@rdfjs/parser-n3": "^2.2.0",
+    "adm-zip": "^0.6.0",
     "dotenv": "^17.4.2",
     "express": "5.2.1",
     "knxultimate": "^6.0.1",
@@ -37,6 +38,6 @@
     "eslint": "^10.7.0",
     "eslint-config-prettier": "^10.1.8",
     "globals": "^17.7.0",
-    "prettier": "^3.9.5"
+    "prettier": "^3.9.6"
   }
 }
