@@ -23,6 +23,7 @@ import { subscriptionsRouter } from './routes/subscriptions.js';
 import { CallbackDispatcher } from './routes/subscription-dispatcher.js';
 import { oauthRouter } from './routes/oauth-router.js';
 import { createDatabaseRouter } from './routes/database.js';
+import { createImportRouter } from './routes/import.js';
 import { SubscriptionStore } from '../storage/subscription-store.js';
 import { MessagingWebSocketServer } from './routes/messaging-websocket-server.js';
 
@@ -415,6 +416,7 @@ export class RestAPI {
         this.app.use(`${API_BASE}/events`, eventsRouter(this.stateEngine, this.db));
         this.app.use(`${API_BASE}/semantic`, semanticRouter(this.semanticEngine));
         this.app.use(`${API_BASE}/database`, createDatabaseRouter(this.db));
+        this.app.use(`${API_BASE}/import`, createImportRouter(this.stateEngine));
 
         // ── 404 handler ───────────────────────────────────────────────────────
         this.app.use((req, res) => {
