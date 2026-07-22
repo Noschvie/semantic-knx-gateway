@@ -4,6 +4,7 @@
 
 import { createLogger } from '../utils/logger.js';
 import { findLogFiles, parseLogFile, splitValueUnit } from './knx-lens-parser.js';
+import { EventStore } from '../storage/event-store.js';
 
 /**
  * Batch importer for knx-lens log files.
@@ -21,6 +22,7 @@ export class KnxLensImporter {
     constructor(stateEngine) {
         this.logger = createLogger('KnxLensImporter');
         this.stateEngine = stateEngine;
+        this.eventStore = new EventStore(stateEngine.db);
     }
 
     /**
@@ -77,7 +79,11 @@ export class KnxLensImporter {
             if (deleteExistingForDay && parsed.length > 0) {
                 const dayRange = this.getDayRange(parsed[0].timestamp);
                 try {
-                    deleted = await this.deleteExistingForDay(dayRange, dryRun);
+                    deleted = await this.eventStore.deleteEventsByTimeRange(
+                        dayRange.start,
+                        dayRange.end,
+                        dryRun,
+                    );
                     if (deleted > 0) {
                         this.logger.info(
                             `${file}: ${deleted} existing event(s) from ${dayRange.start.toISOString().slice(0, 10)} ` +
@@ -133,35 +139,37 @@ export class KnxLensImporter {
     /**
      * Returns [start of day, start of next day) for the calendar day of a timestamp
      * (local time, as used by the knx-lens logger).
+     *
+     * IMPORTANT: Timestamps from knx-lens-parser are in local time (JavaScript Date objects
+     * created with new Date(year, month, day, hour, minute, second, ms)). This function
+     * converts them to UTC boundaries for correct database queries.
+     *
+     * Example:
+     *   Input (local Berlin time): 2026-07-13 15:30:00
+     *   Timestamp object interprets this as local time
+     *   getDayRange() calculates UTC boundaries: 2026-07-12 22:00:00Z to 2026-07-13 22:00:00Z
+     *   Database query uses UTC times for correct event matching
+     *
      */
     getDayRange(timestamp) {
+        // Extract calendar day components (these are interpreted as local time by JS)
         const start = new Date(timestamp.getFullYear(), timestamp.getMonth(), timestamp.getDate());
+
+        // Get timezone offset in milliseconds for the given date
+        // This accounts for DST transitions (Winter: UTC+1, Summer: UTC+2 for Europe/Berlin)
+        const offsetMs = timestamp.getTimezoneOffset() * 60 * 1000;
+
+        // Adjust start to UTC equivalent of midnight local time
+        const startUTC = new Date(start.getTime() - offsetMs);
+
+        // Calculate next day UTC boundary
         const end = new Date(start);
         end.setDate(end.getDate() + 1);
-        return { start, end };
+        const endUTC = new Date(end.getTime() - offsetMs);
+
+        return { start: startUTC, end: endUTC };
     }
 
-    /**
-     * Deletes (or counts in dry-run) existing knx_events in the given day range.
-     * Intentionally NOT filtered by group address: re-importing a day replaces
-     * the entire bus traffic logged for that day.
-     */
-    async deleteExistingForDay({ start, end }, dryRun) {
-        const db = this.stateEngine.db;
-        if (dryRun) {
-            const result = await db.query(
-                'SELECT COUNT(*) AS count FROM knx_events WHERE ts >= $1 AND ts < $2',
-                [start, end],
-            );
-            return parseInt(result.rows[0]?.count || '0', 10);
-        }
-
-        const result = await db.query(
-            'DELETE FROM knx_events WHERE ts >= $1 AND ts < $2',
-            [start, end],
-        );
-        return result.rowCount || 0;
-    }
 
     /**
      * Converts a parsed knx-lens telegram into the format expected by

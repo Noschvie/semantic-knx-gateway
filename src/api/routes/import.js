@@ -7,6 +7,7 @@ import { createLogger } from '../../utils/logger.js';
 import { bearer } from '../middleware/oauth-bearer.js';
 import { KnxLensImporter } from '../../import/knx-lens-importer.js';
 import { importJobStore } from '../../import/import-job-store.js';
+import { formatTimestamp } from '../../utils/timezone.js';
 
 const logger = createLogger('routes.import');
 
@@ -56,7 +57,7 @@ export function createImportRouter(stateEngine) {
                 }
 
                 const jobId = `knx-lens-import-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-                importJobStore.create(jobId, { logDir, dryRun, deleteExistingForDay });
+                const job = importJobStore.create(jobId, { logDir, dryRun, deleteExistingForDay });
 
                 logger.info('POST /import/knx-lens - job started', { jobId, logDir, dryRun, deleteExistingForDay });
 
@@ -73,6 +74,9 @@ export function createImportRouter(stateEngine) {
                             dryRun,
                             deleteExistingForDay,
                             statusUrl: `${req.baseUrl}/knx-lens/${jobId}`,
+                            // Vendor-extension: provide both local human-readable and ISO UTC
+                            created_at: formatTimestamp(job.createdAt),
+                            created_at_iso: job.createdAt,
                         },
                     },
                 });
@@ -109,8 +113,11 @@ export function createImportRouter(stateEngine) {
                         logDir: job.logDir,
                         dryRun: job.dryRun,
                         deleteExistingForDay: job.deleteExistingForDay,
-                        createdAt: job.createdAt,
-                        completedAt: job.completedAt,
+                        // Vendor-extension: provide both local human-readable and ISO UTC
+                        created_at: formatTimestamp(job.createdAt),
+                        created_at_iso: job.createdAt,
+                        completed_at: job.completedAt ? formatTimestamp(job.completedAt) : null,
+                        completed_at_iso: job.completedAt || null,
                         progress: job.progress,
                         result: job.result,
                         error: job.error,

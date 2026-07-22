@@ -12,6 +12,11 @@ export class EventStore {
 
     /**
      * Store a KNX event in the TimescaleDB hypertable
+     *
+     * Timestamp Convention (see docs/API_TIMESTAMP_CONVENTION.md):
+     * - Accepts timestamps as ISO 8601 UTC strings (e.g., '2026-07-13T15:30:00.000Z')
+     * - Always stores as UTC in the database
+     * - Internal database operations use UTC exclusively
      */
     async storeEvent(event) {
         const {
@@ -88,6 +93,11 @@ export class EventStore {
 
     /**
      * Get events for a specific group address
+     *
+     * Timestamp Convention:
+     * - startTime and endTime should be Date objects representing UTC equivalents
+     * - All timestamps in results are returned as UTC ISO 8601 strings
+     * - See docs/API_TIMESTAMP_CONVENTION.md for details
      */
     async getEventsByGA(ga, options = {}) {
         const {
@@ -152,6 +162,33 @@ export class EventStore {
 
         const result = await this.db.query(query, [datapointId, startTime, endTime, limit]);
         return result.rows;
+    }
+
+    /**
+     * Delete events within a time range (or count them in dry-run mode).
+     * Intentionally NOT filtered by group address or datapoint: this operation
+     * is intended for bulk cleanup (e.g., re-importing a day replaces all
+     * bus traffic logged for that day).
+     *
+     * @param {Date} startTime - Start of time range (inclusive)
+     * @param {Date} endTime - End of time range (exclusive)
+     * @param {boolean} [dryRun=false] - If true, count matching events instead of deleting
+     * @returns {Promise<number>} - Number of deleted rows (or count in dry-run mode)
+     */
+    async deleteEventsByTimeRange(startTime, endTime, dryRun = false) {
+        if (dryRun) {
+            const result = await this.db.query(
+                'SELECT COUNT(*) AS count FROM knx_events WHERE ts >= $1 AND ts < $2',
+                [startTime, endTime],
+            );
+            return parseInt(result.rows[0]?.count || '0', 10);
+        }
+
+        const result = await this.db.query(
+            'DELETE FROM knx_events WHERE ts >= $1 AND ts < $2',
+            [startTime, endTime],
+        );
+        return result.rowCount || 0;
     }
 
     /**
