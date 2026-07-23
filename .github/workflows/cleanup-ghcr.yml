@@ -1,0 +1,57 @@
+name: Cleanup GHCR Images
+
+on:
+  workflow_dispatch:
+
+permissions:
+  packages: write
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Delete SHA-tagged image versions
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          OWNER: ${{ github.repository_owner }}
+          PACKAGE: semantic-knx-gateway
+        run: |
+          echo "Fetching package versions..."
+
+          gh api \
+            -H "Accept: application/vnd.github+json" \
+            /users/$OWNER/packages/container/$PACKAGE/versions \
+            --paginate > versions.json
+
+          jq -c '.[]' versions.json | while read version; do
+            ID=$(echo "$version" | jq -r '.id')
+
+            TAGS=$(echo "$version" | jq -r '.metadata.container.tags[]?')
+
+            DELETE=true
+
+            for tag in $TAGS; do
+              case "$tag" in
+                latest|main|development)
+                  DELETE=false
+                  ;;
+                v*)
+                  DELETE=false
+                  ;;
+                sha-*)
+                  ;;
+                *)
+                  DELETE=false
+                  ;;
+              esac
+            done
+
+            if [ "$DELETE" = true ]; then
+              echo "Deleting version $ID ($TAGS)"
+
+              gh api \
+                --method DELETE \
+                /users/$OWNER/packages/container/$PACKAGE/versions/$ID
+            fi
+          done
