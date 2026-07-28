@@ -60,7 +60,7 @@ jobs:
 
       # Build and push multi-architecture Docker image
       - name: Build and push multi-arch image
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: .
           push: ${{ github.event_name != 'pull_request' }}
