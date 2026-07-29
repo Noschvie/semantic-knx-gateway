@@ -34,7 +34,7 @@ jobs:
 
       # Enable Docker Buildx (required for multi-platform builds)
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+        uses: docker/setup-buildx-action@v4
 
       # Log in to GitHub Container Registry (only for push events, not pull requests)
       - name: Log in to GHCR
