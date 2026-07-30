@@ -13,7 +13,7 @@ import pino from 'pino';
  *
  * Environment configuration:
  * - LOG_LEVEL: (string) log verbosity, defaults to 'info'
- * - PRETTY_LOGS: (boolean) when 'true', enables a human-friendly pretty
+ * - PRETTY_LOGS_ENABLED: (boolean) when 'true', enables a human-friendly pretty
  *   transport (pino-pretty) for readable console output.
  */
 
@@ -24,11 +24,11 @@ const logLevel = process.env.LOG_LEVEL || 'info';
 
 /**
  * Configure optional pretty transport for readable console output.
- * In production, you can still enable this by setting PRETTY_LOGS=true.
- * By default, (PRETTY_LOGS=true), we provide colored, readable logs with
+ * In production, you can still enable this by setting PRETTY_LOGS_ENABLED=true.
+ * By default, (PRETTY_LOGS_ENABLED=true), we provide colored, readable logs with
  * formatted timestamps for better console readability.
  */
-const usePrettyLogs = process.env.PRETTY_LOGS !== 'false';
+const usePrettyLogs = process.env.PRETTY_LOGS_ENABLED !== 'false';
 
 const transport = usePrettyLogs
     ? {
@@ -45,7 +45,7 @@ const transport = usePrettyLogs
 
 /**
  * Base logger instance used throughout the app. The `transport` option
- * depends on the PRETTY_LOGS environment variable.
+ * depends on the PRETTY_LOGS_ENABLED environment variable.
  */
 const baseLogger = pino({
     timestamp: pino.stdTimeFunctions.isoTime,

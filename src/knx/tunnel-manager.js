@@ -35,11 +35,27 @@ export class TunnelManager {
         this.isConnected = false;
         this.isConnecting = false;
 
+        // ===== BUS PROTECTION =====
+        // KNX_DISABLED: do not open the tunnel at all
+        // KNX_READONLY_ENABLED: tunnel is opened, but outgoing writes are hard-rejected
+        this.disabled = String(process.env.KNX_DISABLED ?? 'false').toLowerCase() === 'true';
+        this.readOnly = String(process.env.KNX_READONLY_ENABLED ?? 'false').toLowerCase() === 'true';
+
+        if (this.disabled) {
+            this.logger.warn('🚫 TunnelManager instantiated in DISABLED mode – no bus traffic will occur');
+        } else if (this.readOnly) {
+            this.logger.warn('🔒 TunnelManager instantiated in READ-ONLY mode – outgoing writes will be rejected');
+        }
+
         // Telegram queue for outgoing writes during disconnect (FIFO with drop policy)
         this.telegramQueue = new TelegramQueue(MAX_QUEUE_SIZE, this.logger);
     }
 
     async connect() {
+        if (this.disabled) {
+            this.logger.warn('connect() ignored – KNX_DISABLED=true');
+            return;
+        }
         if (this.isConnecting) {
             this.logger.debug('Connection already in progress, skipping...');
             return;
@@ -54,7 +70,7 @@ export class TunnelManager {
 
         // Options are built by tunnel-options.js, which decides between
         // Classic KNXnet/IP and KNX IP Secure based on environment
-        // variables (KNX_SECURE, KNX_HOST_PROTOCOL, KNX_KEYRING_FILE,
+        // variables (KNX_SECURE_ENABLED, KNX_HOST_PROTOCOL, KNX_KEYRING_FILE,
         // KNX_KEYRING_PASSWORD). See KNX_IP_Secure_Integration_Specification.md.
         let options;
         try {
@@ -364,6 +380,24 @@ export class TunnelManager {
     }
 
     async write(groupAddress, value, dpt) {
+        if (this.disabled) {
+            this.logger.warn(
+                `🚫 KNX write blocked (KNX_DISABLED=true): ${groupAddress} = ${value}`,
+            );
+            const err = new Error('KNX bus is disabled (KNX_DISABLED=true)');
+            err.code = 'KNX_DISABLED';
+            throw err;
+        }
+
+        if (this.readOnly) {
+            this.logger.warn(
+                `🔒 KNX write blocked (read-only mode): ${groupAddress} = ${value}`,
+            );
+            const err = new Error('KNX bus is in read-only mode (KNX_READONLY_ENABLED=true)');
+            err.code = 'KNX_READONLY';
+            throw err;
+        }
+
         const telegram = {
             groupAddress,
             value,
