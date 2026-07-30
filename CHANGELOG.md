@@ -8,6 +8,9 @@ contributors and users to follow meaningful changes over time.
 Unreleased
 ----------
 
+2026-07-29
+----------
+
 ### Changed
 - **Environment Variable Naming Convention Standardization (BREAKING CHANGE)** — Unified naming pattern for all boolean feature flags:
   
