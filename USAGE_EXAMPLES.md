@@ -600,7 +600,7 @@ fi
 
 ## Authentication Setup
 
-All analytics endpoints require OAuth2 Bearer token with `read` scope:
+All analytics endpoints require an OAuth2 Bearer token with `read` scope:
 
 ```bash
 # 1. Get token from OAuth provider (if using Keycloak)
