@@ -13,7 +13,6 @@ set -e
 CONTAINER_NAME="${1:-semantic-knx-runtime}"
 DB_NAME="${2:-knxdb}"
 DB_USER="${3:-knxuser}"
-DB_HOST="localhost"
 
 echo "🔍 Testing TimescaleDB queries..."
 echo "Container: $CONTAINER_NAME"

@@ -138,7 +138,7 @@ export class DatabaseManager {
                 const hypertablesResult = await this.db.query(`
                     SELECT 
                         ht.hypertable_schema,
-                        ht.hypertable_name AS hypertable_name,
+                        ht.hypertable_name,
                         count(c.chunk_name) as chunk_count,
                         count(c.chunk_name) FILTER (WHERE c.is_compressed) as compressed_chunks,
                         count(c.chunk_name) FILTER (WHERE NOT c.is_compressed) as uncompressed_chunks,
