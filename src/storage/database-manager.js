@@ -138,13 +138,13 @@ export class DatabaseManager {
                 const hypertablesResult = await this.db.query(`
                     SELECT 
                         ht.table_name,
-                        count(*) as chunk_count,
-                        count(*) FILTER (WHERE is_compressed) as compressed_chunks,
-                        count(*) FILTER (WHERE NOT is_compressed) as uncompressed_chunks,
-                        min(range_start) as earliest_chunk,
-                        max(range_end) as latest_chunk
+                        count(c.chunk_name) as chunk_count,
+                        count(c.chunk_name) FILTER (WHERE c.is_compressed) as compressed_chunks,
+                        count(c.chunk_name) FILTER (WHERE NOT c.is_compressed) as uncompressed_chunks,
+                        min(c.range_start) as earliest_chunk,
+                        max(c.range_end) as latest_chunk
                     FROM timescaledb_information.hypertables ht
-                    LEFT JOIN timescaledb_information.chunks c ON ht.id = c.hypertable_id
+                    LEFT JOIN timescaledb_information.chunks c ON ht.table_name = c.hypertable_name
                     GROUP BY ht.table_name
                     ORDER BY ht.table_name;
                 `);
