@@ -144,7 +144,7 @@ export class DatabaseManager {
                         min(range_start) as earliest_chunk,
                         max(range_end) as latest_chunk
                     FROM timescaledb_information.hypertables ht
-                    LEFT JOIN timescaledb_information.chunks c ON ht.hypertable_id = c.hypertable_id
+                    LEFT JOIN timescaledb_information.chunks c ON ht.id = c.hypertable_id
                     GROUP BY ht.table_name
                     ORDER BY ht.table_name;
                 `);
