@@ -809,36 +809,12 @@ export class DatabaseManager {
 
     /**
      * Helper: Get a compression ratio for a hypertable
-     * Returns a compression ratio or 'N/A' if not available
+     * Note: Compression stats are not available in all TimescaleDB versions
+     * Returns 'N/A' if compression statistics are unavailable
      */
     async #getCompressionRatio(schemaName, tableName) {
-        try {
-            // Try to get compression stats from internal catalog
-            const result = await this.db.query(`
-                SELECT 
-                    COALESCE(
-                        ROUND(
-                            pg_total_relation_size(quote_ident($1) || '.' || quote_ident($2))::numeric /
-                            NULLIF(
-                                (SELECT total_compressed_bytes 
-                                 FROM _timescaledb_internal.compressed_hypertable_stats s
-                                 JOIN _timescaledb_catalog.hypertable h ON h.id = s.hypertable_id
-                                 WHERE h.schema_name = $1 AND h.table_name = $2),
-                                0
-                            ),
-                            1
-                        )::text || ':1',
-                        'N/A'
-                    ) as ratio
-            `, [schemaName, tableName]);
-
-            return result.rows[0]?.ratio ?? 'N/A';
-        } catch (err) {
-            // If query fails (table not compressed or stats unavailable), return N/A
-            this.logger.debug(`Could not get compression ratio for ${schemaName}.${tableName}`, {
-                error: err.message
-            });
-            return 'N/A';
-        }
+        // Compression statistics views may not be available in all TimescaleDB versions
+        // Simply return 'N/A' to avoid errors
+        return 'N/A';
     }
 }
