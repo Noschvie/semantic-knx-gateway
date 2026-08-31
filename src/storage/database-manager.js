@@ -137,30 +137,40 @@ export class DatabaseManager {
             try {
                 const hypertablesResult = await this.db.query(`
                     SELECT 
-                        ht.table_name,
-                        count(*) as chunk_count,
-                        count(*) FILTER (WHERE is_compressed) as compressed_chunks,
-                        count(*) FILTER (WHERE NOT is_compressed) as uncompressed_chunks,
-                        min(range_start) as earliest_chunk,
-                        max(range_end) as latest_chunk
+                        ht.hypertable_schema,
+                        ht.hypertable_name,
+                        count(c.chunk_name) as chunk_count,
+                        count(c.chunk_name) FILTER (WHERE c.is_compressed) as compressed_chunks,
+                        count(c.chunk_name) FILTER (WHERE NOT c.is_compressed) as uncompressed_chunks,
+                        min(c.range_start) as earliest_chunk,
+                        max(c.range_end) as latest_chunk
                     FROM timescaledb_information.hypertables ht
-                    LEFT JOIN timescaledb_information.chunks c ON ht.hypertable_id = c.hypertable_id
-                    GROUP BY ht.table_name
-                    ORDER BY ht.table_name;
+                    LEFT JOIN timescaledb_information.chunks c 
+                        ON ht.hypertable_schema = c.hypertable_schema
+                       AND ht.hypertable_name = c.hypertable_name
+                    GROUP BY ht.hypertable_schema, ht.hypertable_name
+                    ORDER BY ht.hypertable_schema, ht.hypertable_name;
                 `);
+
                 for (const row of hypertablesResult.rows) {
-                    const compressionRatio = await this.#getCompressionRatio(row.table_name);
-                    hypertableInfo[row.table_name] = {
-                        chunk_count: row.chunk_count,
-                        earliest_chunk: row.earliest_chunk ? row.earliest_chunk.toISOString().split('T')[0] : null,
-                        latest_chunk: row.latest_chunk ? row.latest_chunk.toISOString().split('T')[0] : null,
-                        compressed_chunks: row.compressed_chunks,
-                        uncompressed_chunks: row.uncompressed_chunks,
+                    const compressionRatio = await this.#getCompressionRatio(
+                        row.hypertable_schema,
+                        row.hypertable_name
+                    );
+                    hypertableInfo[row.hypertable_name] = {
+                        chunk_count: Number(row.chunk_count),
+                        compressed_chunks: Number(row.compressed_chunks),
+                        uncompressed_chunks: Number(row.uncompressed_chunks),
+                        earliest_chunk: row.earliest_chunk?.toISOString().split('T')[0] ?? null,
+                        latest_chunk: row.latest_chunk?.toISOString().split('T')[0] ?? null,
                         compression_ratio: compressionRatio,
                     };
                 }
             } catch (err) {
-                this.logger.debug('TimescaleDB extension not available or no hypertables found', { error: err.message });
+                this.logger.debug(
+                    'TimescaleDB extension not available or no hypertables found',
+                    { error: err.message }
+                );
             }
 
             // Get event timeline (from knx_events table)
@@ -799,28 +809,12 @@ export class DatabaseManager {
 
     /**
      * Helper: Get a compression ratio for a hypertable
+     * Note: Compression stats are not available in all TimescaleDB versions
+     * Returns 'N/A' if compression statistics are unavailable
      */
-    async #getCompressionRatio(tableName) {
-        try {
-            const result = await this.db.query(`
-                SELECT 
-                    COALESCE(
-                        ROUND(
-                            (SELECT pg_total_relation_size(tablename)
-                             FROM pg_tables WHERE tablename = $1) /
-                            NULLIF(
-                                (SELECT total_compressed_bytes FROM _timescaledb_internal.compressed_hypertable_stats
-                                 WHERE hypertable_id = (SELECT id FROM _timescaledb_catalog.hypertable WHERE table_name = $1)),
-                                0
-                            ),
-                            1
-                         )::text || ':1',
-                         'N/A'
-                     ) as ratio;
-             `, [tableName]);
-            return result.rows[0]?.ratio || 'N/A';
-        } catch {
-            return 'N/A';
-        }
+    async #getCompressionRatio(schemaName, tableName) {
+        // Compression statistics views may not be available in all TimescaleDB versions
+        // Simply return 'N/A' to avoid errors
+        return 'N/A';
     }
 }
