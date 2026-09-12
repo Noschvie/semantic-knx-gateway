@@ -8,6 +8,14 @@ contributors and users to follow meaningful changes over time.
 Unreleased
 ----------
 
+2026-09-12
+----------
+
+### Changed
+- **Dependency Update**: Replaced `adm-zip` with `fflate` for ZIP file handling
+  - `fflate` provides better performance and a smaller bundle size
+  - Fully compatible with existing ZIP import/export functionality
+
 2026-08-31
 ----------
 
