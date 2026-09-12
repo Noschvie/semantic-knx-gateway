@@ -4,7 +4,7 @@
 
 import fs from 'node:fs';
 import path from 'node:path';
-import AdmZip from 'adm-zip';
+import { unzipSync } from 'fflate';
 
 /**
  * Parser for log files produced by the knx-lens logger
@@ -75,14 +75,25 @@ export function splitValueUnit(raw) {
 }
 
 function readLogFileContent(filePath) {
-    if (filePath.toLowerCase().endsWith('.zip')) {
-        const zip = new AdmZip(filePath);
-        const entries = zip.getEntries().filter((e) => !e.isDirectory);
-        // ZipTimedRotatingFileHandler bundles exactly one text file per ZIP
-        return entries.map((e) => e.getData().toString('utf-8')).join('\n');
+    if (!filePath.toLowerCase().endsWith('.zip')) {
+        return fs.readFileSync(filePath, 'utf-8');
     }
-    return fs.readFileSync(filePath, 'utf-8');
+
+    const zipData = fs.readFileSync(filePath);
+    const entries = unzipSync(zipData);
+
+    const files = Object.entries(entries)
+        .filter(([name]) => !name.endsWith('/'));
+
+    if (files.length !== 1) {
+        throw new Error(
+            `Expected exactly one file in KNX Lens ZIP, found ${files.length}`
+        );
+    }
+
+    return Buffer.from(files[0][1]).toString('utf-8');
 }
+
 /** Reads a single log file (plain text or .zip) and returns all contained telegrams. */
 export function parseLogFile(filePath) {
     const content = readLogFileContent(filePath);
