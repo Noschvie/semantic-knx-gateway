@@ -60,7 +60,7 @@ export class StateEngine {
         // Get old mapping to detect DPT changes
         const oldMappingResult = await this.db.query(
             'SELECT dpt FROM datapoint_mappings WHERE datapoint_id = $1',
-            [datapointId]
+            [datapointId],
         );
         const oldDpt = oldMappingResult.rows[0]?.dpt || null;
 
