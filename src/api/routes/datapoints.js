@@ -166,6 +166,87 @@ async function getDatapointMappingByUuid(uuid, stateEngine) {
 }
 
 /**
+ * Builds the union of projected datapoint mappings and current runtime states.
+ *
+ * A single group address must yield exactly one datapoint resource. Runtime
+ * states created from telegrams that arrived before the mapping was loaded use a
+ * synthetic id (e.g. "ga-2-4-0"). When a projected mapping exists for the same
+ * GA, such states are canonicalized onto the mapping's datapointId (e.g.
+ * "GA-471") so they collapse onto the canonical datapoint instead of appearing
+ * as a second resource.
+ *
+ * Conflict resolution: if several states collapse onto the same canonical key,
+ * the one with the newest updatedAt wins.
+ *
+ * @param {Array} datapointMappings - Rows from datapoint_mappings.
+ * @param {Array} allStates         - Current states from the state store.
+ * @returns {Array} Union datapoint records (one per canonical key).
+ */
+function buildDatapointUnion(datapointMappings, allStates) {
+    const mappingByDatapointId = new Map();
+    const mappingByGa = new Map();
+    const unionByKey = new Map();
+
+    for (const mapping of datapointMappings) {
+        if (mapping.datapointId) mappingByDatapointId.set(mapping.datapointId, mapping);
+        if (mapping.ga) mappingByGa.set(mapping.ga, mapping);
+
+        const key = getDatapointUnionKey(mapping);
+        if (!key) continue;
+
+        unionByKey.set(key, {
+            ...mapping,
+            value: null,
+            updatedAt: null,
+            hasCurrentState: false,
+        });
+    }
+
+    for (const state of allStates) {
+        const mapping = mappingByDatapointId.get(state.datapointId)
+            ?? mappingByGa.get(state.ga)
+            ?? null;
+
+        // Skip orphaned states without a mapping
+        // (prevents duplicate/stale datapoints from old KNX systems appearing in API)
+        if (!mapping) continue;
+
+        const merged = {
+            ...mapping,
+            ...state,
+            // Canonicalize onto the projected datapointId so a synthetic runtime
+            // state ("ga-2-4-0") collapses onto the canonical datapoint ("GA-471").
+            datapointId: mapping.datapointId ?? state.datapointId,
+            ga: state.ga ?? mapping.ga,
+            dpt: state.dpt ?? mapping.dpt,
+            name: state.name ?? mapping.name,
+            locationId: state.locationId ?? mapping.locationId ?? null,
+            deviceId: mapping.deviceId ?? null,
+            hasCurrentState: true,
+        };
+
+        const key = getDatapointUnionKey(merged);
+        if (!key) continue;
+
+        // Conflict resolution: keep the newest state when several collapse onto
+        // the same canonical key.
+        const existing = unionByKey.get(key);
+        if (
+            existing?.hasCurrentState &&
+            existing.updatedAt &&
+            merged.updatedAt &&
+            new Date(existing.updatedAt).getTime() >= new Date(merged.updatedAt).getTime()
+        ) {
+            continue;
+        }
+
+        unionByKey.set(key, merged);
+    }
+
+    return Array.from(unionByKey.values());
+}
+
+/**
  * Enriches a datapoint resource with historical DPT information
  * @param {Object} state - Datapoint state
  * @param {DptHistoryManager} dptHistory - DPT history manager instance
@@ -380,55 +461,7 @@ export function datapointsRouter(stateEngine, tunnelManager) {
                 getDatapointMappings(stateEngine),
             ]);
 
-            const mappingByDatapointId = new Map();
-            const mappingByGa = new Map();
-            const unionByKey = new Map();
-
-            for (const mapping of datapointMappings) {
-                if (mapping.datapointId) mappingByDatapointId.set(mapping.datapointId, mapping);
-                if (mapping.ga) mappingByGa.set(mapping.ga, mapping);
-
-                const key = getDatapointUnionKey(mapping);
-                if (!key) continue;
-
-                unionByKey.set(key, {
-                    ...mapping,
-                    value: null,
-                    updatedAt: null,
-                    hasCurrentState: false,
-                });
-            }
-
-            for (const state of allStates) {
-                const mapping = mappingByDatapointId.get(state.datapointId)
-                    ?? mappingByGa.get(state.ga)
-                    ?? null;
-
-                // Skip orphaned states without a mapping
-                // (prevents duplicate/stale datapoints from old KNX systems appearing in API)
-                if (!mapping) {
-                    continue;
-                }
-
-                const merged = {
-                    ...mapping,
-                    ...state,
-                    datapointId: state.datapointId ?? mapping?.datapointId,
-                    ga: state.ga ?? mapping?.ga,
-                    dpt: state.dpt ?? mapping?.dpt,
-                    name: state.name ?? mapping?.name,
-                    locationId: state.locationId ?? mapping?.locationId ?? null,
-                    deviceId: mapping?.deviceId ?? null,
-                    hasCurrentState: true,
-                };
-
-                const key = getDatapointUnionKey(merged);
-                if (!key) continue;
-
-                unionByKey.set(key, merged);
-            }
-
-            let unionDatapoints = Array.from(unionByKey.values());
+            let unionDatapoints = buildDatapointUnion(datapointMappings, allStates);
 
             if (filterGa) {
                 unionDatapoints = unionDatapoints.filter((s) => s.ga === filterGa);
@@ -560,54 +593,7 @@ export function datapointsRouter(stateEngine, tunnelManager) {
                 getDatapointMappings(stateEngine),
             ]);
 
-            const mappingByDatapointId = new Map();
-            const mappingByGa = new Map();
-            const unionByKey = new Map();
-
-            for (const mapping of datapointMappings) {
-                if (mapping.datapointId) mappingByDatapointId.set(mapping.datapointId, mapping);
-                if (mapping.ga) mappingByGa.set(mapping.ga, mapping);
-
-                const key = getDatapointUnionKey(mapping);
-                if (!key) continue;
-
-                unionByKey.set(key, {
-                    ...mapping,
-                    value: null,
-                    updatedAt: null,
-                    hasCurrentState: false,
-                });
-            }
-
-            for (const state of allStates) {
-                const mapping = mappingByDatapointId.get(state.datapointId)
-                    ?? mappingByGa.get(state.ga)
-                    ?? null;
-
-                // Skip orphaned states without a mapping
-                if (!mapping) {
-                    continue;
-                }
-
-                const merged = {
-                    ...mapping,
-                    ...state,
-                    datapointId: state.datapointId ?? mapping?.datapointId,
-                    ga: state.ga ?? mapping?.ga,
-                    dpt: state.dpt ?? mapping?.dpt,
-                    name: state.name ?? mapping?.name,
-                    locationId: state.locationId ?? mapping?.locationId ?? null,
-                    deviceId: mapping?.deviceId ?? null,
-                    hasCurrentState: true,
-                };
-
-                const key = getDatapointUnionKey(merged);
-                if (!key) continue;
-
-                unionByKey.set(key, merged);
-            }
-
-            const unionDatapoints = Array.from(unionByKey.values());
+            const unionDatapoints = buildDatapointUnion(datapointMappings, allStates);
 
             const datapoint = unionDatapoints.find(
                 (dp) => stableUuid(dp.datapointId ?? '') === id
@@ -678,54 +664,7 @@ export function datapointsRouter(stateEngine, tunnelManager) {
                 getDatapointMappings(stateEngine),
             ]);
 
-            const mappingByDatapointId = new Map();
-            const mappingByGa = new Map();
-            const unionByKey = new Map();
-
-            for (const mapping of datapointMappings) {
-                if (mapping.datapointId) mappingByDatapointId.set(mapping.datapointId, mapping);
-                if (mapping.ga) mappingByGa.set(mapping.ga, mapping);
-
-                const key = getDatapointUnionKey(mapping);
-                if (!key) continue;
-
-                unionByKey.set(key, {
-                    ...mapping,
-                    value: null,
-                    updatedAt: null,
-                    hasCurrentState: false,
-                });
-            }
-
-            for (const state of allStates) {
-                const mapping = mappingByDatapointId.get(state.datapointId)
-                    ?? mappingByGa.get(state.ga)
-                    ?? null;
-
-                // Skip orphaned states without a mapping
-                if (!mapping) {
-                    continue;
-                }
-
-                const merged = {
-                    ...mapping,
-                    ...state,
-                    datapointId: state.datapointId ?? mapping?.datapointId,
-                    ga: state.ga ?? mapping?.ga,
-                    dpt: state.dpt ?? mapping?.dpt,
-                    name: state.name ?? mapping?.name,
-                    locationId: state.locationId ?? mapping?.locationId ?? null,
-                    deviceId: mapping?.deviceId ?? null,
-                    hasCurrentState: true,
-                };
-
-                const key = getDatapointUnionKey(merged);
-                if (!key) continue;
-
-                unionByKey.set(key, merged);
-            }
-
-            const unionDatapoints = Array.from(unionByKey.values());
+            const unionDatapoints = buildDatapointUnion(datapointMappings, allStates);
 
             const datapoint = unionDatapoints.find(
                 (dp) => stableUuid(dp.datapointId ?? '') === id

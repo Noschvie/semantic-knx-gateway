@@ -8,6 +8,43 @@ contributors and users to follow meaningful changes over time.
 Unreleased
 ----------
 
+2026-09-24
+----------
+
+### Fixed
+- **Duplicate Datapoints per Group Address** — `GET /api/v2/datapoints` (and
+  `/:id`, `/:id/timeseries`) could return two datapoint resources for a single
+  group address: the projected one (e.g. `meta.datapointId = "GA-471"`) plus a
+  synthetic, derived one (e.g. `ga-2-4-0`). The derived entry originated from a
+  telegram processed before its mapping was loaded, causing the state engine to
+  persist a fallback state under `ga-<a>-<b>-<c>` (`src/state/state-engine.js`).
+
+  **Root cause:** The API union keyed datapoints purely by `datapointId`, so the
+  synthetic and canonical ids never collapsed onto a single resource, and the
+  command path (`PUT /datapoints/values` via resource UUID) and status path
+  (WS-Subscribe/Read via `meta.datapointId`) could resolve to different datapoints.
+
+  **Resolution:**
+  - **API canonicalization** (`src/api/routes/datapoints.js`): Extracted the
+    duplicated union logic into a shared `buildDatapointUnion()` helper. When a
+    projected mapping exists for a GA, runtime states are canonicalized onto the
+    mapping's `datapointId` so a GA now yields **exactly one** resource.
+  - **Conflict resolution:** When multiple states collapse onto the same
+    canonical key, the one with the newest `updatedAt` wins (also fixes a latent
+    "oldest wins" overwriting in the union map).
+  - **Source reconciliation** (`src/state/state-engine.js`):
+    `registerDatapoint()` now migrates a leftover synthetic `current_state` row
+    onto the canonical `datapointId` via new `migrateFallbackState()`, keeping
+    the row with the newest `updated_at` on conflict.
+  - **Deterministic across restarts:** New `cleanupFallbackStates()` runs during
+    `initialize()` and reconciles only actual duplicates (fallback state and an
+    existing mapping) via a targeted join, keeping startup fast.
+
+  **Impact:**
+  - ✅ `filter[ga]=<GA>` now returns a single, canonical datapoint.
+  - ✅ Command and status paths resolve to the same datapoint (converged UUID).
+  - ✅ Behavior is stable/deterministic across restarts and re-imports.
+
 2026-09-12
 ----------
 
