@@ -26,6 +26,7 @@ export class SemanticMapper {
                     ga: this.normalizeGroupAddress(datapoint.groupAddress),
                     dpt: datapoint.dpt,
                     id: datapoint.id,
+                    name: datapoint.name,
                 });
             }
         }
@@ -35,9 +36,16 @@ export class SemanticMapper {
                     ga: this.normalizeGroupAddress(ga.address),
                     dpt: ga.dpt,
                     id: ga.id,
+                    name: ga.name,
                 });
             }
         }
+
+        // Warn about group addresses mapped to more than one datapoint. Unlike
+        // detectDptConflicts() (which only fires on DIFFERENT DPTs), this also
+        // catches same-DPT duplicates — typically an ETS projection error where
+        // two datapoints from different functions share one group address.
+        this.warnMultiplyMappedGAs(newMappings);
 
         // Detect DPT conflicts BEFORE applying changes
         const conflicts = await this.dptHistory.detectDptConflicts(newMappings);
@@ -79,6 +87,49 @@ export class SemanticMapper {
         }
 
         this.logger.info(`✅ Mapped ${mappedCount} datapoints to state engine`);
+    }
+
+    /**
+     * Logs a warning for every group address that is projected to more than one
+     * datapoint. A GA should normally map to a single datapoint; multiple
+     * datapoints on the same GA usually indicate an ETS projection error and
+     * force the API/BFF to pick one non-deterministically.
+     *
+     * @param {Array<{ga: string, id: string, name?: string}>} mappings
+     * @returns {number} number of group addresses mapped to multiple datapoints
+     */
+    warnMultiplyMappedGAs(mappings) {
+        const byGa = new Map(); // ga -> Map(datapointId -> name)
+
+        for (const m of mappings) {
+            if (!m?.ga || !m?.id) continue;
+            if (!byGa.has(m.ga)) byGa.set(m.ga, new Map());
+            byGa.get(m.ga).set(m.id, m.name ?? null);
+        }
+
+        let count = 0;
+        for (const [ga, idMap] of byGa) {
+            if (idMap.size <= 1) continue;
+            count++;
+
+            const details = Array.from(idMap.entries())
+                .map(([id, name]) => (name ? `${id} ("${name}")` : id))
+                .join(', ');
+
+            this.logger.warn(
+                `[Projection] ⚠️ GA ${ga} is mapped to ${idMap.size} datapoints: ${details} ` +
+                '— check ETS projection (a group address should map to a single datapoint)',
+            );
+        }
+
+        if (count > 0) {
+            this.logger.warn(
+                `[Projection] ${count} group address(es) are mapped to multiple datapoints; ` +
+                'the API/BFF must pick one and command/status paths may diverge.',
+            );
+        }
+
+        return count;
     }
 
     /**

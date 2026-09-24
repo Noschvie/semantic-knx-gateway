@@ -51,6 +51,25 @@ Unreleased
     PREVIEW and a VERIFY step; local `psql` and Docker Compose usage documented.
 
 ### Added
+- **Import Warning for Multiply Mapped Group Addresses** — Surfaces ETS
+  projection errors where one group address is mapped to more than one datapoint:
+
+  **Why:** A group address is normally projected to a single datapoint. When two
+  datapoints (e.g. from different functions) share the same GA, the API returns
+  two resources for that GA, and the client/BFF must pick one — command and status
+  paths can then diverge. The existing `detectDptConflicts()` only fires on
+  *different* DPTs, so same-DPT duplicates (e.g., both `scaling`) went unnoticed.
+
+  **What** (`src/semantic/semantic-mapper.js`): During the TTL import,
+  `warnMultiplyMappedGAs()` groups the collected mappings by GA and logs a
+  warning for every GA that resolves to more than one datapointId, e.g.:
+  ```
+  [Projection] ⚠️ GA 2/3/12 is mapped to 2 datapoints: GA-445 ("Treppe Position in %"), GA-531 ("Zimmer") — check ETS projection (a group address should map to a single datapoint)
+  ```
+  followed by a summary count. This is **logging only** — no hard failure and no
+  `UNIQUE(ga)` constraint — so legitimate n:1 projections are not blocked while
+  data-quality issues become visible in the startup log.
+
 - **Automatic Fallback-State Reconciliation on Startup** — Self-healing of
   duplicate datapoints without manual SQL:
 
