@@ -8,42 +8,83 @@ contributors and users to follow meaningful changes over time.
 Unreleased
 ----------
 
-2026-09-24
-----------
-
 ### Fixed
 - **Duplicate Datapoints per Group Address** — `GET /api/v2/datapoints` (and
   `/:id`, `/:id/timeseries`) could return two datapoint resources for a single
   group address: the projected one (e.g. `meta.datapointId = "GA-471"`) plus a
-  synthetic, derived one (e.g. `ga-2-4-0`). The derived entry originated from a
-  telegram processed before its mapping was loaded, causing the state engine to
-  persist a fallback state under `ga-<a>-<b>-<c>` (`src/state/state-engine.js`).
+  synthetic, derived one (e.g. `ga-2-4-0`). The derived entry originates from a
+  telegram processed before its mapping was loaded, so the state engine persisted
+  a fallback state under `ga-<a>-<b>-<c>`.
 
   **Root cause:** The API union keyed datapoints purely by `datapointId`, so the
   synthetic and canonical ids never collapsed onto a single resource, and the
   command path (`PUT /datapoints/values` via resource UUID) and status path
   (WS-Subscribe/Read via `meta.datapointId`) could resolve to different datapoints.
 
-  **Resolution:**
+  **Resolution (API-only, no database changes):**
   - **API canonicalization** (`src/api/routes/datapoints.js`): Extracted the
     duplicated union logic into a shared `buildDatapointUnion()` helper. When a
     projected mapping exists for a GA, runtime states are canonicalized onto the
-    mapping's `datapointId` so a GA now yields **exactly one** resource.
+    mapping's `datapointId` so a GA now yields **exactly one** resource (the last
+    known value is preserved under the canonical id).
   - **Conflict resolution:** When multiple states collapse onto the same
     canonical key, the one with the newest `updatedAt` wins (also fixes a latent
     "oldest wins" overwriting in the union map).
-  - **Source reconciliation** (`src/state/state-engine.js`):
-    `registerDatapoint()` now migrates a leftover synthetic `current_state` row
-    onto the canonical `datapointId` via new `migrateFallbackState()`, keeping
-    the row with the newest `updated_at` on conflict.
-  - **Deterministic across restarts:** New `cleanupFallbackStates()` runs during
-    `initialize()` and reconciles only actual duplicates (fallback state and an
-    existing mapping) via a targeted join, keeping startup fast.
 
   **Impact:**
   - ✅ `filter[ga]=<GA>` now returns a single, canonical datapoint.
-  - ✅ Command and status paths resolve to the same datapoint (converged UUID).
-  - ✅ Behavior is stable/deterministic across restarts and re-imports.
+  - ✅ Command and status paths resolve to the same datapoint: writes resolve the
+    UUID against `datapoint_mappings`, and telegrams are emitted under the
+    canonical `datapointId`.
+  - ✅ No database migration required. A pre-existing synthetic `current_state`
+    row remains as harmless, API-invisible data and is superseded once the
+    canonical datapoint has a newer value.
+
+  **Optional maintenance scripts** (for operators who want to remove leftover
+  synthetic `current_state` rows from before this fix):
+  - `scripts/diagnose-duplicate-datapoints.sql` — read-only root-cause analysis
+    (when the canonical mapping was created vs. when the synthetic state was last
+    seen, and whether a canonical state already exists). Run this first.
+  - `scripts/cleanup-duplicate-datapoints.sql` — value-preserving, transactional
+    cleanup that migrates/collapses synthetic rows onto the canonical
+    `datapoint_id` (keeps the newest value on conflict). Includes a dry-run
+    PREVIEW and a VERIFY step; local `psql` and Docker Compose usage documented.
+
+### Added
+- **Automatic Fallback-State Reconciliation on Startup** — Self-healing of
+  duplicate datapoints without manual SQL:
+
+  **Why:** In practice the timing window cannot be avoided — new GAs are
+  commissioned in ETS and start sending telegrams while the running gateway
+  still has the old TTL, so synthetic `ga-<a>-<b>-<c>` states are persisted.
+  After the TTL/project file is replaced and the container restarted, these
+  become duplicates of the projected datapoint.
+
+  **What:** During startup, **after** the TTL import and **before** connecting
+  the KNX bus (new "Phase 3b" in `src/index.js`), the gateway now reconciles
+  synthetic `current_state` rows onto their canonical `datapointId`
+  (value-preserving; on conflict the newest value by `updated_at` wins). Only
+  synthetic rows that have a matching mapping are touched — genuine unprojected
+  datapoints are left intact.
+
+  **Implementation** (`src/state/state-engine.js`):
+  - `reconcileFallbackStates({ windowMinutes })` — finds synthetic-with-mapping
+    rows via a targeted join and migrates them.
+  - `migrateFallbackState(ga, canonicalId)` — value-preserving per-row migration
+    (rename when no canonical row exists; copy the newest value and drop synthetic on
+    conflict).
+
+  **Configuration** (`env.example`):
+  - `DATAPOINT_RECONCILE_ON_START` (default `true`) — enable/disable the startup
+    reconciliation.
+  - `DATAPOINT_RECONCILE_WINDOW_MINUTES` (default `60`) — only reconcile rows
+    updated within the last N minutes; `0` = no limit (reconcile all).
+
+  **Benefits:**
+  - ✅ Duplicates are corrected automatically after a TTL replacement and restart.
+  - ✅ Time-bounded by default (last 60 min) to target the latest commissioning.
+  - ✅ Same value-preserving logic as the manual cleanup script; no bus impact
+    (runs before Phase 4 connection).
 
 2026-09-12
 ----------

@@ -70,6 +70,28 @@ class SemanticKNXRuntime {
                 await this.semanticEngine.initialize(ttlFilePath);
             }
 
+            // Phase 3b: Reconcile synthetic fallback states
+            // A telegram received while the running gateway still had the old TTL
+            // (e.g., GAs commissioned in ETS before the project file was replaced)
+            // persists a synthetic 'ga-<a>-<b>-<c>' state. Now that mappings are
+            // loaded and the TTL is imported, migrate those onto the canonical
+            // datapointId (value-preserving) BEFORE connecting the bus.
+            const reconcileEnabled =
+                String(process.env.DATAPOINT_RECONCILE_ON_START ?? 'true').toLowerCase() === 'true';
+            if (reconcileEnabled) {
+                const windowMinutes = Number.parseInt(
+                    process.env.DATAPOINT_RECONCILE_WINDOW_MINUTES ?? '60', 10,
+                );
+                this.logger.info(
+                    `Phase 3b: Reconciling synthetic fallback states${
+                        windowMinutes > 0 ? ` (last ${windowMinutes} min)` : ' (all)'
+                    }...`,
+                );
+                await this.stateEngine.reconcileFallbackStates({
+                    windowMinutes: Number.isFinite(windowMinutes) ? windowMinutes : 60,
+                });
+            }
+
             // Phase 4: KNX Tunnel Manager
             this.tunnelManager = new TunnelManager(this.stateEngine);
             const knxDisabled = String(process.env.KNX_DISABLED ?? 'false').toLowerCase() === 'true';

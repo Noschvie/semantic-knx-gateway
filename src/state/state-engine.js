@@ -25,10 +25,6 @@ export class StateEngine {
         // Load datapoint mappings from database
         await this.loadDatapointMappings();
 
-        // Reconcile any synthetic fallback states left over from telegrams that
-        // arrived before their mapping existed, so each GA maps to exactly one
-        // canonical datapoint (deterministic across restarts).
-        await this.cleanupFallbackStates();
 
         this.logger.info('✅ State Engine initialized');
     }
@@ -57,30 +53,126 @@ export class StateEngine {
     }
 
     /**
-     * Reconciles all synthetic fallback current_state rows that already have a
-     * projected mapping onto their canonical datapointId. Only rows that are
-     * actual duplicates are touched, keeping startup fast.
+     * Reconciles synthetic fallback current_state rows onto their canonical
+     * datapointId. A synthetic row ('ga-<a>-<b>-<c>') is created when a telegram
+     * arrives before its mapping exists (e.g., new GAs are commissioned in ETS
+     * while the running gateway still has the old TTL). After the TTL is replaced
+     * and the container restarted, the canonical mapping exists, so these rows
+     * become duplicates.
+     *
+     * Run this AFTER the TTL import (mappings must exist) and BEFORE connecting
+     * the KNX bus. Only synthetic rows that have a matching mapping are touched;
+     * genuine unprojected datapoints are left intact.
+     *
+     * @param {object} [opts]
+     * @param {number} [opts.windowMinutes=0] - If > 0, only reconcile rows whose
+     *   updated_at is within the last N minutes. 0 = no time limit (all).
+     * @returns {Promise<{reconciled: number}>}
      */
-    async cleanupFallbackStates() {
+    async reconcileFallbackStates({ windowMinutes = 0 } = {}) {
         try {
+            const params = [];
+            let timeClause = '';
+            if (Number.isFinite(windowMinutes) && windowMinutes > 0) {
+                timeClause = 'AND cs.updated_at >= NOW() - make_interval(mins => ($1)::int)';
+                params.push(windowMinutes);
+            }
+
             const { rows } = await this.db.query(`
                 SELECT cs.ga, dm.datapoint_id AS canonical_id
                 FROM current_state cs
                 JOIN datapoint_mappings dm ON dm.ga = cs.ga
                 WHERE cs.datapoint_id = 'ga-' || replace(cs.ga, '/', '-')
                   AND cs.datapoint_id <> dm.datapoint_id
-            `);
+                  ${timeClause}
+            `, params);
 
-            if (rows.length === 0) return;
-
-            this.logger.info(`[Dedup] Reconciling ${rows.length} fallback state(s) with existing mappings`);
-            for (const row of rows) {
-                await this.migrateFallbackState(row.ga, row.canonical_id);
+            if (rows.length === 0) {
+                this.logger.info('[Dedup] No synthetic fallback states to reconcile');
+                return { reconciled: 0 };
             }
+
+            const scope = windowMinutes > 0 ? ` from the last ${windowMinutes} min` : '';
+            this.logger.info(`[Dedup] Reconciling ${rows.length} synthetic fallback state(s)${scope}`);
+
+            let count = 0;
+            for (const row of rows) {
+                if (await this.migrateFallbackState(row.ga, row.canonical_id)) count++;
+            }
+
+            this.logger.info(`[Dedup] Reconciliation complete: ${count} state(s) migrated/cleaned`);
+            return { reconciled: count };
         } catch (error) {
-            this.logger.warn({ msg: 'cleanupFallbackStates failed', error: error.message });
+            this.logger.warn({ msg: 'reconcileFallbackStates failed', error: error.message });
+            return { reconciled: 0, error: error.message };
         }
     }
+
+    /**
+     * Migrates a single synthetic fallback row (e.g. "ga-2-4-0") onto the
+     * canonical datapointId (e.g. "GA-471"), value-preserving. On conflict the
+     * newest value (by updated_at) is kept.
+     *
+     * @param {string} ga          - Group address, e.g. "2/4/0".
+     * @param {string} canonicalId - Projected datapointId, e.g. "GA-471".
+     * @returns {Promise<boolean>} true if a synthetic row was migrated/removed.
+     */
+    async migrateFallbackState(ga, canonicalId) {
+        if (!ga || !canonicalId) return false;
+
+        const syntheticId = `ga-${ga.replace(/\//g, '-')}`;
+        if (syntheticId === canonicalId) return false;
+
+        try {
+            const { rows } = await this.db.query(
+                'SELECT datapoint_id, updated_at FROM current_state WHERE datapoint_id IN ($1, $2)',
+                [syntheticId, canonicalId],
+            );
+
+            const synthetic = rows.find(r => r.datapoint_id === syntheticId);
+            if (!synthetic) return false; // nothing to migrate
+
+            const canonical = rows.find(r => r.datapoint_id === canonicalId);
+
+            if (!canonical) {
+                // No canonical row yet → rename synthetic to canonical (keeps value).
+                await this.db.query(
+                    'UPDATE current_state SET datapoint_id = $1 WHERE datapoint_id = $2',
+                    [canonicalId, syntheticId],
+                );
+                this.logger.info(`[Dedup] Migrated ${syntheticId} → ${canonicalId} (GA ${ga})`);
+                return true;
+            }
+
+            const syntheticNewer =
+                new Date(synthetic.updated_at).getTime() > new Date(canonical.updated_at).getTime();
+
+            if (syntheticNewer) {
+                // Value-preserving: copy synthetic values onto canonical, drop synthetic.
+                await this.db.query(
+                    `UPDATE current_state canon
+                        SET value         = syn.value,
+                            value_decoded = syn.value_decoded,
+                            dpt           = syn.dpt,
+                            updated_at    = syn.updated_at,
+                            source        = syn.source
+                       FROM current_state syn
+                      WHERE canon.datapoint_id = $1 AND syn.datapoint_id = $2`,
+                    [canonicalId, syntheticId],
+                );
+                await this.db.query('DELETE FROM current_state WHERE datapoint_id = $1', [syntheticId]);
+                this.logger.info(`[Dedup] Canonical ${canonicalId} updated from newer ${syntheticId}, synthetic dropped (GA ${ga})`);
+            } else {
+                await this.db.query('DELETE FROM current_state WHERE datapoint_id = $1', [syntheticId]);
+                this.logger.info(`[Dedup] Dropped stale ${syntheticId}, kept ${canonicalId} (GA ${ga})`);
+            }
+            return true;
+        } catch (error) {
+            this.logger.warn({ msg: 'migrateFallbackState failed', ga, canonicalId, error: error.message });
+            return false;
+        }
+    }
+
 
     /**
      * Register a datapoint mapping
@@ -142,72 +234,6 @@ export class StateEngine {
 
         this.datapointMappings.set(ga, { datapointId, dpt, name });
         this.logger.debug(`Registered datapoint: ${ga} -> ${datapointId}`);
-
-        // Fix duplicate datapoints: a telegram received before this mapping was
-        // loaded may have persisted a synthetic fallback state ("ga-2-4-0").
-        // Migrate it onto the canonical datapointId so the API returns exactly
-        // one datapoint per GA.
-        await this.migrateFallbackState(ga, datapointId);
-    }
-
-    /**
-     * Migrates a synthetic fallback current_state row (e.g. "ga-2-4-0") onto the
-     * canonical datapointId (e.g. "GA-471") once a projected mapping exists for
-     * the group address.
-     *
-     * Conflict resolution: if a canonical current_state row already exists, the
-     * row with the newest updated_at is kept and the other is dropped.
-     *
-     * @param {string} ga          - Group address, e.g. "2/4/0".
-     * @param {string} canonicalId - Projected datapointId, e.g. "GA-471".
-     */
-    async migrateFallbackState(ga, canonicalId) {
-        if (!ga || !canonicalId) return;
-
-        const syntheticId = `ga-${ga.replace(/\//g, '-')}`;
-        if (syntheticId === canonicalId) return;
-
-        try {
-            const { rows } = await this.db.query(
-                `SELECT datapoint_id, updated_at
-                   FROM current_state
-                  WHERE datapoint_id IN ($1, $2)`,
-                [syntheticId, canonicalId],
-            );
-
-            const synthetic = rows.find(r => r.datapoint_id === syntheticId);
-            if (!synthetic) return; // nothing to migrate
-
-            const canonical = rows.find(r => r.datapoint_id === canonicalId);
-
-            if (!canonical) {
-                // No canonical row yet → simply rename the synthetic row.
-                await this.db.query(
-                    'UPDATE current_state SET datapoint_id = $1 WHERE datapoint_id = $2',
-                    [canonicalId, syntheticId],
-                );
-                this.logger.info(`[Dedup] Migrated fallback state ${syntheticId} → ${canonicalId} (GA ${ga})`);
-                return;
-            }
-
-            // Both rows exist → keep the one with the newest updated_at.
-            const syntheticNewer =
-                new Date(synthetic.updated_at).getTime() > new Date(canonical.updated_at).getTime();
-
-            if (syntheticNewer) {
-                await this.db.query('DELETE FROM current_state WHERE datapoint_id = $1', [canonicalId]);
-                await this.db.query(
-                    'UPDATE current_state SET datapoint_id = $1 WHERE datapoint_id = $2',
-                    [canonicalId, syntheticId],
-                );
-                this.logger.info(`[Dedup] Replaced canonical ${canonicalId} with newer fallback ${syntheticId} (GA ${ga})`);
-            } else {
-                await this.db.query('DELETE FROM current_state WHERE datapoint_id = $1', [syntheticId]);
-                this.logger.info(`[Dedup] Dropped stale fallback state ${syntheticId}, kept ${canonicalId} (GA ${ga})`);
-            }
-        } catch (error) {
-            this.logger.warn({ msg: 'migrateFallbackState failed', ga, canonicalId, error: error.message });
-        }
     }
 
     /**
