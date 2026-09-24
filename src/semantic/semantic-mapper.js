@@ -87,6 +87,17 @@ export class SemanticMapper {
         }
 
         this.logger.info(`✅ Mapped ${mappedCount} datapoints to state engine`);
+
+        // Prune orphaned mappings (optional, disabled by default). Any
+        // datapoint_mappings row whose datapoint_id was NOT part of this import
+        // belongs to a removed/re-projected datapoint and would otherwise linger
+        // as a stale duplicate for its group address.
+        const pruneEnabled =
+            String(process.env.IMPORT_PRUNE_ENABLED ?? 'false').toLowerCase() === 'true';
+        if (pruneEnabled) {
+            const activeIds = new Set(newMappings.map(m => m.id).filter(Boolean));
+            await this.pruneOrphanedMappings(activeIds);
+        }
     }
 
     /**
@@ -368,5 +379,60 @@ export class SemanticMapper {
             .replace(/[^\w\s-]/g, '')
             .replace(/[\s_]+/g, '-')
             .replace(/^-+|-+$/g, '');
+    }
+
+    /**
+     * Removes datapoint_mappings (and their current_state) whose datapoint_id was
+     * not part of the latest TTL import. Prevents stale duplicates when a
+     * datapoint is removed from ETS or moved off a group address between TTL
+     * versions.
+     *
+     * Safety: skips entirely if no active IDs were collected (e.g., empty/failed
+     * import) to avoid wiping the whole table.
+     *
+     * @param {Set<string>} activeIds - datapoint IDs present in the current import.
+     * @returns {Promise<number>} number of pruned mappings
+     */
+    async pruneOrphanedMappings(activeIds) {
+        try {
+            if (!activeIds || activeIds.size === 0) {
+                this.logger.warn('[Prune] Skipped: no active datapoint IDs collected from import');
+                return 0;
+            }
+
+            const ids = Array.from(activeIds);
+
+            const { rows } = await this.stateEngine.db.query(
+                'SELECT datapoint_id, ga, name FROM datapoint_mappings WHERE NOT (datapoint_id = ANY($1))',
+                [ids],
+            );
+
+            if (rows.length === 0) {
+                this.logger.info('[Prune] No orphaned datapoint mappings');
+                return 0;
+            }
+
+            for (const r of rows) {
+                this.logger.warn(
+                    `[Prune] Removing orphaned mapping ${r.datapoint_id} ` +
+                    `(ga=${r.ga}, name="${r.name ?? ''}") — not present in current TTL`,
+                );
+            }
+
+            await this.stateEngine.db.query(
+                'DELETE FROM current_state WHERE NOT (datapoint_id = ANY($1))',
+                [ids],
+            );
+            const del = await this.stateEngine.db.query(
+                'DELETE FROM datapoint_mappings WHERE NOT (datapoint_id = ANY($1))',
+                [ids],
+            );
+
+            this.logger.info(`[Prune] Removed ${del.rowCount} orphaned datapoint mapping(s)`);
+            return del.rowCount;
+        } catch (error) {
+            this.logger.warn({ msg: 'pruneOrphanedMappings failed', error: error.message });
+            return 0;
+        }
     }
 }

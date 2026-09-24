@@ -90,6 +90,10 @@ class SemanticKNXRuntime {
                 await this.stateEngine.reconcileFallbackStates({
                     windowMinutes: Number.isFinite(windowMinutes) ? windowMinutes : 60,
                 });
+
+                // Align current_state.ga with the current mapping GA (GA drift
+                // after a datapoint was moved to a different group address in ETS).
+                await this.stateEngine.reconcileStateGaDrift();
             }
 
             // Phase 4: KNX Tunnel Manager

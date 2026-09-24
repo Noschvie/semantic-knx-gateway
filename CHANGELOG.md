@@ -40,15 +40,27 @@ Unreleased
     row remains as harmless, API-invisible data and is superseded once the
     canonical datapoint has a newer value.
 
-  **Optional maintenance scripts** (for operators who want to remove leftover
-  synthetic `current_state` rows from before this fix):
-  - `scripts/diagnose-duplicate-datapoints.sql` — read-only root-cause analysis
-    (when the canonical mapping was created vs. when the synthetic state was last
-    seen, and whether a canonical state already exists). Run this first.
-  - `scripts/cleanup-duplicate-datapoints.sql` — value-preserving, transactional
-    cleanup that migrates/collapses synthetic rows onto the canonical
-    `datapoint_id` (keeps the newest value on conflict). Includes a dry-run
-    PREVIEW and a VERIFY step; local `psql` and Docker Compose usage documented.
+- **Stale duplicate datapoints after GA re-assignment / removal in ETS** — Two
+  further duplicate-per-GA classes are now handled:
+  - **GA drift:** When a datapoint is moved to a new group address in ETS, the
+    persisted `current_state` kept its old `ga`, so the datapoint appeared under
+    the old GA in the API (and command/status paths diverged).
+    `StateEngine.registerDatapoint()` now updates `current_state.ga` when a
+    datapoint's GA changes, and a new startup step
+    `StateEngine.reconcileStateGaDrift()` (Phase 3b, in `src/index.js`) aligns any
+    already-drifted rows in bulk (value-preserving; only the `ga` column is
+    corrected).
+  - **Orphaned mappings:** `datapoint_mappings` was never cleaned on import, so a
+    datapoint removed from ETS (or moved off a GA) left a stale mapping — a
+    second, obsolete datapoint for that GA. `SemanticMapper.pruneOrphanedMappings()`
+    now removes mappings (and their `current_state`) whose datapointId was not
+    part of the latest TTL import. It is **opt-in** via `IMPORT_PRUNE_ENABLED`
+    (default `false`, destructive) and guarded against empty imports.
+  - Existing databases can be cleaned by the startup reconciliation on the next
+    restart, or manually via `scripts/diagnose-duplicate-datapoints.sql` /
+    `scripts/cleanup-duplicate-datapoints.sql` and the
+    `scripts/check-ga-datapoints.sh` probe.
+
 
 ### Added
 - **Import Warning for Multiply Mapped Group Addresses** — Surfaces ETS

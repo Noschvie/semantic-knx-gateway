@@ -109,6 +109,37 @@ export class StateEngine {
     }
 
     /**
+     * Aligns current_state.ga with datapoint_mappings.ga. When a datapoint is
+     * moved to a different group address in ETS between TTL versions, the
+     * persisted state keeps its old ga and would appear under the old GA in the
+     * API (duplicate per GA). This reconciles all drifted rows in one pass
+     * (value-preserving; only the ga column is corrected).
+     *
+     * @returns {Promise<{fixed: number}>}
+     */
+    async reconcileStateGaDrift() {
+        try {
+            const { rowCount } = await this.db.query(`
+                UPDATE current_state cs
+                   SET ga = dm.ga
+                  FROM datapoint_mappings dm
+                 WHERE dm.datapoint_id = cs.datapoint_id
+                   AND cs.ga <> dm.ga
+            `);
+
+            if (rowCount > 0) {
+                this.logger.info(`[Dedup] Aligned ${rowCount} current_state row(s) to the current mapping GA`);
+            } else {
+                this.logger.info('[Dedup] No current_state GA drift to reconcile');
+            }
+            return { fixed: rowCount };
+        } catch (error) {
+            this.logger.warn({ msg: 'reconcileStateGaDrift failed', error: error.message });
+            return { fixed: 0, error: error.message };
+        }
+    }
+
+    /**
      * Migrates a single synthetic fallback row (e.g. "ga-2-4-0") onto the
      * canonical datapointId (e.g. "GA-471"), value-preserving. On conflict the
      * newest value (by updated_at) is kept.
@@ -180,11 +211,12 @@ export class StateEngine {
     async registerDatapoint(ga, mapping) {
         const { datapointId, dpt, name, locationId, deviceId, functionId, metadata } = mapping;
 
-        // Get old mapping to detect DPT changes
+        // Get old mapping to detect DPT changes and GA moves
         const oldMappingResult = await this.db.query(
-            'SELECT dpt FROM datapoint_mappings WHERE datapoint_id = $1',
+            'SELECT ga, dpt FROM datapoint_mappings WHERE datapoint_id = $1',
             [datapointId],
         );
+        const oldGa = oldMappingResult.rows[0]?.ga || null;
         const oldDpt = oldMappingResult.rows[0]?.dpt || null;
 
         const query = `
@@ -234,6 +266,17 @@ export class StateEngine {
 
         this.datapointMappings.set(ga, { datapointId, dpt, name });
         this.logger.debug(`Registered datapoint: ${ga} -> ${datapointId}`);
+
+        // Keep current_state consistent when a datapoint is moved to a new GA in ETS.
+        // Otherwise, the stale state.ga would make the datapoint appear under
+        // its old group address in the API (duplicate per GA).
+        if (oldGa && oldGa !== ga) {
+            await this.db.query(
+                'UPDATE current_state SET ga = $1 WHERE datapoint_id = $2 AND ga <> $1',
+                [ga, datapointId],
+            );
+            this.logger.info(`[GA Move] ${datapointId}: current_state ga ${oldGa} → ${ga}`);
+        }
     }
 
     /**
