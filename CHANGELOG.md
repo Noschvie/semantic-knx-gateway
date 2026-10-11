@@ -8,6 +8,9 @@ contributors and users to follow meaningful changes over time.
 Unreleased
 ----------
 
+2026-10-11
+----------
+
 ### Fixed
 - **Duplicate Datapoints per Group Address** — `GET /api/v2/datapoints` (and
   `/:id`, `/:id/timeseries`) could return two datapoint resources for a single
