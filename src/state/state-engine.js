@@ -25,6 +25,7 @@ export class StateEngine {
         // Load datapoint mappings from database
         await this.loadDatapointMappings();
 
+
         this.logger.info('✅ State Engine initialized');
     }
 
@@ -52,16 +53,170 @@ export class StateEngine {
     }
 
     /**
+     * Reconciles synthetic fallback current_state rows onto their canonical
+     * datapointId. A synthetic row ('ga-<a>-<b>-<c>') is created when a telegram
+     * arrives before its mapping exists (e.g., new GAs are commissioned in ETS
+     * while the running gateway still has the old TTL). After the TTL is replaced
+     * and the container restarted, the canonical mapping exists, so these rows
+     * become duplicates.
+     *
+     * Run this AFTER the TTL import (mappings must exist) and BEFORE connecting
+     * the KNX bus. Only synthetic rows that have a matching mapping are touched;
+     * genuine unprojected datapoints are left intact.
+     *
+     * @param {object} [opts]
+     * @param {number} [opts.windowMinutes=0] - If > 0, only reconcile rows whose
+     *   updated_at is within the last N minutes. 0 = no time limit (all).
+     * @returns {Promise<{reconciled: number}>}
+     */
+    async reconcileFallbackStates({ windowMinutes = 0 } = {}) {
+        try {
+            const params = [];
+            let timeClause = '';
+            if (Number.isFinite(windowMinutes) && windowMinutes > 0) {
+                timeClause = 'AND cs.updated_at >= NOW() - make_interval(mins => ($1)::int)';
+                params.push(windowMinutes);
+            }
+
+            const { rows } = await this.db.query(`
+                SELECT cs.ga, dm.datapoint_id AS canonical_id
+                FROM current_state cs
+                JOIN datapoint_mappings dm ON dm.ga = cs.ga
+                WHERE cs.datapoint_id = 'ga-' || replace(cs.ga, '/', '-')
+                  AND cs.datapoint_id <> dm.datapoint_id
+                  ${timeClause}
+            `, params);
+
+            if (rows.length === 0) {
+                this.logger.info('[Dedup] No synthetic fallback states to reconcile');
+                return { reconciled: 0 };
+            }
+
+            const scope = windowMinutes > 0 ? ` from the last ${windowMinutes} min` : '';
+            this.logger.info(`[Dedup] Reconciling ${rows.length} synthetic fallback state(s)${scope}`);
+
+            let count = 0;
+            for (const row of rows) {
+                if (await this.migrateFallbackState(row.ga, row.canonical_id)) count++;
+            }
+
+            this.logger.info(`[Dedup] Reconciliation complete: ${count} state(s) migrated/cleaned`);
+            return { reconciled: count };
+        } catch (error) {
+            this.logger.warn({ msg: 'reconcileFallbackStates failed', error: error.message });
+            return { reconciled: 0, error: error.message };
+        }
+    }
+
+    /**
+     * Aligns current_state.ga with datapoint_mappings.ga. When a datapoint is
+     * moved to a different group address in ETS between TTL versions, the
+     * persisted state keeps its old ga and would appear under the old GA in the
+     * API (duplicate per GA). This reconciles all drifted rows in one pass
+     * (value-preserving; only the ga column is corrected).
+     *
+     * @returns {Promise<{fixed: number}>}
+     */
+    async reconcileStateGaDrift() {
+        try {
+            const { rowCount } = await this.db.query(`
+                UPDATE current_state cs
+                   SET ga = dm.ga
+                  FROM datapoint_mappings dm
+                 WHERE dm.datapoint_id = cs.datapoint_id
+                   AND cs.ga <> dm.ga
+            `);
+
+            if (rowCount > 0) {
+                this.logger.info(`[Dedup] Aligned ${rowCount} current_state row(s) to the current mapping GA`);
+            } else {
+                this.logger.info('[Dedup] No current_state GA drift to reconcile');
+            }
+            return { fixed: rowCount };
+        } catch (error) {
+            this.logger.warn({ msg: 'reconcileStateGaDrift failed', error: error.message });
+            return { fixed: 0, error: error.message };
+        }
+    }
+
+    /**
+     * Migrates a single synthetic fallback row (e.g. "ga-2-4-0") onto the
+     * canonical datapointId (e.g. "GA-471"), value-preserving. On conflict the
+     * newest value (by updated_at) is kept.
+     *
+     * @param {string} ga          - Group address, e.g. "2/4/0".
+     * @param {string} canonicalId - Projected datapointId, e.g. "GA-471".
+     * @returns {Promise<boolean>} true if a synthetic row was migrated/removed.
+     */
+    async migrateFallbackState(ga, canonicalId) {
+        if (!ga || !canonicalId) return false;
+
+        const syntheticId = `ga-${ga.replace(/\//g, '-')}`;
+        if (syntheticId === canonicalId) return false;
+
+        try {
+            const { rows } = await this.db.query(
+                'SELECT datapoint_id, updated_at FROM current_state WHERE datapoint_id IN ($1, $2)',
+                [syntheticId, canonicalId],
+            );
+
+            const synthetic = rows.find(r => r.datapoint_id === syntheticId);
+            if (!synthetic) return false; // nothing to migrate
+
+            const canonical = rows.find(r => r.datapoint_id === canonicalId);
+
+            if (!canonical) {
+                // No canonical row yet → rename synthetic to canonical (keeps value).
+                await this.db.query(
+                    'UPDATE current_state SET datapoint_id = $1 WHERE datapoint_id = $2',
+                    [canonicalId, syntheticId],
+                );
+                this.logger.info(`[Dedup] Migrated ${syntheticId} → ${canonicalId} (GA ${ga})`);
+                return true;
+            }
+
+            const syntheticNewer =
+                new Date(synthetic.updated_at).getTime() > new Date(canonical.updated_at).getTime();
+
+            if (syntheticNewer) {
+                // Value-preserving: copy synthetic values onto canonical, drop synthetic.
+                await this.db.query(
+                    `UPDATE current_state canon
+                        SET value         = syn.value,
+                            value_decoded = syn.value_decoded,
+                            dpt           = syn.dpt,
+                            updated_at    = syn.updated_at,
+                            source        = syn.source
+                       FROM current_state syn
+                      WHERE canon.datapoint_id = $1 AND syn.datapoint_id = $2`,
+                    [canonicalId, syntheticId],
+                );
+                await this.db.query('DELETE FROM current_state WHERE datapoint_id = $1', [syntheticId]);
+                this.logger.info(`[Dedup] Canonical ${canonicalId} updated from newer ${syntheticId}, synthetic dropped (GA ${ga})`);
+            } else {
+                await this.db.query('DELETE FROM current_state WHERE datapoint_id = $1', [syntheticId]);
+                this.logger.info(`[Dedup] Dropped stale ${syntheticId}, kept ${canonicalId} (GA ${ga})`);
+            }
+            return true;
+        } catch (error) {
+            this.logger.warn({ msg: 'migrateFallbackState failed', ga, canonicalId, error: error.message });
+            return false;
+        }
+    }
+
+
+    /**
      * Register a datapoint mapping
      */
     async registerDatapoint(ga, mapping) {
         const { datapointId, dpt, name, locationId, deviceId, functionId, metadata } = mapping;
 
-        // Get old mapping to detect DPT changes
+        // Get old mapping to detect DPT changes and GA moves
         const oldMappingResult = await this.db.query(
-            'SELECT dpt FROM datapoint_mappings WHERE datapoint_id = $1',
-            [datapointId]
+            'SELECT ga, dpt FROM datapoint_mappings WHERE datapoint_id = $1',
+            [datapointId],
         );
+        const oldGa = oldMappingResult.rows[0]?.ga || null;
         const oldDpt = oldMappingResult.rows[0]?.dpt || null;
 
         const query = `
@@ -111,6 +266,17 @@ export class StateEngine {
 
         this.datapointMappings.set(ga, { datapointId, dpt, name });
         this.logger.debug(`Registered datapoint: ${ga} -> ${datapointId}`);
+
+        // Keep current_state consistent when a datapoint is moved to a new GA in ETS.
+        // Otherwise, the stale state.ga would make the datapoint appear under
+        // its old group address in the API (duplicate per GA).
+        if (oldGa && oldGa !== ga) {
+            await this.db.query(
+                'UPDATE current_state SET ga = $1 WHERE datapoint_id = $2 AND ga <> $1',
+                [ga, datapointId],
+            );
+            this.logger.info(`[GA Move] ${datapointId}: current_state ga ${oldGa} → ${ga}`);
+        }
     }
 
     /**

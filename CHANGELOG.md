@@ -8,6 +8,118 @@ contributors and users to follow meaningful changes over time.
 Unreleased
 ----------
 
+2026-10-11
+----------
+
+### Fixed
+- **Duplicate Datapoints per Group Address** — `GET /api/v2/datapoints` (and
+  `/:id`, `/:id/timeseries`) could return two datapoint resources for a single
+  group address: the projected one (e.g. `meta.datapointId = "GA-471"`) plus a
+  synthetic, derived one (e.g. `ga-2-4-0`). The derived entry originates from a
+  telegram processed before its mapping was loaded, so the state engine persisted
+  a fallback state under `ga-<a>-<b>-<c>`.
+
+  **Root cause:** The API union keyed datapoints purely by `datapointId`, so the
+  synthetic and canonical ids never collapsed onto a single resource, and the
+  command path (`PUT /datapoints/values` via resource UUID) and status path
+  (WS-Subscribe/Read via `meta.datapointId`) could resolve to different datapoints.
+
+  **Resolution (API-only, no database changes):**
+  - **API canonicalization** (`src/api/routes/datapoints.js`): Extracted the
+    duplicated union logic into a shared `buildDatapointUnion()` helper. When a
+    projected mapping exists for a GA, runtime states are canonicalized onto the
+    mapping's `datapointId` so a GA now yields **exactly one** resource (the last
+    known value is preserved under the canonical id).
+  - **Conflict resolution:** When multiple states collapse onto the same
+    canonical key, the one with the newest `updatedAt` wins (also fixes a latent
+    "oldest wins" overwriting in the union map).
+
+  **Impact:**
+  - ✅ `filter[ga]=<GA>` now returns a single, canonical datapoint.
+  - ✅ Command and status paths resolve to the same datapoint: writes resolve the
+    UUID against `datapoint_mappings`, and telegrams are emitted under the
+    canonical `datapointId`.
+  - ✅ No database migration required. A pre-existing synthetic `current_state`
+    row remains as harmless, API-invisible data and is superseded once the
+    canonical datapoint has a newer value.
+
+- **Stale duplicate datapoints after GA re-assignment / removal in ETS** — Two
+  further duplicate-per-GA classes are now handled:
+  - **GA drift:** When a datapoint is moved to a new group address in ETS, the
+    persisted `current_state` kept its old `ga`, so the datapoint appeared under
+    the old GA in the API (and command/status paths diverged).
+    `StateEngine.registerDatapoint()` now updates `current_state.ga` when a
+    datapoint's GA changes, and a new startup step
+    `StateEngine.reconcileStateGaDrift()` (Phase 3b, in `src/index.js`) aligns any
+    already-drifted rows in bulk (value-preserving; only the `ga` column is
+    corrected).
+  - **Orphaned mappings:** `datapoint_mappings` was never cleaned on import, so a
+    datapoint removed from ETS (or moved off a GA) left a stale mapping — a
+    second, obsolete datapoint for that GA. `SemanticMapper.pruneOrphanedMappings()`
+    now removes mappings (and their `current_state`) whose datapointId was not
+    part of the latest TTL import. It is **opt-in** via `IMPORT_PRUNE_ENABLED`
+    (default `false`, destructive) and guarded against empty imports.
+  - Existing databases can be cleaned by the startup reconciliation on the next
+    restart, or manually via `scripts/diagnose-duplicate-datapoints.sql` /
+    `scripts/cleanup-duplicate-datapoints.sql` and the
+    `scripts/check-ga-datapoints.sh` probe.
+
+
+### Added
+- **Import Warning for Multiply Mapped Group Addresses** — Surfaces ETS
+  projection errors where one group address is mapped to more than one datapoint:
+
+  **Why:** A group address is normally projected to a single datapoint. When two
+  datapoints (e.g. from different functions) share the same GA, the API returns
+  two resources for that GA, and the client/BFF must pick one — command and status
+  paths can then diverge. The existing `detectDptConflicts()` only fires on
+  *different* DPTs, so same-DPT duplicates (e.g., both `scaling`) went unnoticed.
+
+  **What** (`src/semantic/semantic-mapper.js`): During the TTL import,
+  `warnMultiplyMappedGAs()` groups the collected mappings by GA and logs a
+  warning for every GA that resolves to more than one datapointId, e.g.:
+  ```
+  [Projection] ⚠️ GA 2/3/12 is mapped to 2 datapoints: GA-445 ("Treppe Position in %"), GA-531 ("Zimmer") — check ETS projection (a group address should map to a single datapoint)
+  ```
+  followed by a summary count. This is **logging only** — no hard failure and no
+  `UNIQUE(ga)` constraint — so legitimate n:1 projections are not blocked while
+  data-quality issues become visible in the startup log.
+
+- **Automatic Fallback-State Reconciliation on Startup** — Self-healing of
+  duplicate datapoints without manual SQL:
+
+  **Why:** In practice the timing window cannot be avoided — new GAs are
+  commissioned in ETS and start sending telegrams while the running gateway
+  still has the old TTL, so synthetic `ga-<a>-<b>-<c>` states are persisted.
+  After the TTL/project file is replaced and the container restarted, these
+  become duplicates of the projected datapoint.
+
+  **What:** During startup, **after** the TTL import and **before** connecting
+  the KNX bus (new "Phase 3b" in `src/index.js`), the gateway now reconciles
+  synthetic `current_state` rows onto their canonical `datapointId`
+  (value-preserving; on conflict the newest value by `updated_at` wins). Only
+  synthetic rows that have a matching mapping are touched — genuine unprojected
+  datapoints are left intact.
+
+  **Implementation** (`src/state/state-engine.js`):
+  - `reconcileFallbackStates({ windowMinutes })` — finds synthetic-with-mapping
+    rows via a targeted join and migrates them.
+  - `migrateFallbackState(ga, canonicalId)` — value-preserving per-row migration
+    (rename when no canonical row exists; copy the newest value and drop synthetic on
+    conflict).
+
+  **Configuration** (`env.example`):
+  - `DATAPOINT_RECONCILE_ON_START` (default `true`) — enable/disable the startup
+    reconciliation.
+  - `DATAPOINT_RECONCILE_WINDOW_MINUTES` (default `60`) — only reconcile rows
+    updated within the last N minutes; `0` = no limit (reconcile all).
+
+  **Benefits:**
+  - ✅ Duplicates are corrected automatically after a TTL replacement and restart.
+  - ✅ Time-bounded by default (last 60 min) to target the latest commissioning.
+  - ✅ Same value-preserving logic as the manual cleanup script; no bus impact
+    (runs before Phase 4 connection).
+
 2026-09-12
 ----------
 

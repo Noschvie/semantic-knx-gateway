@@ -204,9 +204,19 @@ TOP_COUNT=$(echo "$TOP" | jq '.datapoints | length')
 check "top-active result count" "$TOP_COUNT"
 echo ""
 
+# ─── 3. Node ──────────────────────────────────────────────────────────────────
+
+echo "3. Node..."
+NODE_RESULT=$(ctime "GET /node" -H "$AUTH_READ" "$KNX_IOT/node")
+NODE_ID=$(echo "$NODE_RESULT" | jq -r '.data.id')
+NODE_TYPE=$(echo "$NODE_RESULT" | jq -r '.data.type')
+check "node id" "$NODE_ID"
+check "node type" "$NODE_TYPE"
+echo ""
+
 # ─── 3. Installations ─────────────────────────────────────────────────────────
 
-echo "3. Installations..."
+echo "3a. Installations..."
 INST_RESULT=$(ctime "GET /installations" -H "$AUTH_READ" "$KNX_IOT/installations")
 INST_TOTAL=$(echo "$INST_RESULT" | jq '.data | length')
 INST_ID=$(echo "$INST_RESULT" | jq -r '.data[0].id')
