@@ -8,6 +8,36 @@ contributors and users to follow meaningful changes over time.
 Unreleased
 ----------
 
+### Fixed
+- **Missing KNX DPT name mappings caused HTTP 400 on write** — Writing to a
+  datapoint whose DPT is expressed as a symbolic ETS name (e.g. `value1Ucount`)
+  failed with `400 Bad Request – Unknown or unsupported DPT: value1Ucount`
+  because the name was not present in `DPT_NAME_MAP`.
+
+  **Resolution** (`src/utils/dpt-map.js`):
+  - Added the missing 1-byte counter names: `value1Ucount` → `5.010`,
+    `value1Count` → `6.010`, plus `percentV8` → `6.001`.
+  - Added the missing 4-byte counter names: `value4Ucount` → `12.001`,
+    `value4Count` → `13.001`.
+  - Corrected `valueTempF` from the wrong `9.010` (time) to the standard
+    `9.027` (`DPT_Value_Temp_F`).
+
+- **32-bit counter-values decoded as float on write** — `decodeValueForKnx()`
+  (`src/api/routes/helpers/knx-iot-dpt.js`) now decodes DPT main groups `12`
+  and `13` via `parseInt()` (integer), matching the newly added
+  `value4Ucount`/`value4Count` mappings, instead of falling through to the
+  generic numeric `default` branch.
+
+### Changed
+- **Clearer diagnostics for unknown/unsupported DPTs on write**
+  (`src/api/routes/datapoints.js`):
+  - `normalizeDpt()` now logs an explicit warning when a symbolic DPT name is
+    not found in `DPT_NAME_MAP`, including the offending name and a hint to add
+    the mapping in `src/utils/dpt-map.js`.
+  - `writeDatapointValue()` enriches the `400 Bad Request` response and log
+    entry with the group address and datapoint name and distinguishes an
+    unmapped symbolic name from a malformed numeric DPT.
+
 2026-10-11
 ----------
 

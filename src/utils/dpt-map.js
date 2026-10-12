@@ -45,6 +45,7 @@ export const DPT_NAME_MAP = {
     'value1Ucount':     '5.010',
 
     // DPT 6.x – 8-Bit signed
+    'percentV8':        '6.001',
     'counter8s':        '6.010',
     'value1Count':      '6.010',
 
@@ -81,13 +82,13 @@ export const DPT_NAME_MAP = {
     'airQuality':       '9.008',
     'valueAirQuality':  '9.008',
     'valuePpm':         '9.008',
-    'valueTempF':       '9.010',
     'voltage':          '9.020',
     'valueVolt':        '9.020',
     'current':          '9.021',
     'valueCurr':        '9.021',
     'power':            '9.024',
     'valuePower':       '9.024',
+    'valueTempF':       '9.027',
 
     // DPT 10.x - time
     'timeOfDay':        '10.001',
@@ -97,9 +98,11 @@ export const DPT_NAME_MAP = {
 
     // DPT 12.x – 32-Bit unsigned
     'counter32':        '12.001',
+    'value4Ucount':     '12.001',
 
     // DPT 13.x – 32-Bit signed
     'counter32s':       '13.001',
+    'value4Count':      '13.001',
 
     // DPT 14.x – 4-Byte float
     'float4':           '14.005',

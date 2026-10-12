@@ -102,6 +102,8 @@ export function decodeValueForKnx(valueStr, dpt) {
         throw new Error(`Invalid boolean value for DPT ${dpt}: "${str}"`);
     case 2: case 3: case 5: case 6: case 7: case 8: case 17: case 18: case 20:
         return parseInt(str, 10);
+    case 12: case 13:
+        return parseInt(str, 10);
     case 9: case 14:
         return parseFloat(str);
     case 4: case 16:
