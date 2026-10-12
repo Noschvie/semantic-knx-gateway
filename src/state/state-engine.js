@@ -401,4 +401,11 @@ export class StateEngine {
     unsubscribe(event, callback) {
         this.eventBus.off(event, callback);
     }
+
+    /**
+     * Get all projected datapoint mappings.
+     */
+    async getDatapointMappings() {
+        return await this.stateStore.getDatapointMappings();
+    }
 }

@@ -156,16 +156,7 @@ function getDatapointUnionKey(item) {
 
 async function getDatapointMappings(stateEngine) {
     try {
-        const result = await stateEngine.db.query(`
-            SELECT datapoint_id AS "datapointId",
-                   ga,
-                   dpt,
-                   name,
-                   location_id  AS "locationId",
-                   device_id    AS "deviceId"
-            FROM datapoint_mappings
-        `);
-        return result.rows ?? [];
+        return await stateEngine.getDatapointMappings();
     } catch (error) {
         logger.error({ msg: 'getDatapointMappings query failed', error: error.message });
         return [];
