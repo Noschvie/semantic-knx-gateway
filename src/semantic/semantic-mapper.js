@@ -3,6 +3,7 @@
 // KNX Runtime Engine – https://github.com/Noschvie/semantic-knx-gateway.git
 
 import { createLogger } from '../utils/logger.js';
+import {stableUuid} from "../api/routes/helpers/knx-iot-uuid.js";
 
 export class SemanticMapper {
     constructor(resourceStore, stateEngine) {
@@ -183,6 +184,21 @@ export class SemanticMapper {
         if (!address) {
             this.logger.warn(`Invalid group address: ${ga.address}`);
             return;
+        }
+
+        const primaryDevice = ga.connectedDevices?.[0];
+        const deviceId = primaryDevice?.deviceId ?? primaryDevice?.uri ?? null;
+
+        // TEMP-Diagnose: prüft, ob die aus connectedDevices abgeleitete deviceId
+        // dieselbe stableUuid ergibt wie die Device-Ressource aus GET /devices.
+        if (deviceId) {
+            this.logger.info({
+                msg: '[Diag deviceId] mapping device link',
+                ga: address,
+                rawDeviceId: deviceId,
+                deviceUuid: stableUuid(deviceId),
+                connectedDevices: ga.connectedDevices,
+            });
         }
 
         const mapping = {

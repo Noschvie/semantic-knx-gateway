@@ -116,6 +116,12 @@ export function devicesRouter(semanticEngine) {
             const allDevices  = await semanticEngine.getAllDevices();
             const resources   = allDevices.map(toDeviceResource);
 
+            // TEMP-Diagnose: zeigt interne id/uri und die daraus erzeugte UUID
+            allDevices.slice(0, 5).forEach(d =>
+                console.log('[Diag deviceId] device resource',
+                    { id: d.id, uri: d.uri, uuid: stableUuid(d.id ?? d.uri ?? '') }),
+            );
+
             // ── Apply filters (typeFilter / tagFilter / attributeFilter) ─────
             const filters         = parseFilters(req.query);
             const filteredResources = applyAllFilters(resources, filters);
