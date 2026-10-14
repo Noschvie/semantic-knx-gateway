@@ -3,7 +3,6 @@
 // KNX Runtime Engine – https://github.com/Noschvie/semantic-knx-gateway.git
 
 import { createLogger } from '../utils/logger.js';
-import {stableUuid} from "../api/routes/helpers/knx-iot-uuid.js";
 
 export class SemanticMapper {
     constructor(resourceStore, stateEngine) {
@@ -189,21 +188,11 @@ export class SemanticMapper {
         const primaryDevice = ga.connectedDevices?.[0];
         const deviceId = primaryDevice?.deviceId ?? primaryDevice?.uri ?? null;
 
-        // TEMP-Diagnose: feuert IMMER (auch ohne deviceId), damit sichtbar wird,
-        // ob connectedDevices am GA fehlen oder die deviceId leer bleibt.
-        this.logger.info({
-            msg: '[Diag deviceId] mapping device link',
-            ga: address,
-            gaId: ga.id,
-            rawDeviceId: deviceId,
-            deviceUuid: deviceId ? stableUuid(deviceId) : null,
-            connectedCount: ga.connectedDevices?.length ?? 0,
-        });
-
         const mapping = {
             datapointId: ga.id,
             dpt: ga.dpt,
             name: ga.name,
+            deviceId,
             metadata: {
                 uri: ga.uri,
                 datapoints: ga.datapoints,

@@ -9,6 +9,30 @@ Unreleased
 ----------
 
 ### Fixed
+- **`filter[deviceId]` returned no datapoints** — `GET /api/v2/datapoints?filter[deviceId]=<uuid>`
+  always returned an empty collection because `datapoint_mappings.device_id` was
+  never populated: group addresses are mapped via `SemanticMapper.mapGroupAddress()`
+  (not `mapDatapoint()`), which did not set a `deviceId`.
+
+  **Resolution:**
+  - `SemanticMapper.mapGroupAddress()` now derives the primary linked device from
+    the group address' `connectedDevices` (`connectedDevices[0]`) and passes it as
+    `deviceId` to `StateEngine.registerDatapoint()`, so `device_id` is persisted for
+    every GA that has a connected device.
+  - Added `StateEngine.backfillDeviceIds()` (invoked in `SemanticEngine.initialize()`
+    after the TTL import), which fills any still-`NULL` `device_id` from the
+    `linkedToDevice` relationships. Idempotent (`device_id IS NULL` guard) and safe
+    to run on every start.
+
+  **Impact:** `filter[deviceId]` now resolves datapoints per device (verified: a
+  device with N linked GAs returns N datapoints). Group addresses without a
+  connected device keep `device_id = NULL` (expected).
+
+  **Note:** When a GA is linked to multiple devices, the first entry
+  (`connectedDevices[0]`) is chosen as the mapping's primary `device_id`. A GA whose
+  primary device differs from a given device will therefore not appear under that
+  other device's filter.
+
 - **Missing KNX DPT name mappings caused HTTP 400 on write** — Writing to a
   datapoint whose DPT is expressed as a symbolic ETS name (e.g. `value1Ucount`)
   failed with `400 Bad Request – Unknown or unsupported DPT: value1Ucount`
