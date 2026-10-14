@@ -8,6 +8,7 @@
 # Optional: override OAuth secret:          OAUTH_CLIENT_SECRET=mysecret ./test-knx-iot.sh
 # Optional: override read GA:               KNX_TEST_GA_READ=1/1/1 ./test-knx-iot.sh
 # Optional: override write GA:              KNX_TEST_GA_WRITE=1/1/1 ./test-knx-iot.sh
+# Optional: override timeseries GA:         KNX_TEST_GA_TS=3/6/1 ./test-knx-iot.sh
 # Optional: skip write test:                SKIP_WRITE=true ./test-knx-iot.sh
 #
 # Enhanced test messages to distinguish between:
@@ -19,6 +20,7 @@ API_URL="${API_URL:-http://localhost:3000}"
 KNX_IOT="$API_URL/api/v2"
 OAUTH_CLIENT_SECRET="${OAUTH_CLIENT_SECRET:-change-me-in-production}"
 KNX_TEST_GA_WRITE="${KNX_TEST_GA_WRITE:-8/1/1}"
+KNX_TEST_GA_TS="${KNX_TEST_GA_TS:-3/6/1}"   # WP Aussentemperatur
 
 PASS=0
 FAIL=0
@@ -253,20 +255,54 @@ DP_PAGE=$(ctime "GET /datapoints (paged)" -H "$AUTH_READ" "$KNX_IOT/datapoints?p
 check "page result count" "$(echo "$DP_PAGE" | jq '.data | length')"
 echo ""
 
-echo "4d. Datapoints filter by device ($DEV_ID)..."
-DEV_ID=$(ctime "GET /devices (probe)" -H "$AUTH_READ" "$KNX_IOT/devices" | jq -r '.data[0].id')
-DP_FILTERED=$(ctime "GET /datapoints?filter[deviceId]" -g --globoff -H "$AUTH_READ" "$KNX_IOT/datapoints?filter[deviceId]=$DEV_ID")
-check "filtered datapoints" "$(echo "$DP_FILTERED" | jq '.meta.collection.total')"
+echo "4d. Datapoints filter by device..."
+DEV_LIST=$(ctime "GET /devices (probe)" -H "$AUTH_READ" "$KNX_IOT/devices")
+
+# Pick the first device that actually resolves to >=1 datapoint, so the test
+# does not fail on devices without a primary GA mapping (filter is per-device).
+DEV_ID=""
+DEV_DP_TOTAL=0
+for cand in $(echo "$DEV_LIST" | jq -r '.data[].id'); do
+  CAND_TOTAL=$(ctime "GET /datapoints?filter[deviceId] (probe $cand)" -g --globoff \
+    -H "$AUTH_READ" "$KNX_IOT/datapoints?filter[deviceId]=$cand" \
+    | jq '.meta.collection.total // 0')
+  if [ "${CAND_TOTAL:-0}" -gt 0 ] 2>/dev/null; then
+    DEV_ID="$cand"
+    DEV_DP_TOTAL="$CAND_TOTAL"
+    break
+  fi
+done
+
+if [ -n "$DEV_ID" ]; then
+  ok "filtered datapoints: $DEV_DP_TOTAL for device $DEV_ID"
+else
+  warn "no device with a primary datapoint mapping found (all GAs map to other devices)"
+fi
 echo ""
 
-echo "4e. Timeseries for first datapoint..."
-TS=$(ctime "GET /datapoints/{id}/timeseries" -H "$AUTH_READ" "$KNX_IOT/datapoints/$DP_ID/timeseries")
-TS_COUNT=$(echo "$TS" | jq '.data | length')
-if [ "$TS_COUNT" -gt 0 ] 2>/dev/null; then
-  ok "timeseries history: $TS_COUNT entries found"
+echo "4e. Timeseries for WP Aussentemperatur (GA $KNX_TEST_GA_TS)..."
+# Festes Datapoint statt "erstes der Liste" => deterministischer Test.
+# -g --globoff: curl soll die eckigen Klammern in filter[ga] nicht als Globbing deuten.
+TS_DP_RESULT=$(ctime "GET /datapoints?filter[ga]=$KNX_TEST_GA_TS" -g --globoff -H "$AUTH_READ" "$KNX_IOT/datapoints?filter[ga]=$KNX_TEST_GA_TS")
+TS_DP_ID=$(echo "$TS_DP_RESULT" | jq -r '.data[0].id // empty' 2>/dev/null)
+TS_DP_TITLE=$(echo "$TS_DP_RESULT" | jq -r '.data[0].attributes.title // "n/a"' 2>/dev/null)
+
+if [ -z "$TS_DP_ID" ]; then
+  fail "Datapoint not found for GA $KNX_TEST_GA_TS"
 else
-  warn "timeseries history: empty (no historical events recorded for this datapoint)"
-  ((FAIL++))
+  ok "Datapoint: $TS_DP_TITLE (GA $KNX_TEST_GA_TS, ID $TS_DP_ID)"
+  TS=$(ctime "GET /datapoints/{id}/timeseries" -H "$AUTH_READ" "$KNX_IOT/datapoints/$TS_DP_ID/timeseries")
+  TS_ITEMS=$(echo "$TS" | jq -c 'if type == "array" then . elif (.data | type) == "array" then .data else [] end' 2>/dev/null)
+  TS_COUNT=$(echo "${TS_ITEMS:-[]}" | jq 'length' 2>/dev/null)
+  if [ "${TS_COUNT:-0}" -gt 0 ] 2>/dev/null; then
+    ok "timeseries history: $TS_COUNT entries found"
+    echo "      Neueste 10 Messwerte:"
+    echo "$TS_ITEMS" | jq -r '
+      sort_by(.attributes.timestamp // "") | reverse | .[0:10][]
+      | "      \(.attributes.timestamp // "unbekannt") | \(if .attributes.value == null then "unbekannt" else (.attributes.value | tostring) end)"'
+  else
+    fail "timeseries history: empty for GA $KNX_TEST_GA_TS (no historical events recorded)"
+  fi
 fi
 echo ""
 
