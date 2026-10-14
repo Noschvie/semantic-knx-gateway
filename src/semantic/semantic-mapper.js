@@ -189,17 +189,16 @@ export class SemanticMapper {
         const primaryDevice = ga.connectedDevices?.[0];
         const deviceId = primaryDevice?.deviceId ?? primaryDevice?.uri ?? null;
 
-        // TEMP-Diagnose: prüft, ob die aus connectedDevices abgeleitete deviceId
-        // dieselbe stableUuid ergibt wie die Device-Ressource aus GET /devices.
-        if (deviceId) {
-            this.logger.info({
-                msg: '[Diag deviceId] mapping device link',
-                ga: address,
-                rawDeviceId: deviceId,
-                deviceUuid: stableUuid(deviceId),
-                connectedDevices: ga.connectedDevices,
-            });
-        }
+        // TEMP-Diagnose: feuert IMMER (auch ohne deviceId), damit sichtbar wird,
+        // ob connectedDevices am GA fehlen oder die deviceId leer bleibt.
+        this.logger.info({
+            msg: '[Diag deviceId] mapping device link',
+            ga: address,
+            gaId: ga.id,
+            rawDeviceId: deviceId,
+            deviceUuid: deviceId ? stableUuid(deviceId) : null,
+            connectedCount: ga.connectedDevices?.length ?? 0,
+        });
 
         const mapping = {
             datapointId: ga.id,

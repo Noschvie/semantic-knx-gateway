@@ -204,6 +204,39 @@ export class StateEngine {
         }
     }
 
+    /**
+     * Backfills datapoint_mappings.device_id from the semantic
+     * 'linkedToDevice' relationships. The GA↔Device link is stored as
+     * (groupAddress.id) -linkedToDevice-> (device.id), and a datapoint_mapping's
+     * datapoint_id equals the group address resource id (e.g. "GA-108").
+     *
+     * Run AFTER the TTL import (mappings + relationships must exist). Only fills
+     * rows where device_id IS NULL so existing values are never overwritten.
+     *
+     * @returns {Promise<{filled: number}>}
+     */
+    async backfillDeviceIds() {
+        try {
+            const { rowCount } = await this.db.query(`
+                UPDATE datapoint_mappings dm
+                   SET device_id = rel.object
+                  FROM semantic_relationships rel
+                 WHERE rel.predicate = 'linkedToDevice'
+                   AND rel.subject = dm.datapoint_id
+                   AND dm.device_id IS NULL
+            `);
+
+            if (rowCount > 0) {
+                this.logger.info(`[DeviceLink] Backfilled device_id for ${rowCount} datapoint mapping(s)`);
+            } else {
+                this.logger.info('[DeviceLink] No datapoint mappings needed device_id backfill');
+            }
+            return { filled: rowCount };
+        } catch (error) {
+            this.logger.warn({ msg: 'backfillDeviceIds failed', error: error.message });
+            return { filled: 0, error: error.message };
+        }
+    }
 
     /**
      * Register a datapoint mapping
