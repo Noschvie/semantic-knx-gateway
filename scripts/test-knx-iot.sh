@@ -20,7 +20,7 @@ API_URL="${API_URL:-http://localhost:3000}"
 KNX_IOT="$API_URL/api/v2"
 OAUTH_CLIENT_SECRET="${OAUTH_CLIENT_SECRET:-change-me-in-production}"
 KNX_TEST_GA_WRITE="${KNX_TEST_GA_WRITE:-8/1/1}"
-KNX_TEST_GA_TS="${KNX_TEST_GA_TS:-3/6/1}"   # WP Aussentemperatur
+KNX_TEST_GA_TS="${KNX_TEST_GA_TS:-3/6/1}"   # WP Outside temperature
 
 PASS=0
 FAIL=0
@@ -280,9 +280,9 @@ else
 fi
 echo ""
 
-echo "4e. Timeseries for WP Aussentemperatur (GA $KNX_TEST_GA_TS)..."
-# Festes Datapoint statt "erstes der Liste" => deterministischer Test.
-# -g --globoff: curl soll die eckigen Klammern in filter[ga] nicht als Globbing deuten.
+echo "4e. Timeseries for outside temperature (GA $KNX_TEST_GA_TS)..."
+# Fixed datapoint instead of "first from the list" => deterministic test.
+# -g --globoff: curl should not treat the square brackets in filter[ga] as globbing.
 TS_DP_RESULT=$(ctime "GET /datapoints?filter[ga]=$KNX_TEST_GA_TS" -g --globoff -H "$AUTH_READ" "$KNX_IOT/datapoints?filter[ga]=$KNX_TEST_GA_TS")
 TS_DP_ID=$(echo "$TS_DP_RESULT" | jq -r '.data[0].id // empty' 2>/dev/null)
 TS_DP_TITLE=$(echo "$TS_DP_RESULT" | jq -r '.data[0].attributes.title // "n/a"' 2>/dev/null)
@@ -296,10 +296,10 @@ else
   TS_COUNT=$(echo "${TS_ITEMS:-[]}" | jq 'length' 2>/dev/null)
   if [ "${TS_COUNT:-0}" -gt 0 ] 2>/dev/null; then
     ok "timeseries history: $TS_COUNT entries found"
-    echo "      Neueste 10 Messwerte:"
+    echo "      Latest 10 measurements:"
     echo "$TS_ITEMS" | jq -r '
       sort_by(.attributes.timestamp // "") | reverse | .[0:10][]
-      | "      \(.attributes.timestamp // "unbekannt") | \(if .attributes.value == null then "unbekannt" else (.attributes.value | tostring) end)"'
+      | "      \(.attributes.timestamp // "unknown") | \(if .attributes.value == null then "unknown" else (.attributes.value | tostring) end)"'
   else
     fail "timeseries history: empty for GA $KNX_TEST_GA_TS (no historical events recorded)"
   fi
@@ -330,100 +330,6 @@ if [ -n "$FIRST_GA" ] && [ "$FIRST_GA" != "null" ]; then
 else
   ok "no datapoint with GA in collection - filter[ga] test skipped"
 fi
-echo ""
-
-# ─── 4g ────────────────────────────────────────────────────────────────────────
-# 4g – Timeseries fuer WP Aussentemperatur (GA 3/6/1)
-# ─── 4g ────────────────────────────────────────────────────────────────────────
-
-echo ""
-echo "4g. Timeseries fuer WP Aussentemperatur (GA 3/6/1)"
-
-TARGET_GA="3/6/1"
-
-# Datenpunkt anhand der Gruppenadresse suchen.
-# -g --globoff verhindert, dass curl die eckigen Klammern
-# in filter[ga] als URL-Globbing interpretiert.
-DP=$(ctime "GET /datapoints?filter[ga]=$TARGET_GA" \
-  -g --globoff \
-  -H "$AUTH_READ" \
-  "$KNX_IOT/datapoints?filter[ga]=$TARGET_GA")
-
-# HTTP-Status aus der ctime-Ausgabe ermitteln.
-# Da ctime in einer Subshell aufgerufen wurde, verwenden wir
-# curl hier erneut mit einer Statuscode-Abfrage nicht direkt.
-# Stattdessen prÃ¼fen wir die erhaltene JSON-Antwort.
-if ! echo "$DP" | jq -e . >/dev/null 2>&1; then
-  fail "Datapoint lookup returned invalid JSON"
-  ((FAIL++))
-else
-  # Die API liefert hier eine JSON-API-Antwort mit data[].
-  # Die Gruppenadresse steht in meta.ga.
-  DP_INFO=$(echo "$DP" | jq -c --arg ga "$TARGET_GA" '
-    if type == "array" then
-      [.[] | select(.meta.ga == $ga)][0] // {}
-    else
-      [.data[]? | select(.meta.ga == $ga)][0] // {}
-    end
-  ')
-
-  DP_ID=$(echo "$DP_INFO" | jq -r '.id // empty')
-  DP_TITLE=$(echo "$DP_INFO" | jq -r '.title // "WP Aussentemperatur"')
-
-  if [[ -z "$DP_ID" ]]; then
-    fail "Datapoint not found for GA $TARGET_GA"
-    ((FAIL++))
-  else
-    ok "Datapoint found: $DP_TITLE (GA $TARGET_GA, ID $DP_ID)"
-
-    # Timeseries abrufen
-    TS=$(ctime "GET timeseries GA $TARGET_GA" \
-      -H "$AUTH_READ" \
-      "$KNX_IOT/datapoints/$DP_ID/timeseries")
-
-    if ! echo "$TS" | jq -e . >/dev/null 2>&1; then
-      fail "Timeseries response is not valid JSON"
-      ((FAIL++))
-    else
-      # Die API liefert ein Array auf oberster Ebene.
-      TS_ITEMS=$(echo "$TS" | jq '
-        if type == "array" then .
-        elif (.data | type) == "array" then .data
-        else []
-        end
-      ')
-
-      TS_COUNT=$(echo "$TS_ITEMS" | jq 'length')
-
-      echo ""
-      echo "   Datenpunkt: $DP_TITLE"
-      echo "   Gruppenadresse: $TARGET_GA"
-      echo "   Gesamtzahl Timeseries-EintrÃ¤ge: $TS_COUNT"
-      echo ""
-      echo "   Juengste 10 Messwerte:"
-      echo "   ──────────────────────────────────────────────────────────────────────────────"
-
-      if [[ "$TS_COUNT" -gt 0 ]]; then
-        echo "$TS_ITEMS" | jq -r '
-          .[0:10][] |
-          "   \(.attributes.timestamp // "unbekannt") | " +
-          (
-            if .attributes.value == null
-            then "unbekannt"
-            else (.attributes.value | tostring)
-            end
-          ) + " Â°C"
-        '
-
-        ok "Timeseries available: $TS_COUNT entries found"
-      else
-        warn "No historical events recorded for GA $TARGET_GA"
-        ((FAIL++))
-      fi
-    fi
-  fi
-fi
-
 echo ""
 
 # ─── 5. Devices ───────────────────────────────────────────────────────────────
@@ -517,7 +423,7 @@ if [ "${SKIP_WRITE:-false}" = "true" ]; then
   echo "   ⏭️  Skipped (SKIP_WRITE=true)"
 else
   PUT_GA="$KNX_TEST_GA_WRITE"
-  PUT_DP_RESULT=$(ctime "GET /datapoints?filter[ga] (PUT-Vorbereitung)" -g --globoff -H "$AUTH_READ" "$KNX_IOT/datapoints?filter[ga]=$PUT_GA")
+  PUT_DP_RESULT=$(ctime "GET /datapoints?filter[ga] (PUT preparation)" -g --globoff -H "$AUTH_READ" "$KNX_IOT/datapoints?filter[ga]=$PUT_GA")
   PUT_DP_ID=$(echo "$PUT_DP_RESULT" | jq -r '.data[0].id // empty')
   if [ -z "$PUT_DP_ID" ]; then
     fail "Datapoint for GA $PUT_GA not found - PUT skipped"
@@ -531,7 +437,7 @@ else
     if [[ "$PUT_HTTP" =~ ^2 ]]; then
       ok "HTTP status: $PUT_HTTP"
     else
-      fail "HTTP status (erwartet 2xx, got $PUT_HTTP)"
+      fail "HTTP status (expected 2xx, got $PUT_HTTP)"
     fi
   fi
 fi
