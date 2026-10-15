@@ -182,7 +182,7 @@ echo ""
 
 echo "2b. Stats events (last 24h)..."
 STATS_EV=$(ctime "GET /stats/events" -H "$AUTH_READ" "$KNX_IOT/stats/events?hours=24")
-check "total events" "$(echo "$STATS_EV" | jq -r '.summary.total // "0"')"
+check "total events" "$(echo "$STATS_EV" | jq -r '.summary.total_events // .summary.total // "0"')"
 echo ""
 
 echo "2c. Stats states..."
