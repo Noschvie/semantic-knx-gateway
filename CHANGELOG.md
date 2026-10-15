@@ -74,6 +74,8 @@ Unreleased
   dashboard and database startup logging while keeping the value accurate
   enough for operational summaries.
 
+- **TimescaleDB chunk size increased to 7 days** — `knx_events` and `subscription_events` now use a 7-day hypertable chunk interval in `src/storage/postgres.js`, reducing chunk count and planning overhead for high-volume event workloads while keeping the default simple and stable.
+
 2026-10-11
 ----------
 
