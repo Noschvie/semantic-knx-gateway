@@ -68,6 +68,12 @@ Unreleased
   This keeps the HTTP layer free of raw DB queries and aligns datapoint mapping
   access with the existing `StateStore` / `EventStore` abstraction pattern.
 
+- **Faster `/stats` and startup statistics** — `knx_events` counts in
+  `src/storage/postgres.js` now use `approximate_row_count('knx_events')`
+  instead of a full `COUNT(*)` scan. This avoids long delays for the
+  dashboard and database startup logging while keeping the value accurate
+  enough for operational summaries.
+
 2026-10-11
 ----------
 

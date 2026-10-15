@@ -379,7 +379,7 @@ export class PostgresClient {
      */
     async getStatistics() {
         const results = await Promise.all([
-            this.query('SELECT COUNT(*) as count FROM knx_events'),
+            this.query("SELECT approximate_row_count('knx_events') as count"),
             this.query('SELECT COUNT(*) as count FROM current_state'),
             this.query('SELECT COUNT(*) as count FROM datapoint_mappings'),
             this.query('SELECT COUNT(*) as count FROM semantic_resources'),
