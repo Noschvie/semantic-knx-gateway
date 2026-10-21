@@ -52,6 +52,12 @@ Unreleased
   `value4Ucount`/`value4Count` mappings, instead of falling through to the
   generic numeric `default` branch.
 
+- **Callback payloads for DPT 10/11 values no longer serialize as `[object Object]`** — KNX date/time datapoints decoded as objects (e.g. `{ formatted: '2026-10-21' }` or `{ formatted: '14:36:03' }`) were previously converted via `String(value)`, which produced `[object Object]` in outbound callback payloads.
+
+  **Resolution:** `src/api/routes/subscription-dispatcher.js` now serializes callback values defensively and prefers the decoded `formatted` field for structured DPT values, so date and time values are sent as clean strings instead of object placeholders.
+
+  **Impact:** Callback subscribers now receive human-readable date/time values like `2026-10-21` and `14:36:03` for DPT 11.001 / 10.001 datapoints.
+
 ### Changed
 - **Clearer diagnostics for unknown/unsupported DPTs on write**
   (`src/api/routes/datapoints.js`):
