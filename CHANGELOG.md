@@ -8,6 +8,9 @@ contributors and users to follow meaningful changes over time.
 Unreleased
 ----------
 
+2026-11-01
+----------
+
 ### Fixed
 - **`filter[deviceId]` returned no datapoints** — `GET /api/v2/datapoints?filter[deviceId]=<uuid>`
   always returned an empty collection because `datapoint_mappings.device_id` was
