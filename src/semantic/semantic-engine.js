@@ -57,6 +57,10 @@ export class SemanticEngine {
             // Map to state engine
             await this.semanticMapper.mapDatapointsToStateEngine(this.graph);
 
+            // Backfill datapoint_mappings.device_id from the 'linkedToDevice'
+            // relationships so filter[deviceId] can resolve datapoints per device.
+            await this.stateEngine.backfillDeviceIds();
+
             // Reload the StateEngine's in-memory cache after the TTL import
             await this.stateEngine.loadDatapointMappings();
 

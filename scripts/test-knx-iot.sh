@@ -8,6 +8,7 @@
 # Optional: override OAuth secret:          OAUTH_CLIENT_SECRET=mysecret ./test-knx-iot.sh
 # Optional: override read GA:               KNX_TEST_GA_READ=1/1/1 ./test-knx-iot.sh
 # Optional: override write GA:              KNX_TEST_GA_WRITE=1/1/1 ./test-knx-iot.sh
+# Optional: override timeseries GA:         KNX_TEST_GA_TS=3/6/1 ./test-knx-iot.sh
 # Optional: skip write test:                SKIP_WRITE=true ./test-knx-iot.sh
 #
 # Enhanced test messages to distinguish between:
@@ -19,6 +20,7 @@ API_URL="${API_URL:-http://localhost:3000}"
 KNX_IOT="$API_URL/api/v2"
 OAUTH_CLIENT_SECRET="${OAUTH_CLIENT_SECRET:-change-me-in-production}"
 KNX_TEST_GA_WRITE="${KNX_TEST_GA_WRITE:-8/1/1}"
+KNX_TEST_GA_TS="${KNX_TEST_GA_TS:-3/6/1}"   # WP Outside temperature
 
 PASS=0
 FAIL=0
@@ -180,7 +182,7 @@ echo ""
 
 echo "2b. Stats events (last 24h)..."
 STATS_EV=$(ctime "GET /stats/events" -H "$AUTH_READ" "$KNX_IOT/stats/events?hours=24")
-check "total events" "$(echo "$STATS_EV" | jq -r '.summary.total // "0"')"
+check "total events" "$(echo "$STATS_EV" | jq -r '.summary.total_events // .summary.total // "0"')"
 echo ""
 
 echo "2c. Stats states..."
@@ -206,7 +208,7 @@ echo ""
 
 # ─── 3. Node ──────────────────────────────────────────────────────────────────
 
-echo "3. Node..."
+echo "3a. Node..."
 NODE_RESULT=$(ctime "GET /node" -H "$AUTH_READ" "$KNX_IOT/node")
 NODE_ID=$(echo "$NODE_RESULT" | jq -r '.data.id')
 NODE_TYPE=$(echo "$NODE_RESULT" | jq -r '.data.type')
@@ -216,7 +218,7 @@ echo ""
 
 # ─── 3. Installations ─────────────────────────────────────────────────────────
 
-echo "3a. Installations..."
+echo "3b. Installations..."
 INST_RESULT=$(ctime "GET /installations" -H "$AUTH_READ" "$KNX_IOT/installations")
 INST_TOTAL=$(echo "$INST_RESULT" | jq '.data | length')
 INST_ID=$(echo "$INST_RESULT" | jq -r '.data[0].id')
@@ -248,25 +250,59 @@ else
   warn "datapointType: not defined (datapoint has no DPT)"
 fi
 
-echo "4c. Datapoints (pagination – page 0, 10 items)..."
+echo "4c. Datapoints (pagination - page 0, 10 items)..."
 DP_PAGE=$(ctime "GET /datapoints (paged)" -H "$AUTH_READ" "$KNX_IOT/datapoints?page%5Bnumber%5D=0&page%5Bsize%5D=10")
 check "page result count" "$(echo "$DP_PAGE" | jq '.data | length')"
 echo ""
 
-echo "4d. Datapoints filter by device ($DEV_ID)..."
-DEV_ID=$(ctime "GET /devices (probe)" -H "$AUTH_READ" "$KNX_IOT/devices" | jq -r '.data[0].id')
-DP_FILTERED=$(ctime "GET /datapoints?filter[deviceId]" -g --globoff -H "$AUTH_READ" "$KNX_IOT/datapoints?filter[deviceId]=$DEV_ID")
-check "filtered datapoints" "$(echo "$DP_FILTERED" | jq '.meta.collection.total')"
+echo "4d. Datapoints filter by device..."
+DEV_LIST=$(ctime "GET /devices (probe)" -H "$AUTH_READ" "$KNX_IOT/devices")
+
+# Pick the first device that actually resolves to >=1 datapoint, so the test
+# does not fail on devices without a primary GA mapping (filter is per-device).
+DEV_ID=""
+DEV_DP_TOTAL=0
+for cand in $(echo "$DEV_LIST" | jq -r '.data[].id'); do
+  CAND_TOTAL=$(ctime "GET /datapoints?filter[deviceId] (probe $cand)" -g --globoff \
+    -H "$AUTH_READ" "$KNX_IOT/datapoints?filter[deviceId]=$cand" \
+    | jq '.meta.collection.total // 0')
+  if [ "${CAND_TOTAL:-0}" -gt 0 ] 2>/dev/null; then
+    DEV_ID="$cand"
+    DEV_DP_TOTAL="$CAND_TOTAL"
+    break
+  fi
+done
+
+if [ -n "$DEV_ID" ]; then
+  ok "filtered datapoints: $DEV_DP_TOTAL for device $DEV_ID"
+else
+  warn "no device with a primary datapoint mapping found (all GAs map to other devices)"
+fi
 echo ""
 
-echo "4e. Timeseries for first datapoint..."
-TS=$(ctime "GET /datapoints/{id}/timeseries" -H "$AUTH_READ" "$KNX_IOT/datapoints/$DP_ID/timeseries")
-TS_COUNT=$(echo "$TS" | jq '.data | length')
-if [ "$TS_COUNT" -gt 0 ] 2>/dev/null; then
-  ok "timeseries history: $TS_COUNT entries found"
+echo "4e. Timeseries for outside temperature (GA $KNX_TEST_GA_TS)..."
+# Fixed datapoint instead of "first from the list" => deterministic test.
+# -g --globoff: curl should not treat the square brackets in filter[ga] as globbing.
+TS_DP_RESULT=$(ctime "GET /datapoints?filter[ga]=$KNX_TEST_GA_TS" -g --globoff -H "$AUTH_READ" "$KNX_IOT/datapoints?filter[ga]=$KNX_TEST_GA_TS")
+TS_DP_ID=$(echo "$TS_DP_RESULT" | jq -r '.data[0].id // empty' 2>/dev/null)
+TS_DP_TITLE=$(echo "$TS_DP_RESULT" | jq -r '.data[0].attributes.title // "n/a"' 2>/dev/null)
+
+if [ -z "$TS_DP_ID" ]; then
+  fail "Datapoint not found for GA $KNX_TEST_GA_TS"
 else
-  warn "timeseries history: empty (no historical events recorded for this datapoint)"
-  ((FAIL++))
+  ok "Datapoint: $TS_DP_TITLE (GA $KNX_TEST_GA_TS, ID $TS_DP_ID)"
+  TS=$(ctime "GET /datapoints/{id}/timeseries" -H "$AUTH_READ" "$KNX_IOT/datapoints/$TS_DP_ID/timeseries")
+  TS_ITEMS=$(echo "$TS" | jq -c 'if type == "array" then . elif (.data | type) == "array" then .data else [] end' 2>/dev/null)
+  TS_COUNT=$(echo "${TS_ITEMS:-[]}" | jq 'length' 2>/dev/null)
+  if [ "${TS_COUNT:-0}" -gt 0 ] 2>/dev/null; then
+    ok "timeseries history: $TS_COUNT entries found"
+    echo "      Latest 10 measurements:"
+    echo "$TS_ITEMS" | jq -r '
+      sort_by(.attributes.timestamp // "") | reverse | .[0:10][]
+      | "      \(.attributes.timestamp // "unknown") | \(if .attributes.value == null then "unknown" else (.attributes.value | tostring) end)"'
+  else
+    fail "timeseries history: empty for GA $KNX_TEST_GA_TS (no historical events recorded)"
+  fi
 fi
 echo ""
 
@@ -285,14 +321,14 @@ if [ -n "$FIRST_GA" ] && [ "$FIRST_GA" != "null" ]; then
     if [ -n "$STATE_VALUE" ] && [ "$STATE_VALUE" != "null" ]; then
       ok "  └─ Current state (value): $STATE_VALUE"
     else
-      warn "  └─ ⚠️  NO CURRENT STATE → GA exists in DB/TTL, but no current_state value recorded"
+      warn "  └─ ⚠️  NO CURRENT STATE => GA exists in DB/TTL, but no current_state value recorded"
       ((FAIL++))
     fi
   else
     fail "GA $FIRST_GA not found in database"
   fi
 else
-  ok "no datapoint with GA in collection – filter[ga] test skipped"
+  ok "no datapoint with GA in collection - filter[ga] test skipped"
 fi
 echo ""
 
@@ -382,15 +418,15 @@ echo ""
 
 # ─── 11. Write datapoint (PUT) ───────────────────────────────────────────────
 
-echo "11. Write datapoint (PUT GA $KNX_TEST_GA_WRITE – switch, value '1')..."
+echo "11. Write datapoint (PUT GA $KNX_TEST_GA_WRITE - switch, value '1')..."
 if [ "${SKIP_WRITE:-false}" = "true" ]; then
   echo "   ⏭️  Skipped (SKIP_WRITE=true)"
 else
   PUT_GA="$KNX_TEST_GA_WRITE"
-  PUT_DP_RESULT=$(ctime "GET /datapoints?filter[ga] (PUT-Vorbereitung)" -g --globoff -H "$AUTH_READ" "$KNX_IOT/datapoints?filter[ga]=$PUT_GA")
+  PUT_DP_RESULT=$(ctime "GET /datapoints?filter[ga] (PUT preparation)" -g --globoff -H "$AUTH_READ" "$KNX_IOT/datapoints?filter[ga]=$PUT_GA")
   PUT_DP_ID=$(echo "$PUT_DP_RESULT" | jq -r '.data[0].id // empty')
   if [ -z "$PUT_DP_ID" ]; then
-    fail "Datapoint for GA $PUT_GA not found – PUT skipped"
+    fail "Datapoint for GA $PUT_GA not found - PUT skipped"
   else
     ok "Datapoint UUID for GA $PUT_GA: $PUT_DP_ID"
     ctime "PUT /datapoints/values" -X PUT "$KNX_IOT/datapoints/values" \
@@ -401,7 +437,7 @@ else
     if [[ "$PUT_HTTP" =~ ^2 ]]; then
       ok "HTTP status: $PUT_HTTP"
     else
-      fail "HTTP status (erwartet 2xx, got $PUT_HTTP)"
+      fail "HTTP status (expected 2xx, got $PUT_HTTP)"
     fi
   fi
 fi

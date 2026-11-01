@@ -202,4 +202,22 @@ export class StateStore {
             source: row.source,
         };
     }
+
+    /**
+     * Get all projected datapoint mappings.
+     */
+    async getDatapointMappings() {
+        const query = `
+            SELECT datapoint_id AS "datapointId",
+                   ga,
+                   dpt,
+                   name,
+                   location_id AS "locationId",
+                   device_id AS "deviceId"
+            FROM datapoint_mappings
+        `;
+
+        const result = await this.db.query(query);
+        return result.rows ?? [];
+    }
 }

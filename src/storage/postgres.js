@@ -7,6 +7,8 @@ import { createLogger } from '../utils/logger.js';
 
 const { Pool } = pg;
 
+const TIMESCALE_CHUNK_INTERVAL = '7 days';
+
 /**
  * @typedef {Object} TransactionContext
  * @property {Function} query - Execute a query within the transaction
@@ -91,7 +93,7 @@ export class PostgresClient {
             await client.query(`
             SELECT create_hypertable('knx_events', 'ts', 
               if_not_exists => TRUE,
-              chunk_time_interval => INTERVAL '1 day'
+              chunk_time_interval => INTERVAL '${TIMESCALE_CHUNK_INTERVAL}'
             );
           `);
 
@@ -232,7 +234,7 @@ export class PostgresClient {
             await client.query(`
             SELECT create_hypertable('subscription_events', 'ts',
               if_not_exists => TRUE,
-              chunk_time_interval => INTERVAL '1 day'
+              chunk_time_interval => INTERVAL '${TIMESCALE_CHUNK_INTERVAL}'
             );
           `);
 
@@ -379,7 +381,7 @@ export class PostgresClient {
      */
     async getStatistics() {
         const results = await Promise.all([
-            this.query('SELECT COUNT(*) as count FROM knx_events'),
+            this.query("SELECT approximate_row_count('knx_events') as count"),
             this.query('SELECT COUNT(*) as count FROM current_state'),
             this.query('SELECT COUNT(*) as count FROM datapoint_mappings'),
             this.query('SELECT COUNT(*) as count FROM semantic_resources'),

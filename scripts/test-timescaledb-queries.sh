@@ -3,9 +3,19 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 # Test script for TimescaleDB queries via docker exec
 # This script tests different query variants to find a working solution
-
-# Das Skript mit dem korrekten Container ausführen:
-# bash scripts/test-timescaledb-queries.sh timescaledb knxdb knxuser
+#
+# EXPLAIN usage example (pass as 4th argument or set EXPLAIN_QUERY env):
+#
+# EXPLAIN_QUERY="SELECT * FROM knx_events \
+#   WHERE ga = '1/0/1' AND ts >= NOW() - INTERVAL '7 days' \
+#   ORDER BY ts DESC LIMIT 100;"
+#
+# Then run:
+#   bash scripts/test-timescaledb-queries.sh timescaledb knxdb knxuser "$EXPLAIN_QUERY"
+#
+# Or set via environment and save output:
+#   EXPLAIN_QUERY="..." EXPLAIN_OUTPUT=./tmp/explain.log \
+#     bash scripts/test-timescaledb-queries.sh timescaledb knxdb knxuser
 
 set -e
 
@@ -13,16 +23,30 @@ set -e
 CONTAINER_NAME="${1:-semantic-knx-runtime}"
 DB_NAME="${2:-knxdb}"
 DB_USER="${3:-knxuser}"
+# Optional: EXPLAIN query to run (pass as 4th arg or set EXPLAIN_QUERY env)
+EXPLAIN_QUERY="${4:-${EXPLAIN_QUERY:-}}"
+# Optional: path to save explain output
+EXPLAIN_OUTPUT="${EXPLAIN_OUTPUT:-}"
 
 echo "🔍 Testing TimescaleDB queries..."
 echo "Container: $CONTAINER_NAME"
 echo "Database: $DB_NAME"
+echo "User: $DB_USER"
+if [ -n "$EXPLAIN_QUERY" ]; then
+  echo "Explain Query: $EXPLAIN_QUERY"
+fi
 echo ""
 
 # Function to execute SQL in docker container
 run_sql() {
     local query="$1"
     docker exec "$CONTAINER_NAME" psql -U "$DB_USER" -d "$DB_NAME" -c "$query" 2>&1 || true
+}
+
+# Function to execute SQL and capture output (for explain)
+run_sql_capture() {
+    local query="$1"
+    docker exec -i "$CONTAINER_NAME" psql -U "$DB_USER" -d "$DB_NAME" -c "$query" 2>&1 || true
 }
 
 # Function to test if view exists
@@ -40,7 +64,7 @@ test_view_structure() {
     local schema="$1"
     local view="$2"
     echo "Testing structure of $schema.$view..."
-    run_sql "\d $schema.$view" || echo "❌ View/Table not found"
+    run_sql "\\d $schema.$view" || echo "❌ View/Table not found"
     echo ""
 }
 
@@ -62,7 +86,8 @@ echo ""
 
 echo "Test 1: Simple hypertables listing"
 echo "---"
-run_sql "SELECT table_name FROM timescaledb_information.hypertables LIMIT 5;"
+# some TimescaleDB versions expose 'hypertable_name' instead of 'table_name'
+run_sql "SELECT hypertable_name AS table_name FROM timescaledb_information.hypertables LIMIT 5;"
 echo ""
 
 echo "Test 2: Hypertables with schema info"
@@ -98,12 +123,12 @@ echo ""
 
 echo "Test 1: Check _timescaledb_catalog.hypertable structure"
 echo "---"
-run_sql "\d _timescaledb_catalog.hypertable" || echo "❌ Catalog table not available"
+run_sql "\\d _timescaledb_catalog.hypertable" || echo "❌ Catalog table not available"
 echo ""
 
 echo "Test 2: Check _timescaledb_internal.compressed_hypertable_stats"
 echo "---"
-run_sql "\d _timescaledb_internal.compressed_hypertable_stats" || echo "❌ Internal table not available"
+run_sql "\\d _timescaledb_internal.compressed_hypertable_stats" || echo "❌ Internal table not available"
 echo ""
 
 echo "Test 3: Try to get compression ratio (with error handling)"
@@ -137,6 +162,31 @@ LIMIT 5;
 "
 echo ""
 
+# New: Optional EXPLAIN (ANALYZE, BUFFERS) run if EXPLAIN_QUERY provided
+if [ -n "$EXPLAIN_QUERY" ]; then
+  echo "================================"
+  echo "5️⃣  Running EXPLAIN (ANALYZE, BUFFERS)"
+  echo "================================"
+  echo ""
+
+  # Check container
+  if ! docker ps --format '{{.Names}}' | grep -q "^$CONTAINER_NAME$"; then
+    echo "❌ Container '$CONTAINER_NAME' not found. Skipping EXPLAIN."
+  else
+    echo "Running EXPLAIN in container '$CONTAINER_NAME'..."
+    EXPLAIN_OUT=$(run_sql_capture "EXPLAIN (ANALYZE, BUFFERS) $EXPLAIN_QUERY")
+    echo "----- EXPLAIN OUTPUT -----"
+    echo "$EXPLAIN_OUT"
+    echo "--------------------------"
+
+    if [ -n "$EXPLAIN_OUTPUT" ]; then
+      mkdir -p "$(dirname "$EXPLAIN_OUTPUT")" || true
+      echo "$EXPLAIN_OUT" > "$EXPLAIN_OUTPUT"
+      echo "Saved EXPLAIN output to $EXPLAIN_OUTPUT"
+    fi
+  fi
+fi
+
 echo "================================"
 echo "Summary & Recommendations"
 echo "================================"
@@ -165,4 +215,3 @@ echo "📋 RECOMMENDED COMPRESSION RATIO QUERY:"
 echo "Return 'N/A' - compression stats are not reliably available in all TimescaleDB versions"
 echo ""
 echo "✅ Test completed!"
-

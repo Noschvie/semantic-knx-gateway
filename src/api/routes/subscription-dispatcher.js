@@ -5,6 +5,42 @@
 import { createLogger } from '../../utils/logger.js';
 import { createHmac } from 'node:crypto';
 
+function serializeCallbackValue(value) {
+    if (value === null || value === undefined) {
+        return null;
+    }
+
+    if (value instanceof Date) {
+        return value.toISOString();
+    }
+
+    if (Buffer.isBuffer(value)) {
+        return value.toString('hex');
+    }
+
+    if (value && typeof value === 'object') {
+        if (value.type === 'Buffer' && Array.isArray(value.data)) {
+            return Buffer.from(value.data).toString('hex');
+        }
+
+        if (value.formatted !== undefined && value.formatted !== null) {
+            return String(value.formatted);
+        }
+
+        try {
+            return JSON.stringify(value);
+        } catch {
+            return String(value);
+        }
+    }
+
+    if (Array.isArray(value)) {
+        return value.map(item => serializeCallbackValue(item)).join(',');
+    }
+
+    return String(value);
+}
+
 /**
  * CallbackDispatcher
  *
@@ -243,7 +279,7 @@ export class CallbackDispatcher {
                         self: `/api/v2/datapoints/${datapointId}`,
                     },
                     attributes: {
-                        value:     value !== undefined ? String(value) : null,
+                        value:     value !== undefined ? serializeCallbackValue(value) : null,
                         timestamp: timestamp ?? new Date().toISOString(),
                     },
                 },

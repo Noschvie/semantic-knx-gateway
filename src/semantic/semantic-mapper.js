@@ -185,10 +185,14 @@ export class SemanticMapper {
             return;
         }
 
+        const primaryDevice = ga.connectedDevices?.[0];
+        const deviceId = primaryDevice?.deviceId ?? primaryDevice?.uri ?? null;
+
         const mapping = {
             datapointId: ga.id,
             dpt: ga.dpt,
             name: ga.name,
+            deviceId,
             metadata: {
                 uri: ga.uri,
                 datapoints: ga.datapoints,

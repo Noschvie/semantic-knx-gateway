@@ -132,7 +132,19 @@ function applyTimeFilters(entries, filters) {
 function normalizeDpt(inputDpt) {
     if (!inputDpt) return null;
     if (/^\d+\.\d+$/.test(inputDpt)) return inputDpt; // already numeric
-    return DPT_NAME_MAP[inputDpt] || null;
+
+    const resolved = DPT_NAME_MAP[inputDpt];
+    if (resolved) return resolved;
+
+    // Unknown symbolic DPT name: log it explicitly so missing DPT_NAME_MAP
+    // entries (e.g. "value1Ucount") are immediately visible in the logs and
+    // can be added to src/utils/dpt-map.js.
+    logger.warn({
+        msg: '⚠️ Unknown DPT name – not present in DPT_NAME_MAP',
+        dpt: inputDpt,
+        hint: 'Add a mapping to the numeric DPT in src/utils/dpt-map.js, e.g. "value1Ucount": "5.010".',
+    });
+    return null;
 }
 
 function getDatapointUnionKey(item) {
@@ -144,16 +156,7 @@ function getDatapointUnionKey(item) {
 
 async function getDatapointMappings(stateEngine) {
     try {
-        const result = await stateEngine.db.query(`
-            SELECT datapoint_id AS "datapointId",
-                   ga,
-                   dpt,
-                   name,
-                   location_id  AS "locationId",
-                   device_id    AS "deviceId"
-            FROM datapoint_mappings
-        `);
-        return result.rows ?? [];
+        return await stateEngine.getDatapointMappings();
     } catch (error) {
         logger.error({ msg: 'getDatapointMappings query failed', error: error.message });
         return [];
@@ -344,11 +347,26 @@ async function writeDatapointValue(uuid, value, stateEngine, tunnelManager) {
 
     const resolvedDpt = normalizeDpt(dpt);
     if (!resolvedDpt) {
-        logger.warn({ msg: 'writeDatapointValue: unknown DPT', uuid, ga, dpt });
+        const isSymbolicName = !/^\d+\.\d+$/.test(String(dpt));
+        logger.warn({
+            msg: 'writeDatapointValue: unknown or unsupported DPT – cannot encode value for KNX',
+            uuid,
+            ga,
+            name,
+            dpt,
+            isSymbolicName,
+        });
         return {
             error: {
                 status: 400,
-                payload: knxError(400, 'Bad Request', `Unknown or unsupported DPT: ${dpt}`),
+                payload: knxError(
+                    400,
+                    'Bad Request',
+                    `Unknown or unsupported DPT: ${dpt} (GA ${ga}, "${name}")` +
+                    (isSymbolicName
+                        ? '. Symbolic name not found in DPT_NAME_MAP – add a mapping in src/utils/dpt-map.js.'
+                        : '.'),
+                ),
             },
         };
     }
