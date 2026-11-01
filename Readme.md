@@ -20,6 +20,8 @@ It is a full **semantic runtime engine**: group addresses are just transport bin
 
 ## Getting Started
 
+**Prerequisite:** Node.js **26.0.0 or later** is required for local development and running the application directly. The Docker image uses Node.js 26.
+
 **1. Clone the repository**
 
 ```bash

@@ -106,7 +106,7 @@ npm install
 
 # 2. Node.js
 node --version
-# v22.22.2 oder höher
+# v26.0.0 oder höher
 
 # 3. KNX-Gateway-Adresse + Port bekannt
 export KNX_GATEWAY_IP="192.168.1.1"
@@ -160,7 +160,7 @@ KNX Secure Integration Tests
 Spec §11: Classic & Secure Mode Scenarios
 
 ℹ semantic-knx-gateway found
-ℹ Node.js v22.22.2 found
+ℹ Node.js v26.x found
 
 ────────────────────────────────────────
 Test 1: Classic Mode (TunnelUDP)
@@ -289,7 +289,7 @@ node test-tunnel-options.js
 
 #### Fehler: `fs.existsSync is not a function`
 
-Dies kann vorkommen, wenn eine ältere Node.js-Version verwendet wird. Upgrade auf **v20+**:
+Dies kann vorkommen, wenn eine ältere Node.js-Version verwendet wird. Upgrade auf **v26.0.0 oder höher**:
 
 ```bash
 node --version
