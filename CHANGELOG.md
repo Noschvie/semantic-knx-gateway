@@ -59,6 +59,11 @@ Unreleased
   **Impact:** Callback subscribers now receive human-readable date/time values like `2026-10-21` and `14:36:03` for DPT 11.001 / 10.001 datapoints.
 
 ### Changed
+- **Updated locked npm dependencies** — Refreshed resolved package versions in
+  `package-lock.json`, including `knxultimate` 6.3.2, `ws` 8.22.1, ESLint
+  10.14.0, and `swagger-ui-dist` 5.34.1. Dependency ranges in `package.json`
+  are unchanged.
+
 - **Clearer diagnostics for unknown/unsupported DPTs on write**
   (`src/api/routes/datapoints.js`):
   - `normalizeDpt()` now logs an explicit warning when a symbolic DPT name is
